@@ -1,0 +1,157 @@
+package lixco.com.bean;
+
+import lombok.Getter;
+import lombok.Setter;
+import trong.lixco.com.bean.AbstractBean;
+import vinh.lixco.com.apiecommerce.LazadaAPIServlet;
+import vinh.lixco.com.apiecommerce.OrderDTO;
+
+import javax.faces.application.FacesMessage;
+import javax.faces.bean.ManagedBean;
+import javax.faces.bean.ViewScoped;
+import javax.faces.context.FacesContext;
+import javax.inject.Inject;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Logger;
+
+@ManagedBean
+@ViewScoped
+public class EcomOrderBean extends AbstractBean implements Serializable {
+    private static final long serialVersionUID = 1L;
+    @Getter
+    @Setter
+    private List<OrderDTO> orders = new ArrayList<>();
+    @Getter
+    @Setter
+    private OrderDTO order;
+    private static final Logger LOGGER = Logger.getLogger(EcomOrderBean.class.getName());
+    @Inject
+    private LazadaAPIServlet lazadaAPIServlet;
+
+    @Override
+    protected void initItem() {
+        orders = new ArrayList<>();
+        order = new OrderDTO();
+        order.setOrderDetails(new ArrayList<>());
+        if (lazadaAPIServlet == null) {
+            LOGGER.severe("LazadaAPIServlet is not injected");
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi hệ thống", "Không thể kết nối đến Lazada API"));
+            return;
+        }
+        try {
+            // Initialize orders from pendingUpdates
+            Map<String, OrderDTO> pendingUpdates = LazadaAPIServlet.getPendingUpdates();
+            synchronized (pendingUpdates) {
+                orders.addAll(pendingUpdates.values());
+                LOGGER.info("Đã khởi tạo danh sách đơn hàng từ pendingUpdates, tổng số: " + orders.size());
+                // Fetch details for each order
+                for (OrderDTO orderDTO : orders) {
+                    OrderDTO updatedOrder = lazadaAPIServlet.fetchOrderData(orderDTO.getOrderId());
+                    if (updatedOrder != null) {
+                        updateOrderInList(updatedOrder);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            LOGGER.severe("Lỗi khi khởi tạo danh sách đơn hàng: " + e.getMessage());
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Không thể tải danh sách đơn hàng: " + e.getMessage()));
+        }
+    }
+
+    @Override
+    protected org.jboss.logging.Logger getLogger() {
+        return org.jboss.logging.Logger.getLogger(EcomOrderBean.class);
+    }
+
+    public void updateOrderStatus() {
+        if (lazadaAPIServlet == null) {
+            LOGGER.severe("LazadaAPIServlet is not injected");
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi hệ thống", "Không thể kết nối đến Lazada API"));
+            return;
+        }
+        synchronized (orders) {
+            Map<String, OrderDTO> updates = LazadaAPIServlet.getPendingUpdates();
+            for (OrderDTO dto : orders) {
+                OrderDTO update = updates.get(dto.getOrderId());
+                if (update != null) {
+                    dto.setOrder_status(update.getOrder_status());
+                    dto.setCustomerLastName(update.getCustomerLastName());
+                    dto.setCustomerFirstName(update.getCustomerFirstName());
+                    dto.setCreatedAt(update.getCreatedAt());
+                    dto.setUpdatedAt(update.getUpdatedAt());
+                    dto.setShippingFee(update.getShippingFee());
+                    dto.setOrderDetails(update.getOrderDetails());
+                    LOGGER.info("Cập nhật trạng thái đơn hàng " + dto.getOrderId() + " thành " + update.getOrder_status());
+                    LazadaAPIServlet.clearPendingUpdate(dto.getOrderId());
+                }
+            }
+        }
+    }
+
+    public void refreshOrders() {
+        if (lazadaAPIServlet == null) {
+            LOGGER.severe("LazadaAPIServlet is not injected");
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi hệ thống", "Không thể kết nối đến Lazada API"));
+            return;
+        }
+        try {
+            updateOrderStatus(); // Update from pendingUpdates
+            Map<String, OrderDTO> pendingUpdates = LazadaAPIServlet.getPendingUpdates();
+            synchronized (orders) {
+                // Fetch details for existing orders
+                for (OrderDTO existingOrder : orders) {
+                    OrderDTO updatedOrder = lazadaAPIServlet.fetchOrderData(existingOrder.getOrderId());
+                    if (updatedOrder != null) {
+                        updateOrderInList(updatedOrder);
+                    }
+                }
+                // Add new orders from pendingUpdates
+                synchronized (pendingUpdates) {
+                    for (OrderDTO newOrder : pendingUpdates.values()) {
+                        if (orders.stream().noneMatch(o -> o.getOrderId().equals(newOrder.getOrderId()))) {
+                            OrderDTO updatedOrder = lazadaAPIServlet.fetchOrderData(newOrder.getOrderId());
+                            if (updatedOrder != null) {
+                                orders.add(updatedOrder);
+                                LOGGER.info("Thêm đơn hàng mới " + updatedOrder.getOrderId());
+                            }
+                        }
+                    }
+                }
+            }
+            LOGGER.info("Đã làm mới danh sách đơn hàng, tổng số: " + orders.size());
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_INFO, "Thành công", "Đã làm mới danh sách đơn hàng"));
+        } catch (IOException e) {
+            LOGGER.severe("Lỗi khi làm mới danh sách đơn hàng: " + e.getMessage());
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Không thể làm mới danh sách đơn hàng: " + e.getMessage()));
+        }
+    }
+
+    private void updateOrderInList(OrderDTO updatedOrder) {
+        synchronized (orders) {
+            for (int i = 0; i < orders.size(); i++) {
+                OrderDTO existingOrder = orders.get(i);
+                if (existingOrder.getOrderId().equals(updatedOrder.getOrderId())) {
+                    orders.set(i, updatedOrder);
+                    LOGGER.info("Cập nhật đơn hàng " + updatedOrder.getOrderId());
+                    return;
+                }
+            }
+            orders.add(updatedOrder);
+            LOGGER.info("Thêm đơn hàng mới " + updatedOrder.getOrderId());
+        }
+    }
+
+    public void setLazadaAPIServlet(LazadaAPIServlet lazadaAPIServlet) {
+        this.lazadaAPIServlet = lazadaAPIServlet;
+    }
+}

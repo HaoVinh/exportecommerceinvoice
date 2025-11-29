@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Nhập
+			xuất hàng đổi/bể</h3>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<span
+					style="position: absolute; right: 20px; top: 10px; z-index: 1;">
+					<p:commandLink title="Prev" update="menuformid:tabview1:group1"
+						styleClass="btnexportpos"
+						action="#{goodsImportBreakBean.nextOrPrev(0)}"
+						style="margin-right:2px;">
+						<i class="fa fa-caret-left" aria-hidden="true"></i>
+					</p:commandLink> <p:commandLink title="Prev" update="menuformid:tabview1:group1"
+						styleClass="btnexportpos"
+						action="#{goodsImportBreakBean.nextOrPrev(1)}">
+						<i class="fa fa-caret-right" aria-hidden="true"></i>
+					</p:commandLink>
+				</span>
+				<p:tabView id="tabview1" styleClass="clearfix label12 tabview_lix">
+					<p:ajax event="tabChange"
+						listener="#{goodsImportBreakBean.onTabChange}" update=":messages" />
+					<p:tab id="tab1" title="Chi tiết phiếu nhập/xuất">
+						<h:panelGroup id="group1" style="margin:10px">
+							<div class="col-md-12" style="background-color: #eeeeee;">
+								<div class="col-md-8">
+									<div class="row" style="margin-top: 10px;">
+										<div class="nhapsp">
+											<span class="fa fa-search"></span>
+											<p:autoComplete style="width:98%;" id="completesp"
+												placeholder="Nhập mã, tên sản phẩm"
+												value="#{goodsImportBreakBean.goodsImportBreakDetailCrud.product}"
+												queryDelay="900" maxResults="200" scrollHeight="250"
+												converter="abstractConverter" minQueryLength="2"
+												completeMethod="#{goodsImportBreakBean.completeProduct}"
+												var="p" itemLabel="#{p.product_name}" itemValue="#{p}"
+												forceSelection="true" onclick="this.select();">
+												<p:column style="width:80px">
+													<h:outputText value="#{p.product_code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{p.product_name}" />
+												</p:column>
+												<p:ajax process="@this" event="itemSelect"
+													listener="#{goodsImportBreakBean.addGoodsImportBreakDetail()}"
+													update="tablect,@this,messages" />
+											</p:autoComplete>
+										</div>
+									</div>
+									<div class="row" style="margin-top: 15px; margin-bottom: 20px;">
+										<p:dataTable
+											value="#{goodsImportBreakBean.goodsImportBreakDetails}"
+											paginatorPosition="bottom" rowsPerPageTemplate="50,60,70"
+											rowIndexVar="index" styleClass="tablenhapsp tableright1"
+											rows="30" scrollable="true" scrollHeight="300"
+											paginator="true" rowKey="#{item.id==0?item.minv :item.id}"
+											id="tablect" widgetVar="tablect" resizableColumns="true"
+											var="item">
+											<p:column headerText="" width="20" styleClass="textcenter">
+												<p:commandLink update="tablect,messages"
+													styleClass="trash_del" process="@this"
+													actionListener="#{goodsImportBreakBean.deleteGoodsImportBreakDetail(item)}">
+													<span class="fa fa-trash-o"></span>
+													<p:confirm icon="ui-icon-alert" />
+												</p:commandLink>
+											</p:column>
+											<p:column headerText="STT" width="15" styleClass="textcenter">
+												<h:outputText value="#{index+1}" />
+											</p:column>
+											<p:column headerText="ID" width="40" styleClass="textcenter">
+												<h:outputText value="#{item.id}" />
+											</p:column>
+											<p:column headerText="Mã SP" width="30">
+												<h:outputText value="#{item.product.product_code}" />
+											</p:column>
+											<p:column headerText="Sản phẩm" width="230">
+												<h:outputText style="white-space: initial;"
+													value="#{item.product.product_name}" />
+											</p:column>
+											<p:column headerText="Số lượng" width="50"
+												style="text-align:right">
+												<p:inputNumber value="#{item.quantity}"
+													styleClass="fix_width100" decimalPlaces="2"
+													decimalSeparator="," thousandSeparator=".">
+													<p:ajax update="idthanhtien"
+														listener="#{goodsImportBreakBean.ajaxt_total(item)}" />
+												</p:inputNumber>
+											</p:column>
+											<p:column headerText="Đơn giá" width="50"
+												style="text-align:right">
+												<p:inputNumber value="#{item.price}"
+													styleClass="fix_width100" decimalPlaces="0"
+													decimalSeparator="," thousandSeparator=".">
+													<p:ajax update="idthanhtien"
+														listener="#{goodsImportBreakBean.ajaxt_total(item)}" />
+												</p:inputNumber>
+											</p:column>
+											<p:column headerText="Thành tiền" width="60"
+												style="text-align:right">
+												<p:inputNumber id="idthanhtien" value="#{item.total}"
+													styleClass="inputtextpl" decimalPlaces="0"
+													decimalSeparator="," thousandSeparator=".">
+												</p:inputNumber>
+											</p:column>
+										</p:dataTable>
+									</div>
+									<div class="row"></div>
+								</div>
+								<div class="col-md-4" style="background-color: white;">
+									<div class="row" style="margin-top: 10px;">
+										<div class="col-md-5">
+											<label>Số chứng từ<span style="color: red;">*</span></label>
+											<p:inputText
+												value="#{goodsImportBreakBean.goodsImportBreakCrud.importCode}" />
+										</div>
+										<div class="col-md-7">
+											<label>ID</label>
+											<p:inputText disabled="true"
+												value="#{goodsImportBreakBean.goodsImportBreakCrud.id}" />
+										</div>
+									</div>
+									<div class="row" style="margin-top: 10px;">
+										<div class="col-md-5">
+											<label>Ngày<span style="color: red;">*</span></label>
+											<p:calendar
+												value="#{goodsImportBreakBean.goodsImportBreakCrud.importDate}"
+												pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+												showButtonPanel="true" />
+										</div>
+										<div class="col-md-7">
+											<label>Nhân viên tạo</label>
+											<div class="usernhapsp">
+												<span class="fa fa-user-circle-o"></span>
+												<p:inputText disabled="true"
+													value="#{goodsImportBreakBean.goodsImportBreakCrud.createdBy}" />
+											</div>
+										</div>
+									</div>
+									<div class="row" style="margin-top: 10px;">
+										<div class="col-md-12">
+											<div class="col-md-5 pdright3">
+												<label>Nhập/xuất<span style="color: red;">*</span></label>
+												<p:selectOneMenu
+													value="#{goodsImportBreakBean.goodsImportBreakCrud.loaiPhieu}"
+													effect="fade" style="width:100%;">
+													<f:selectItem itemLabel="Nhập" itemValue="N" />
+													<f:selectItem itemLabel="Xuất" itemValue="X" />
+												</p:selectOneMenu>
+											</div>
+											<div class="col-md-7 pdnone">
+												<label>Số xe<span style="color: red;">*</span></label>
+												<p:inputText
+													value="#{goodsImportBreakBean.goodsImportBreakCrud.soxe}" />
+											</div>
+										</div>
+
+									</div>
+									<div class="row" style="margin-top: 10px;">
+										<div class="col-md-12">
+											<label>Khách hàng<span style="color: red;">*</span></label>
+											<div class="nhapnpp">
+												<span class="fa fa-search"></span>
+												<p:autoComplete style="width:100%;"
+													placeholder="Nhập mã/tên khách hàng"
+													value="#{goodsImportBreakBean.goodsImportBreakCrud.customer}"
+													queryDelay="900" maxResults="200"
+													converter="abstractConverter" minQueryLength="2"
+													completeMethod="#{goodsImportBreakBean.completeCustomer}"
+													var="p" itemLabel="#{p.customer_name}" itemValue="#{p}"
+													forceSelection="true" onclick="this.select();">
+													<p:column style="width:50px">
+														<h:outputText value="#{p.customer_code}" />
+													</p:column>
+													<p:column style="width:150px">
+														<h:outputText value="#{p.customer_name}" />
+													</p:column>
+												</p:autoComplete>
+											</div>
+										</div>
+									</div>
+
+									<div class="row" style="margin-top: 10px;">
+										<div class="col-md-12">
+											<label>Ghi chú</label>
+											<p:inputTextarea rows="3"
+												value="#{goodsImportBreakBean.goodsImportBreakCrud.note}" />
+										</div>
+									</div>
+									<div class="row" style="margin-top: 10px;">
+										<p:separator />
+									</div>
+									<div class="row" style="margin: 10px 0px; text-align: center;">
+										<p:commandLink styleClass="btn_primmary"
+											action="#{goodsImportBreakBean.saveOrUpdateReceiptNote()}"
+											update="menuformid:tabview1:group1,menuformid:tabview1:tablect,menuformid:tabview1:tablesp">
+											<i class="fa fa-floppy-o" aria-hidden="true"></i>
+											<span>Lưu/Cập nhật</span>
+										</p:commandLink>
+										<p:commandLink styleClass="btn_new"
+											action="#{goodsImportBreakBean.createNew()}"
+											update="menuformid:tabview1:group1,menuformid:tabview1:tablect,menuformid:tabview1:tablesp"
+											style="margin-left:10px;">
+											<i class="fa fa-file-o" aria-hidden="true"></i>
+											<span>Tạo mới</span>
+										</p:commandLink>
+										<p:commandLink styleClass="btn_printtt"
+											action="#{goodsImportBreakBean.exportGoodsReceiptNew()}"
+											update="menuformid:tabview1:group1,menuformid:tabview1:tablect,menuformid:tabview1:tablesp"
+											style="margin-left:10px;">
+											<i class="fa fa-print" aria-hidden="true"></i>
+											<span>In</span>
+										</p:commandLink>
+									</div>
+								</div>
+							</div>
+						</h:panelGroup>
+					</p:tab>
+					<p:tab id="tab2" title="Danh sách phiếu nhập/xuất">
+						<div class="col-md-12"
+							style="padding-left: 0px !important; padding-right: 0px !important; background-color: #eeeeee;">
+							<p:fieldset id="searchform"
+								style="margin-bottom:10px;background:#3c8dbc">
+								<div class="row">
+									<div class="ui-g">
+										<div class="ui-md-6 ui-sm-12 ">
+											<div class="ui-g">
+												<div class="ui-md-8 ui-sm-12 ">
+													<div class="nhapdlg">
+														<span class="fa fa-search" />
+														<p:remoteCommand name="searchEnter"
+															actionListener="#{goodsImportBreakBean.search()}"
+															update="tablesp" />
+														<p:inputText
+															placeholder="Tìm theo số chứng từ, khách hàng, sản phẩm,.."
+															id="inputsearch" style="width:100%;"
+															value="#{goodsImportBreakBean.stextStr}"
+															onkeypress="if (event.keyCode === 13) { searchEnter(); return false; }">
+														</p:inputText>
+													</div>
+												</div>
+												<div class="ui-md-4 ui-sm-12 ">
+													<p:commandLink id="idorder" styleClass="btn_primmary"
+														immediate="true"
+														style="margin-left:5px; margin-right:0px;height:28px !important;line-height:28px !important;">
+														<i class="fa fa-search" aria-hidden="true"></i>
+														<span>Lọc nâng cao</span>
+													</p:commandLink>
+												</div>
+											</div>
+										</div>
+										<div class="ui-md-6 ui-sm-12">
+											<div style="float: right">
+												<p:commandLink styleClass="btn_destroy"
+													style="margin-left:2px; margin-right:0px;height:29px !important;line-height:29px !important;"
+													update="menuformid:tabview1:tablesp,messages"
+													disabled="#{goodsImportBreakBean.goodsImportBreakCrud.id==0}"
+													action="#{goodsImportBreakBean.deleteGoodsImportBreak()}"
+													title="Xóa phiếu">
+													<i class="fa fa-trash" aria-hidden="true"></i>
+													<span>Xóa</span>
+												</p:commandLink>
+
+												<p:commandLink styleClass="btn_download" update=":messages"
+													ajax="false" target="_blank"
+													style="margin-left:5px;background-color: #149d0f !important;"
+													title="Xuất danh sách ra excel"
+													action="#{goodsImportBreakBean.exportExcelTongHop()}">
+													<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+													<span>Xuất file excel</span>
+												</p:commandLink>
+											</div>
+										</div>
+									</div>
+								</div>
+								<p:overlayPanel id="imagePanel" for="idorder" hideEffect="fade"
+									dismissable="false" widgetVar="panelsearch"
+									style="width:360px;">
+									<div class="col-md-12"
+										style="padding-top: 10px !important; padding-left: 0px !important; padding-right: 0px !important;">
+										<div class="row">
+											<div class="col-md-6">
+												<label>Từ ngày</label>
+												<p:calendar value="#{goodsImportBreakBean.fromDateSearch}"
+													pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+													showButtonPanel="true" />
+											</div>
+											<div class="col-md-6">
+												<label>Đến ngày</label>
+												<p:calendar value="#{goodsImportBreakBean.toDateSearch}"
+													pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+													showButtonPanel="true" />
+											</div>
+											<div class="col-md-12">
+												<label>Khách hàng</label>
+												<div class="nhapdlg">
+													<span class="fa fa-search"></span>
+													<p:autoComplete style="width:100%;"
+														placeholder="Tìm nhà cung cấp"
+														value="#{goodsImportBreakBean.customerSearch}"
+														maxResults="200" converter="abstractConverter"
+														minQueryLength="2" queryDelay="900"
+														completeMethod="#{goodsImportBreakBean.completeCustomer}"
+														var="p" itemLabel="#{p.customer_name}" itemValue="#{p}"
+														forceSelection="true" onclick="this.select();">
+														<p:column style="width:50px">
+															<h:outputText value="#{p.customer_code}" />
+														</p:column>
+														<p:column style="width:150px">
+															<h:outputText value="#{p.customer_name}" />
+														</p:column>
+													</p:autoComplete>
+												</div>
+											</div>
+										</div>
+										<div class="col-md-12"
+											style="margin: 10px; margin-right: 15px">
+											<div class="pull-right">
+												<p:commandLink styleClass="btn_new" process="searchform"
+													update="menuformid:tabview1:tablesp"
+													style="margin-left:5px;"
+													title="Lọc dữ liệu theo điều kiện lọc ở trên"
+													oncomplete="PF('panelsearch').hide();"
+													action="#{goodsImportBreakBean.search()}">
+													<i class="fa fa-search" aria-hidden="true"></i>
+													<span>Lọc</span>
+												</p:commandLink>
+											</div>
+										</div>
+									</div>
+								</p:overlayPanel>
+							</p:fieldset>
+							<p:sticky target="searchform" />
+							<div class="row"
+								style="margin-top: 5px; margin-bottom: 25px; margin-left: 16px !important; margin-right: 16px !important;">
+								<p:dataTable value="#{goodsImportBreakBean.goodsImportBreaks}"
+									paginatorPosition="bottom" styleClass="tablenhapsp"
+									style="width:100%;" paginator="true" rowKey="#{item.id}"
+									id="tablesp" widgetVar="tablesp"
+									selection="#{goodsImportBreakBean.goodsImportBreakSelect}"
+									selectionMode="single" resizableColumns="true" var="item">
+									<p:ajax event="rowSelect"
+										listener="#{goodsImportBreakBean.loadGoodsImportBreak()}"
+										update="menuformid:tabview1:group1,menuformid:tabview1:searchform" />
+									<p:column headerText="ID" width="30" styleClass="textcenter">
+										<h:outputText value="#{item.id}" />
+									</p:column>
+									<p:column headerText="Số chứng từ" width="60"
+										styleClass="textcenter">
+										<h:outputText value="#{item.importCode}" />
+									</p:column>
+									<p:column headerText="Ngày nhập" width="60">
+										<h:outputText value="#{item.importDate}">
+											<f:convertDateTime pattern="dd/MM/yyyy" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="Khách hàng" width="190">
+										<h:outputText style="white-space: initial;"
+											value="#{item.customer.customer_name}" />
+									</p:column>
+									<p:column headerText="Loại phiếu" width="50">
+										<h:outputText style="white-space: initial;"
+											value="#{item.loaiPhieu}" />
+									</p:column>
+									<p:column headerText="Ghi chú" width="200">
+										<h:outputText style="white-space: initial;"
+											value="#{item.note}" />
+									</p:column>
+								</p:dataTable>
+							</div>
+						</div>
+					</p:tab>
+				</p:tabView>
+			</h:form>
+		</div>
+	</ui:define>
+</ui:composition>

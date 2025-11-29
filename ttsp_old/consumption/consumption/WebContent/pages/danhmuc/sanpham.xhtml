@@ -1,0 +1,682 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3 class="titleform">Danh mục sản phẩm</h3>
+		<p:separator />
+		<h:form id="menuformid">
+			<div class="col-md-12"
+				style="padding-left: 0px !important; height: 100%; padding-right: 0px !important; background-color: #eeeeee; padding-top: 15px;">
+				<div class="col-md-12">
+					<p:fieldset id="searchform"
+						style="margin-bottom:10px;background:#3c8dbc">
+						<div class="row">
+							<div class="ui-g">
+								<div class="ui-md-6 ui-sm-12 ">
+									<div class="ui-g">
+										<div class="ui-md-8 ui-sm-12 ">
+											<div class="nhapdlg">
+												<span class="fa fa-search" />
+												<p:remoteCommand name="searchEnter"
+													actionListener="#{productBean.search()}" update="tablesp" />
+												<p:inputText
+													placeholder="Tìm theo mã sản phẩm, tên sản phẩm, loại sản phẩm,.."
+													id="inputsearch" style="width:100%;"
+													value="#{productBean.stextStr}"
+													onkeypress="if (event.keyCode === 13) { searchEnter(); return false; }">
+												</p:inputText>
+											</div>
+										</div>
+										<div class="ui-md-4 ui-sm-12 ">
+											<p:commandLink id="idorder" styleClass="btn_primmary"
+												immediate="true"
+												style="margin-left:5px; margin-right:0px;height:28px !important;line-height:28px !important;">
+												<i class="fa fa-search" aria-hidden="true"></i>
+												<span>Lọc nâng cao</span>
+											</p:commandLink>
+										</div>
+									</div>
+								</div>
+								<div class="ui-md-6 ui-sm-12">
+									<div style="float: right">
+										<p:commandLink styleClass="btn_destroy"
+											style="margin-left:1px;height:28px !important;line-height:28px !important;"
+											update=":messages,menuformid"
+											disabled="#{productBean.productCrud==null}"
+											action="#{productBean.delete()}" title="Xóa sản phẩm">
+											<i class="fa fa-trash" aria-hidden="true"></i>
+											<span>Xóa</span>
+											<p:confirm icon="ui-icon-alert" />
+										</p:commandLink>
+										<p:commandLink styleClass="btn_primmary"
+											style="margin-left:5px;height:28px !important;line-height:28px !important;"
+											update="editdetail" title="Thêm mới sản phẩm"
+											action="#{productBean.showDialog()}">
+											<i class="fa fa-plus" aria-hidden="true"></i>
+											<span>Thêm mới</span>
+										</p:commandLink>
+										<p:commandLink styleClass="btn_new"
+											style="margin-left:5px;height:28px !important;line-height:28px !important;"
+											update="editdetail" title="Chỉnh sửa sản phẩm"
+											oncomplete="PF('dlg1').show();"
+											action="#{productBean.showDialogEdit()}">
+											<i class="fa fa-edit" aria-hidden="true"></i>
+											<span>Chỉnh sửa</span>
+										</p:commandLink>
+										<p:commandLink styleClass="btn_new"
+											style="margin-left:5px;height:28px !important;line-height:28px !important;"
+											update=":messages,menuformid"
+											title="Nạp sản phẩm từ file excel"
+											rendered="#{sessionScope.database eq 'HO CHI MINH'}"
+											oncomplete="PF('dlnapsanpham').show();">
+											<i class="fa fa-edit" aria-hidden="true"></i>
+											<span>Nạp excel</span>
+										</p:commandLink>
+
+										<p:commandLink styleClass="btn_printtt"
+											style="margin-left:5px;height:28px !important;line-height:28px !important;"
+											update="editdetail" process="@this" ajax="false"
+											title="Xuất sản phẩm trong danh sách được chọn"
+											target="blank_" action="#{productBean.exportExcel()}">
+											<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+											<span>Xuất excel</span>
+										</p:commandLink>
+										<p:commandLink styleClass="btn_destroy"
+											style="margin-left:1px;height:28px !important;line-height:28px !important;"
+											update=":messages,menuformid"
+											rendered="#{sessionScope.database eq 'HO CHI MINH'}"
+											action="#{productBean.dongbo()}"
+											title="Đồng bộ dữ liệu sản phẩm qua chi nhánh (BD,BN)">
+											<i class="fa fa-sync" aria-hidden="true"></i>
+											<span>Đồng bộ (#{productBean.dongBo.time})</span>
+										</p:commandLink>
+										<p:commandLink process="@this"
+											onclick="PF('dlthongbaospmoi').show();"
+											title="Thông báo SP mới" styleClass="btn_printtt"
+											style="margin-left:5px;">
+											<i class="fa fa-print" aria-hidden="true"></i>
+											<span>Thông báo SP mới</span>
+										</p:commandLink>
+										<p:commandLink styleClass="btn_destroy"
+											style="margin-left:1px;height:28px !important;line-height:28px !important;"
+											update=":messages,menuformid" rendered="false"
+											action="#{productBean.capnhatSPKM()}">
+											<span>Cập nhật SPKM</span>
+											<p:confirm
+												message="Lưu ý: Tất cả dữ liệu KM đã có sẽ cập nhật lại theo bộ cài đặt mới."
+												icon="ui-icon-alert" />
+										</p:commandLink>
+									</div>
+								</div>
+							</div>
+						</div>
+						<p:overlayPanel id="imagePanel" for="idorder" hideEffect="fade"
+							dismissable="false" widgetVar="panelsearch" style="width:360px;">
+							<div class="col-md-12"
+								style="border: 1px solid #ccc; border-radius: 6px; margin-bottom: 5px !important; padding-bottom: 5px !important;">
+								<div class="col-md-12"
+									style="padding-top: 10px !important; padding-left: 0px !important; padding-right: 0px !important;">
+									<div class="row">
+										<div class="col-md-12">
+											<label>Nhóm SP(Com)</label>
+											<p:autoComplete style="width:100%;"
+												value="#{productBean.productCom}" maxResults="20"
+												converter="abstractConverter" minQueryLength="3"
+												queryDelay="900" dropdown="true"
+												completeMethod="#{abstractAutoComplete.completeProductComs}"
+												var="p" itemLabel="#{p.pcom_name}" itemValue="#{p}"
+												forceSelection="true" onclick="this.select();">
+												<p:column style="width:20px">
+													<h:outputText value="#{p.id}" />
+												</p:column>
+												<p:column style="width:50px">
+													<h:outputText value="#{p.pcom_code}" />
+												</p:column>
+												<p:column style="width:150px">
+													<h:outputText value="#{p.pcom_name}" />
+												</p:column>
+											</p:autoComplete>
+										</div>
+										<div class="col-md-12">
+											<label>Loại sản phẩm</label>
+											<div class="nhapdlg">
+												<span class="fa fa-search"></span>
+												<p:autoComplete style="width:100%;"
+													value="#{productBean.productType}" maxResults="50"
+													converter="abstractConverter" minQueryLength="3"
+													queryDelay="900" dropdown="true"
+													completeMethod="#{abstractAutoComplete.completeProductTypes}"
+													var="p" itemLabel="#{p.name}" itemValue="#{p}"
+													forceSelection="true" onclick="this.select();">
+													<p:column style="width:20px">
+														<h:outputText value="#{p.id}" />
+													</p:column>
+													<p:column style="width:50px">
+														<h:outputText value="#{p.code}" />
+													</p:column>
+													<p:column style="width:150px">
+														<h:outputText value="#{p.name}" />
+													</p:column>
+												</p:autoComplete>
+											</div>
+										</div>
+
+									</div>
+								</div>
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important; margin-bottom: 5px;">
+								<div class="pull-right">
+									<p:commandButton value="Lọc" process="imagePanel"
+										icon="ui-icon-search" oncomplete="PF('panelsearch').hide()"
+										actionListener="#{productBean.search()}" update="tablesp" />
+								</div>
+							</div>
+						</p:overlayPanel>
+					</p:fieldset>
+					<p:sticky target="searchform" />
+
+					<p:dataTable value="#{productBean.listProduct}"
+						filteredValue="#{productBean.listProductFilters}"
+						paginatorPosition="bottom" styleClass="tablenhapsp tableright1"
+						paginator="true" rowKey="#{item.id}" id="tablesp" rows="50"
+						rowsPerPageTemplate="50,100,200" style="width:100%"
+						widgetVar="tablesp" selection="#{productBean.productSelect}"
+						selectionMode="single" resizableColumns="true" var="item">
+						<p:ajax event="rowDblselect" oncomplete="PF('dlg1').show();"
+							listener="#{productBean.showDialogEdit()}" update="editdetail" />
+						<p:column style="width:20px" styleClass="textcenter"
+							toggleable="false">
+							<f:facet name="header">
+								<p:selectBooleanCheckbox value="#{productBean.chonhet}">
+									<p:ajax update="@(.stchoose)" process="@this"
+										listener="#{productBean.chonHetMT()}" />
+								</p:selectBooleanCheckbox>
+							</f:facet>
+							<p:selectBooleanCheckbox value="#{item.chonphieu}"
+								styleClass="stchoose">
+								<p:ajax process="@this" />
+							</p:selectBooleanCheckbox>
+						</p:column>
+						<p:column headerText="ID" width="40" styleClass="textcenter">
+							<h:outputText value="#{item.id}" />
+						</p:column>
+						<p:column headerText="Mã SP" width="40"
+							filterFunction="#{abstractCustomFilter.filterByText}"
+							filterBy="#{item.product_code}">
+							<h:outputText value="#{item.product_code}" />
+						</p:column>
+						<p:column headerText="Tên sản phẩm" width="250"
+							filterFunction="#{abstractCustomFilter.filterByText}"
+							filterBy="#{item.product_name}">
+							<h:outputText value="#{item.product_name}"
+								style="white-space: initial;" />
+						</p:column>
+						<p:column headerText="ĐVT" width="50">
+							<h:outputText value="#{item.unit}" />
+						</p:column>
+						<p:column headerText="Thùng/pallet" width="60">
+							<h:outputText value="#{item.box_quantity}" />
+						</p:column>
+						<p:column headerText="Qui cách" width="60">
+							<h:outputText value="#{item.specification}" />
+						</p:column>
+						<p:column headerText="HS qui đổi" width="60">
+							<h:outputText value="#{item.factor }" />
+						</p:column>
+						<p:column headerText="Sản phẩm Com" width="150"
+							filterFunction="#{abstractCustomFilter.filterByText}"
+							filterBy="#{item.product_com.pcom_name}">
+							<h:outputText value="#{item.product_com.pcom_name}"
+								style="white-space: initial;" />
+						</p:column>
+						<p:column headerText="Loại sản phẩm" width="150"
+							filterFunction="#{abstractCustomFilter.filterByText}"
+							filterBy="#{item.product_type.name}">
+							<h:outputText value="#{item.product_type.name}" />
+						</p:column>
+						<p:column headerText="Nhóm sản phẩm" width="150"
+							filterFunction="#{abstractCustomFilter.filterByText}"
+							filterBy="#{item.product_group.name}">
+							<h:outputText value="#{item.product_group.name}" />
+						</p:column>
+						<p:column headerText="Mã SP cũ" width="50"
+							filterFunction="#{abstractCustomFilter.filterByText}"
+							filterBy="#{item.maspcu}">
+							<h:outputText value="#{item.maspcu}" />
+						</p:column>
+						<p:column headerText="Tên SP com" width="150"
+							filterFunction="#{abstractCustomFilter.filterByText}"
+							filterBy="#{item.tensp_com}">
+							<h:outputText value="#{item.tensp_com}" />
+						</p:column>
+						<p:column headerText="Mã lever" width="70"
+							filterFunction="#{abstractCustomFilter.filterByText}"
+							filterBy="#{item.lever_code}">
+							<h:outputText value="#{item.lever_code}" />
+						</p:column>
+						<p:column headerText="TCKT" width="70"
+							filterFunction="#{abstractCustomFilter.filterByText}"
+							filterBy="#{item.tckt}">
+							<h:outputText value="#{item.tckt}" />
+						</p:column>
+					</p:dataTable>
+				</div>
+			</div>
+		</h:form>
+		<p:dialog styleClass="dialogcommon" resizable="true" modal="true"
+			closeOnEscape="true" blockScroll="true" maximizable="true"
+			style="max-width: 900px;" minimizable="true" fitViewport="true"
+			header="Chi tiết sản phẩm" widgetVar="dlg1" draggable="true">
+			<h:form id="editdetail" style="width:100%;">
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important;">
+					<div class="col-md-6">
+						<div class="row">
+							<div class="col-md-6"
+								style="padding-left: 0px !important; padding-right: 5px !important;">
+								<label>Mã sản phẩm<span style="color: red;">*</span></label>
+								<p:inputText value="#{productBean.productCrud.product_code}"
+									style="width:100%" />
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 5px !important; padding-right: 0px !important;">
+								<label>Mã lever</label>
+								<p:inputText value="#{productBean.productCrud.lever_code}" />
+							</div>
+
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<label>Tên sản phẩm<span style="color: red;">*</span></label>
+								<p:inputText value="#{productBean.productCrud.product_name}"
+									style="width:100%" />
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 0px !important; padding-right: 5px !important;">
+								<label>Loại sản phẩm</label>
+								<p:selectOneMenu value="#{productBean.productCrud.product_type}"
+									converter="abstractConverter" effect="fade" var="t"
+									style="width:100%;">
+									<f:selectItem itemLabel="--select--" itemValue="#{null}" />
+									<f:selectItems value="#{productBean.listProductType}"
+										var="theme" itemLabel="#{theme.name}" itemValue="#{theme}" />
+									<p:column width="40">
+										<h:outputText value="#{t.code}" />
+									</p:column>
+									<p:column width="150">
+										<h:outputText style="white-space: initial;"
+											value="#{t==null ? '--select--' :t.name}" />
+									</p:column>
+								</p:selectOneMenu>
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 5px !important; padding-right: 0px !important;">
+								<label>Nhóm sản phẩm</label>
+								<p:selectOneMenu
+									value="#{productBean.productCrud.product_group}"
+									converter="abstractConverter" effect="fade" var="t"
+									style="width:100%;">
+									<f:selectItem itemLabel="--select--" itemValue="#{null}" />
+									<f:selectItems value="#{productBean.listProductGroup}"
+										var="theme" itemLabel="#{theme.name}" itemValue="#{theme}" />
+									<p:column width="40">
+										<h:outputText value="#{t.code}" />
+									</p:column>
+									<p:column width="150">
+										<h:outputText style="white-space: initial;"
+											value="#{t==null ? '--select--' : t.name}" />
+									</p:column>
+								</p:selectOneMenu>
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<label>Sản phẩm com<span style="color: red;">*</span></label>
+								<p:autoComplete style="width:100%;"
+									value="#{productBean.productCrud.product_com}"
+									converter="abstractConverter" minQueryLength="2"
+									completeMethod="#{productBean.autoCompleteProductCom}" var="p"
+									itemLabel="#{p.pcom_name}" itemValue="#{p}"
+									forceSelection="true" onclick="this.select();">
+									<p:column style="width:50px">
+										<h:outputText value="#{p.pcom_code}" />
+									</p:column>
+									<p:column style="width:150px">
+										<h:outputText value="#{p.pcom_name}" />
+									</p:column>
+								</p:autoComplete>
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<label>Tên sản phẩm(Tiếng Anh)</label>
+								<p:inputText value="#{productBean.productCrud.en_name}"
+									style="width:100%" />
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<label>Tên sản phẩm khai báo hải quan</label>
+								<p:inputText value="#{productBean.productCrud.customs_name}"
+									style="width:100%" />
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<label>Thông tin ghi trên Packing List</label>
+								<p:inputText value="#{productBean.productCrud.product_info}"
+									style="width:100%" />
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<label>Nhóm sản phẩm khuyến mãi</label>
+								<p:autoComplete style="width:100%;"
+									value="#{productBean.productCrud.promotion_product_group}"
+									converter="abstractConverter" minQueryLength="2"
+									queryDelay="1000" maxResults="250"
+									completeMethod="#{productBean.completePromotionProductGroup}"
+									var="p" itemLabel="#{p.name}" itemValue="#{p}"
+									forceSelection="true" onclick="this.select();">
+									<f:attribute name="sizep" value="#{250}"></f:attribute>
+									<p:column style="width:50px">
+										<h:outputText value="#{p.code}" />
+									</p:column>
+									<p:column style="width:150px">
+										<h:outputText value="#{p.name}" />
+									</p:column>
+								</p:autoComplete>
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 0px !important; padding-right: 5px !important;">
+								<label>Đơn vị tính</label>
+								<p:inputText value="#{productBean.productCrud.unit}"
+									style="width:100%" />
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 5px !important; padding-right: 0px !important;">
+								<label>Đơn vị tính bao bì</label>
+								<p:inputText value="#{productBean.productCrud.packing_unit}"
+									style="width:100%" />
+							</div>
+
+						</div>
+					</div>
+					<div class="col-md-6">
+						<div class="row">
+							<div class="col-md-6"
+								style="padding-left: 0px !important; padding-right: 5px !important;">
+								<label>Số thùng/pallet</label>
+								<p:inputNumber value="#{productBean.productCrud.box_quantity}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="3"
+									decimalSeparator="," thousandSeparator="." />
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 5px !important; padding-right: 0px !important;">
+								<label>Qui cách đóng gói</label>
+								<p:inputNumber value="#{productBean.productCrud.specification}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="3"
+									decimalSeparator="," thousandSeparator="." />
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 0px !important; padding-right: 5px !important;">
+								<label>Trọng lượng(kg)/đơn vị sp</label>
+								<p:inputNumber value="#{productBean.productCrud.factor}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="5"
+									decimalSeparator="," thousandSeparator="." />
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 5px !important; padding-right: 0px !important;">
+								<label>Trọng lượng thùng + bao bì trong thùng(kg)</label>
+								<p:inputNumber value="#{productBean.productCrud.tare}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="3"
+									decimalSeparator="," thousandSeparator="." />
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 0px !important; padding-right: 5px !important;">
+								<label>Sản phẩm KM(đi kèm sản phẩm bán)</label>
+								<p:autoComplete style="width:100%;" disabled="true"
+									value="#{productBean.productCrud.promotion_product}"
+									converter="abstractConverter" minQueryLength="2"
+									completeMethod="#{productBean.completeProduct}" var="p"
+									itemLabel="#{p.product_name}" itemValue="#{p}"
+									forceSelection="true" onclick="this.select();">
+									<p:column style="width:50px">
+										<h:outputText value="#{p.product_code}" />
+									</p:column>
+									<p:column style="width:150px">
+										<h:outputText value="#{p.product_name}" />
+									</p:column>
+								</p:autoComplete>
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 5px !important; padding-right: 0px !important;">
+								<label>Số lượng dự trữ</label>
+								<p:inputNumber
+									value="#{productBean.productCrud.reserve_quantity}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="3"
+									decimalSeparator="," thousandSeparator="." />
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<div class="row">
+									<div class="col-md-6"
+										style="padding-left: 0px !important; padding-right: 5px !important;">
+										<label>Mã sản phẩm chính(combo)</label>
+										<p:inputText value="#{productBean.productCrud.maspchinh}"
+											disabled="true" style="width:100%" />
+									</div>
+									<div class="col-md-6"
+										style="padding-left: 5px !important; padding-right: 0px !important;">
+										<label>Tiêu chuẩn kỹ thuật</label>
+										<p:inputText value="#{productBean.productCrud.tckt}"
+											style="width:100%" />
+									</div>
+								</div>
+								<div class="col-md-12"
+									style="padding-left: 0px !important; padding-right: 0px !important;">
+									<div class="row">
+										<div class="col-md-6"
+											style="padding-left: 0px !important; padding-right: 5px !important;">
+											<label>Mã sản phẩm cũ</label>
+											<p:inputNumber value="#{productBean.productCrud.maspcu}"
+												styleClass="fix_width100" minValue="0" decimalPlaces="3"
+												decimalSeparator="," thousandSeparator="." />
+										</div>
+										<div class="col-md-6"
+											style="padding-left: 5px !important; padding-right: 0px !important;">
+											<label>Nhãn hàng</label>
+											<p:autoComplete style="width:100%;"
+												value="#{productBean.productCrud.nhanHang}"
+												converter="abstractConverter" minQueryLength="2"
+												dropdown="true"
+												completeMethod="#{productBean.completeNhanHang}" var="p"
+												itemLabel="#{p.name}" itemValue="#{p}" forceSelection="true"
+												onclick="this.select();">
+												<p:column style="width:50px">
+													<h:outputText value="#{p.id}" />
+												</p:column>
+												<p:column style="width:150px">
+													<h:outputText value="#{p.name}" />
+												</p:column>
+											</p:autoComplete>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 5px !important; margin-bottom: 5px;">
+								<p:selectBooleanCheckbox
+									value="#{productBean.productCrud.typep}" itemLabel="Xuất khẩu" />
+								<p:selectBooleanCheckbox
+									value="#{productBean.productCrud.disable}"
+									itemLabel="Sản phẩm không còn sử dụng" />
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<label>Sản phẩm chính/khuyến mãi <p:commandLink
+										update="faddProductKM" styleClass="linkbuton"
+										onclick="PF('dlsanphamkm').show();" value="(Thêm sản phẩm)" /></label>
+								<p:dataTable value="#{productBean.productKMs}"
+									rowIndexVar="index" styleClass="tablenhapsp tableright1"
+									id="tablespkm" style="width:100%" var="item">
+									<p:column headerText="Sản phẩm" width="100">
+										<h:outputText value="#{item.promotion_product.product_code}" />
+										<br />
+										<h:outputText value="#{item.promotion_product.product_name}" />
+									</p:column>
+									<p:column headerText="Số lượng" width="40"
+										styleClass="textcenter">
+										<h:outputText value="#{item.quantity}">
+											<f:convertNumber pattern="##0" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="SP chính" width="40"
+										styleClass="textcenter">
+										<p:selectBooleanCheckbox disabled="true"
+											value="#{item.spchinh}" />
+									</p:column>
+									<p:column headerText="..." width="20" styleClass="textcenter">
+										<p:commandLink styleClass="linkbuton"
+											style="color:red !important" value="Xóa" process="@this"
+											update="tablespkm"
+											action="#{productBean.deleteProductKM(index)}">
+											<p:confirm icon="ui-icon-alert" header="Xác nhận"
+												message="Bạn có chắc muốn xóa không?" />
+										</p:commandLink>
+									</p:column>
+								</p:dataTable>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="col-md-12" style="padding: 10px 0px;">
+					<p:separator />
+					<div class="col-md-12">
+						<p:commandLink styleClass="btn_primmary"
+							action="#{productBean.saveOrUpdate()}"
+							update=":messages,menuformid:tablesp">
+							<i class="fa fa-floppy-o" aria-hidden="true"></i>
+							<span>Lưu/Cập nhật</span>
+						</p:commandLink>
+						<p:commandLink styleClass="btn_new" action="#{productBean.copy()}"
+							update=":messages,editdetail" style="margin-left:10px;">
+							<i class="fa fa-files-o" aria-hidden="true"></i>
+							<span>Copy</span>
+						</p:commandLink>
+					</div>
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog styleClass="dialogcommon" resizable="true" modal="true"
+			width="400" closeOnEscape="true" maximizable="true"
+			minimizable="true" fitViewport="true" header="Sản phẩm khuyến mãi"
+			widgetVar="dlsanphamkm" draggable="true">
+			<h:form id="faddProductKM" style="width:100%;">
+				<div class="col-md-12">
+					<label>Sản phẩm</label>
+					<p:autoComplete style="width:100%;"
+						value="#{productBean.productKM.promotion_product}"
+						converter="abstractConverter" minQueryLength="2"
+						completeMethod="#{productBean.completeProduct}" var="p"
+						itemLabel="#{p.product_name}" itemValue="#{p}"
+						forceSelection="true" onclick="this.select();">
+						<p:column style="width:50px">
+							<h:outputText value="#{p.product_code}" />
+						</p:column>
+						<p:column style="width:150px">
+							<h:outputText value="#{p.product_name}" />
+						</p:column>
+					</p:autoComplete>
+					<label>Số lượng</label>
+					<p:inputNumber value="#{productBean.productKM.quantity}"
+						styleClass="fix_width100" minValue="0" decimalPlaces="0"
+						decimalSeparator="," thousandSeparator="." />
+					<p:selectBooleanCheckbox value="#{productBean.productKM.spchinh}"
+						itemLabel="Sản phẩm chính" />
+				</div>
+				<div class="col-md-12" style="padding: 10px 0px;">
+					<p:separator />
+					<div class="col-md-12">
+						<p:commandLink styleClass="btn_primmary"
+							action="#{productBean.addProductKM()}"
+							update=":messages,editdetail:tablespkm,faddProductKM">
+							<i class="fa fa-floppy-o" aria-hidden="true"></i>
+							<span>Thêm vào danh sách</span>
+						</p:commandLink>
+					</div>
+				</div>
+
+			</h:form>
+		</p:dialog>
+		<p:dialog header="Thông báo sản phẩm mới" styleClass="dialogcommon"
+			resizable="false"
+			style="overflow: initial;width:100%;max-width: min-content;min-width: 300px;"
+			closeOnEscape="true" widgetVar="dlthongbaospmoi">
+			<h:form>
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important;">
+					<div class="col-md-8" style="margin-bottom: 0px;">
+						<p:calendar value="#{productBean.ngayinphieu}"
+							pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+							showButtonPanel="true">
+						</p:calendar>
+					</div>
+					<div class="col-md-4" style="margin-bottom: 0px;">
+						<p:commandLink action="#{productBean.inThongBaoSPMoi()}"
+							title="Tổng hợp, in các phiếu được chọn" styleClass="btn_printtt"
+							style="margin-left:5px;">
+							<i class="fa fa-print" aria-hidden="true"></i>
+							<span>In phiếu</span>
+						</p:commandLink>
+					</div>
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog header="Nạp sản phẩm" styleClass="dialogcommon"
+			resizable="false"
+			style="overflow: initial;width:100%;max-width: min-content;min-width: 384px;"
+			closeOnEscape="true" widgetVar="dlnapsanpham">
+			<h:form id="napsanpham" enctype="multipart/form-data">
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important;">
+					<div class="col-md-12">
+						<div class="row">
+							<p:fileUpload style="width: max-content;" dragDropSupport="true"
+								allowTypes="/(\.|\/)(xls|xlsx)$/" label="Chọn file"
+								cancelLabel="Huỷ"
+								update=":messages,menuformid,iddldulieukhongnapduoc"
+								uploadLabel="Tải lên" multiple="false"
+								listener="#{productBean.loadExcel}" mode="advanced" />
+
+						</div>
+					</div>
+					<div class="col-md-12" style="margin-bottom: 10px;">
+						<div class="row">
+							<div class="col-md-6">
+								<a
+									href="#{request.contextPath}/resources/upload/filemau/file_mau_san_pham.xlsx"
+									style="color: #0077b3; text-decoration: underline;">Xem
+									file excel mẫu</a>
+							</div>
+						</div>
+					</div>
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog header="Thông báo lỗi" styleClass="dialogcommon dialogerror"
+			resizable="false"
+			style="overflow: initial;width:100%;max-width: min-content;min-width: 500px;"
+			closeOnEscape="true" widgetVar="dldulieukhongnapduoc">
+			<h:form id="iddldulieukhongnapduoc">
+				<p:outputLabel value="Không nạp được dữ liệu do: "
+					style="font-size: 1em;" />
+				<p:fieldset>
+					<p:repeat var="item" value="#{productBean.dulieukhongnapduoc}">
+						<h:outputText value="#{item}" style="margin-left:10px" />
+						<br />
+					</p:repeat>
+				</p:fieldset>
+			</h:form>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

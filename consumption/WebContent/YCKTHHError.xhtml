@@ -1,0 +1,42 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions">
+<h:head>
+	<link type="text/css" rel="stylesheet"
+		href="#{request.contextPath}/resources/css/error.css" charset="UTF-8" />
+	<style>
+</style>
+</h:head>
+
+<h:body
+	style="height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;background: linear-gradient(to bottom right, #EEE, #AAA);">
+	<div style="background: white; border-radius: 20px;">
+		<div
+			style="background: #ff8866; padding: 15px; border-radius: 20px 20px 0px 0px; margin-bottom: 50px;">
+			<span
+				style="font-size: 1.5em; text-align: center; color: #ffffff; margin: 0px 20px">
+				PHIẾU YÊU CẦU KIỂM TRA HÀNG HÓA</span>
+		</div>
+		<div style="margin: 20px">
+			<div class="container">
+				<div class="circle-border"></div>
+				<div class="circle">
+					<div class="error"></div>
+				</div>
+			</div>
+			<!-- partial:index.partial.html -->
+			<h2 style="color: #ff8866; text-align: center;">Phiếu đã bị xóa (ID: #{sessionScope.idphieu}).</h2>
+		</div>
+	</div>
+	<!-- partial -->
+</h:body>
+</html>

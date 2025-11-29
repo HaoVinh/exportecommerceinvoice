@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Copy element &apos;ShopeeToken.java&apos; to &apos;consumption_jpa/src/lixco.com.entity&apos;&#x0D;&#x0A;- Original project: &apos;consumption_jpa&apos;&#x0D;&#x0A;- Destination element: &apos;consumption_jpa/src/lixco.com.entity&apos;&#x0D;&#x0A;- Original element: &apos;lixco.com.entity.ShopeeToken.java&apos;" description="Copy compilation unit" destination="/src=/optional=/true=/=/maven.pomderived=/true=/&lt;lixco.com.entity" element1="/src=/optional=/true=/=/maven.pomderived=/true=/&lt;lixco.com.entity{ShopeeToken.java" files="0" flags="589830" folders="0" id="org.eclipse.jdt.ui.copy" policy="org.eclipse.jdt.ui.copyResources" stamp="1754287821361" units="1" version="1.0"/>
+</session>

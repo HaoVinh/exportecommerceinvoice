@@ -1,0 +1,688 @@
+package vinh.lixco.com.apiecommerce;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import lixco.com.entity.Customer;
+import lixco.com.entity.EcomOrder;
+import lixco.com.entity.EcomOrderDetail;
+import lixco.com.entity.PricingProgram;
+import lixco.com.entity.PricingProgramDetail;
+import lixco.com.entity.Product;
+import lixco.com.interfaces.ICustomerService;
+import lixco.com.interfaces.IPricingProgramDetailService;
+import lixco.com.interfaces.IPricingProgramService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.service.EcomOrderService;
+import lixco.com.service.EcomOrderDetailService;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+@Path("lazada")
+public class LazadaAPIServlet {
+	private static final String APP_KEY = "133487";
+	private static final String APP_SECRET = "RZTQdjz5VUdnpQ81koTwuQ0lrBJlnepC";
+	private static final String API_URL = "https://api.lazada.vn/rest";
+	private static final ObjectMapper mapper = new ObjectMapper();
+	private static final Logger LOGGER = Logger.getLogger(LazadaAPIServlet.class.getName());
+	private static final Map<String, OrderDTO> pendingUpdates = new HashMap<>();
+	private static final String ACCESS_TOKEN = "50000501129yK3eZ0FYGhsirSGecfQ5lxwFghwK3D1169914bxVDealspK4Yk8Br";
+	private static final int CONNECTION_TIMEOUT = 10000; // 10 giây timeout
+
+	@Inject
+	private EcomOrderService ecomOrderService;
+	@Inject
+	private EcomOrderDetailService ecomOrderDetailService;
+	@Inject
+	private ICustomerService customerService;
+	@Inject
+	private IProductService productService;
+	@Inject
+	private IPricingProgramService priceProgramService;
+	@Inject
+	private IPricingProgramDetailService pricingProgramDetailService;
+
+	@POST
+	@Path("/webhook/order")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response webHookLazada(@Context HttpHeaders headers, String inputJson) {
+		ObjectNode errorResponse = mapper.createObjectNode();
+
+		try {
+			LOGGER.info("Lazada: Nhận yêu cầu - Headers: " + headers.getRequestHeaders());
+			LOGGER.info("Lazada: Input JSON: " + inputJson);
+
+			// Xác thực chữ ký
+			String authHeader = headers.getRequestHeader("Authorization") != null
+					&& !headers.getRequestHeader("Authorization").isEmpty()
+							? headers.getRequestHeader("Authorization").get(0)
+							: null;
+			String computedSignature = SignatureUtil.getSignature(APP_KEY + inputJson, APP_SECRET);
+
+			if (authHeader == null || !authHeader.equals(computedSignature)) {
+				errorResponse.put("status", "error");
+				errorResponse.put("message", "Header Authorization không hợp lệ hoặc thiếu");
+				LOGGER.warning("Xác thực chữ ký thất bại: authHeader=" + authHeader + ", computedSignature="
+						+ computedSignature);
+				return Response.status(Response.Status.UNAUTHORIZED).entity(errorResponse)
+						.type(MediaType.APPLICATION_JSON).build();
+			}
+
+			// Phân tích JSON input
+			JsonNode jsonNode = mapper.readTree(inputJson);
+			long timestamp = System.currentTimeMillis();
+
+			String sellerId = jsonNode.path("seller_id").asText(null);
+			String site = jsonNode.path("site").asText("lazada_vn");
+			int messageType = jsonNode.path("message_type").asInt(-1);
+
+			JsonNode dataNode = jsonNode.path("data");
+			if (dataNode.isMissingNode()) {
+				throw new IllegalArgumentException("Thiếu data node trong JSON webhook");
+			}
+
+			String tradeOrderId = dataNode.path("trade_order_id").asText(null);
+			if (tradeOrderId == null) {
+				throw new IllegalArgumentException("Thiếu trade_order_id trong data webhook");
+			}
+
+			String orderStatus = dataNode.has("order_status") ? dataNode.path("order_status").asText(null)
+					: dataNode.path("status").asText(null);
+
+			LOGGER.info("Webhook Lazada: Xử lý webhook - trade_order_id: " + tradeOrderId + ", status: " + orderStatus);
+
+			OrderDTO orderDTO = new OrderDTO();
+			orderDTO.setOrderId(tradeOrderId);
+			orderDTO.setOrder_status(orderStatus);
+			synchronized (pendingUpdates) {
+				pendingUpdates.put(tradeOrderId, orderDTO);
+			}
+			processWebhookOrder(tradeOrderId);
+
+			ObjectNode responseJson = mapper.createObjectNode();
+			responseJson.put("status", "success");
+			responseJson.put("message", "Webhook được nhận và sẽ xử lý bất đồng bộ");
+			ObjectNode dataResp = mapper.createObjectNode();
+			if (sellerId != null)
+				dataResp.put("seller_id", sellerId);
+			if (orderStatus != null)
+				dataResp.put("order_status", orderStatus);
+			dataResp.put("trade_order_id", tradeOrderId);
+			responseJson.set("data", dataResp);
+			responseJson.put("timestamp", timestamp);
+			responseJson.put("site", site);
+			responseJson.put("message_type", messageType);
+
+			LOGGER.info("JSON phản hồi: " + mapper.writeValueAsString(responseJson));
+			return Response.status(Response.Status.OK).entity(responseJson).type(MediaType.APPLICATION_JSON).build();
+
+		} catch (Exception e) {
+			LOGGER.severe("Lỗi xử lý webhook: " + e.getMessage());
+			e.printStackTrace();
+			errorResponse.put("status", "error");
+			errorResponse.put("message", "Lỗi xử lý webhook: " + e.getMessage());
+			return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(errorResponse)
+					.type(MediaType.APPLICATION_JSON).build();
+		}
+	}
+
+	private void processWebhookOrder(String orderId) {
+		new Thread(() -> {
+			try {
+				OrderDTO orderDTO = fetchOrderData(orderId);
+				if (orderDTO == null) {
+					LOGGER.severe("fetchOrderData trả về null cho orderId: " + orderId);
+					return;
+				}
+
+				List<OrderDetailDTO> orderDetailDTOs = orderDTO.getOrderDetails();
+				if (orderDetailDTOs == null) {
+					LOGGER.warning("orderDetails là null cho orderId: " + orderId);
+					orderDetailDTOs = new ArrayList<>();
+				}
+
+				synchronized (pendingUpdates) {
+					pendingUpdates.put(orderId, orderDTO);
+				}
+				saveOrUpdateOrder(orderDTO);
+				saveOrUpdateOrderDetail(orderDetailDTOs);
+				LOGGER.info("Đã xử lý và lưu đơn hàng bất đồng bộ: " + orderId);
+			} catch (Exception e) {
+				LOGGER.severe("Lỗi xử lý bất đồng bộ cho webhook order " + orderId + ": " + e.getMessage());
+				e.printStackTrace();
+			}
+		}).start();
+	}
+
+	private void saveOrUpdateOrderDetail(List<OrderDetailDTO> orderDetailDTOs) {
+		if (orderDetailDTOs == null || orderDetailDTOs.isEmpty()) {
+			LOGGER.warning("orderDetailDTOs là null hoặc rỗng");
+			return;
+		}
+
+		for (OrderDetailDTO orddt : orderDetailDTOs) {
+			if (orddt == null) {
+				LOGGER.warning("OrderDetailDTO trong danh sách là null");
+				continue;
+			}
+
+			List<EcomOrderDetail> existingList = ecomOrderDetailService
+					.findByOrderItemNumberAndOrderId(orddt.getOrderItemId(), orddt.getOrderId());
+
+			if (existingList.isEmpty()) {
+				EcomOrderDetail ecomOrddt = new EcomOrderDetail();
+				ecomOrddt.setName(orddt.getName());
+				ecomOrddt.setItemPrice(orddt.getItemPrice());
+				ecomOrddt.setSku(orddt.getSku());
+				ecomOrddt.setOrderItemNumber(orddt.getOrderItemId());
+				ecomOrddt.setOrderId(orddt.getOrderId());
+				ecomOrddt.setLoaitmdt("Lazada");
+				ecomOrddt.setVariant(orddt.isVariant());
+				ecomOrddt.setSplitPrice(orddt.getLastItemPrice());
+				ecomOrddt.setUnitPrice(orddt.getUnitPrice());
+				ecomOrddt.setQuantity(orddt.getQuantity());
+				ecomOrderDetailService.create(ecomOrddt);
+				LOGGER.info("Created new order detail: orderItemNumber=" + orddt.getOrderItemId());
+			} else {
+				for (EcomOrderDetail ecomOrddt : existingList) {
+					ecomOrddt.setName(orddt.getName());
+					ecomOrddt.setItemPrice(orddt.getItemPrice());
+					ecomOrddt.setSku(orddt.getSku());
+					ecomOrddt.setLoaitmdt("Lazada");
+					ecomOrddt.setVariant(orddt.isVariant());
+					ecomOrddt.setSplitPrice(orddt.getLastItemPrice());
+					ecomOrddt.setUnitPrice(orddt.getUnitPrice());
+					ecomOrddt.setQuantity(orddt.getQuantity());
+					ecomOrderDetailService.update(ecomOrddt);
+				}
+				LOGGER.info("Updated " + existingList.size() + " order detail(s) for orderItemNumber="
+						+ orddt.getOrderItemId());
+			}
+		}
+	}
+
+	public void saveOrUpdateOrder(OrderDTO dto) {
+		if (dto == null) {
+			LOGGER.severe("OrderDTO là null trong saveOrUpdateOrder");
+			return;
+		}
+		EcomOrder existing = ecomOrderService.findByCodeAndPlatform(dto.getOrderId(), dto.geteCommerceType());
+		if (existing == null) {
+			EcomOrder order = new EcomOrder();
+			order.setOrderNumber(dto.getOrderId());
+			order.setCustomerLastName(dto.getCustomerLastName());
+			order.setCustomerFirstName(dto.getCustomerFirstName());
+			order.setCreatedAt(dto.getCreatedAt());
+			order.setUpdatedAt(dto.getUpdatedAt());
+			order.setThoigiancapnhat(new Date());
+			order.setPrice(dto.getPrice());
+			order.setStatus(dto.getOrder_status());
+			order.setLoaitmdt(dto.geteCommerceType());
+			order.setShippingFee(dto.getShippingFee());
+			order.setSellerDiscount(dto.getSellerDiscount());
+			order.setLastPrice(dto.getLastPrice());
+			ecomOrderService.create(order);
+			LOGGER.info("Lưu đơn hàng mới: " + dto.getOrderId());
+		} else {
+			existing.setStatus(dto.getOrder_status());
+			existing.setUpdatedAt(dto.getUpdatedAt());
+			existing.setThoigiancapnhat(new Date());
+			existing.setShippingFee(dto.getShippingFee());
+			existing.setSellerDiscount(dto.getSellerDiscount());
+			existing.setLastPrice(dto.getLastPrice());
+			ecomOrderService.update(existing);
+			LOGGER.info("Cập nhật trạng thái đơn hàng: " + dto.getOrderId());
+		}
+	}
+
+	public OrderDTO fetchOrderData(String orderId) throws Exception {
+		Map<String, String> params = new LinkedHashMap<>();
+		params.put("access_token", ACCESS_TOKEN);
+		params.put("app_key", APP_KEY);
+		params.put("order_id", orderId);
+		params.put("sign_method", "sha256");
+		params.put("timestamp", String.valueOf(System.currentTimeMillis()));
+
+		String queryString = buildQueryString("/order/get", params);
+		String sign = sign(queryString, APP_SECRET);
+		params.put("sign", sign);
+
+		String response = sendGetResponse(API_URL + "/order/get", params);
+		JsonNode root = mapper.readTree(response);
+		LOGGER.info("Response từ API /order/get cho orderId " + orderId + ": " + response);
+
+		if (!"0".equals(root.path("code").asText())) {
+			LOGGER.severe("fetchOrderData thất bại cho orderId " + orderId + ", code: " + root.path("code").asText()
+					+ ", message: " + root.path("message").asText());
+			return createDefaultOrderDTO(orderId);
+		}
+
+		JsonNode data = root.path("data");
+		if (data.isMissingNode()) {
+			LOGGER.warning("Dữ liệu missing cho orderId " + orderId);
+			return createDefaultOrderDTO(orderId);
+		}
+
+		String currentStatus = null;
+		JsonNode statusesNode = data.path("statuses");
+		if (statusesNode.isArray() && statusesNode.size() > 0) {
+			currentStatus = statusesNode.get(statusesNode.size() - 1).asText();
+		} else {
+			LOGGER.warning("statusesNode không hợp lệ cho orderId " + orderId);
+		}
+
+		OrderDTO dto = new OrderDTO();
+		dto.setOrderId(data.path("order_id").asText(orderId));
+		dto.setCustomerFirstName(data.path("customer_first_name").asText(null));
+		dto.setCustomerLastName(data.path("customer_last_name").asText(null));
+		dto.setCreatedAt(parseDate(data.path("created_at").asText()));
+		dto.setUpdatedAt(parseDate(data.path("updated_at").asText()));
+		dto.seteCommerceType("Lazada");
+		dto.setOrder_status(currentStatus);
+		dto.setPrice(data.path("price").asDouble(0.0));
+
+		double discountShippingFee = data.path("shipping_fee_discount_seller").asDouble(0.0);
+		double shippingFee = data.path("shipping_fee_original").asDouble(0.0);
+		double lastShippingFee = discountShippingFee != 0.0 ? shippingFee - discountShippingFee : shippingFee;
+		dto.setShippingFee(lastShippingFee);
+
+		List<OrderDetailDTO> items = fetchOrderItems(orderId);
+		if (items == null) {
+			LOGGER.warning("fetchOrderItems trả về null cho orderId " + orderId);
+			items = new ArrayList<>();
+		}
+		dto.setOrderDetails(items);
+
+		double totalVoucherSeller = items.stream()
+				.mapToDouble(item -> item.getVoucherSeller() != null ? item.getVoucherSeller() : 0.0).sum();
+		dto.setSellerDiscount(totalVoucherSeller);
+
+		double totalLastPrice = (dto.getPrice() - dto.getSellerDiscount() + dto.getShippingFee()) / 1.1;
+		dto.setLastPrice(totalLastPrice);
+
+		// Phân bổ lastItemPrice sau khi tách SKU
+		if (!items.isEmpty() && totalLastPrice > 0) {
+			List<OrderDetailDTO> validItems = items.stream()
+					.filter(item -> item != null && item.getItemPrice() != null && item.getItemPrice() > 0)
+					.collect(Collectors.toList());
+
+			if (!validItems.isEmpty()) {
+				LOGGER.info("Bắt đầu phân bổ lastItemPrice cho " + validItems.size() + " mục đã tách từ orderId "
+						+ orderId);
+				double totalItemPrice = validItems.stream()
+						.mapToDouble(
+								item -> item.getItemPrice() != null ? item.getItemPrice() * item.getQuantity() : 0.0)
+						.sum();
+				double remainingLastPrice = totalLastPrice;
+
+				for (OrderDetailDTO item : validItems) {
+					if (item != null && item.getItemPrice() != null) {
+						double allocatedPrice = (item.getItemPrice() * item.getQuantity() / totalItemPrice)
+								* totalLastPrice;
+						item.setLastItemPrice(Math.max(0, Math.min(allocatedPrice, remainingLastPrice)));
+						remainingLastPrice -= item.getLastItemPrice();
+						LOGGER.info("Phân bổ lastItemPrice: item=" + item.getOrderItemId() + ", allocatedPrice="
+								+ allocatedPrice + ", remaining=" + remainingLastPrice);
+					}
+				}
+
+				if (!validItems.isEmpty()) {
+					OrderDetailDTO lastItem = validItems.get(validItems.size() - 1);
+					if (lastItem != null) {
+						lastItem.setLastItemPrice(lastItem.getLastItemPrice() + remainingLastPrice);
+						LOGGER.info("Cập nhật lastItem: item=" + lastItem.getOrderItemId() + ", lastItemPrice="
+								+ lastItem.getLastItemPrice());
+					}
+				}
+
+				for (OrderDetailDTO item : items) {
+					if (item != null) {
+						if (item.getItemPrice() != null && item.getItemPrice() <= 0) {
+							item.setLastItemPrice(0.0);
+						}
+						if (item.getQuantity() > 0) {
+							item.setUnitPrice(item.getLastItemPrice() / item.getQuantity());
+						} else {
+							item.setUnitPrice(0.0);
+						}
+						LOGGER.info("Cập nhật unitPrice: item=" + item.getOrderItemId() + ", unitPrice="
+								+ item.getUnitPrice());
+					}
+				}
+			} else {
+				LOGGER.warning("Không có mục hợp lệ để phân bổ lastItemPrice cho orderId " + orderId);
+			}
+		} else {
+			LOGGER.info(
+					"Không phân bổ lastItemPrice cho orderId " + orderId + " do items rỗng hoặc totalLastPrice <= 0");
+		}
+
+		return dto;
+	}
+
+	public List<OrderDetailDTO> fetchOrderItems(String orderId) throws Exception {
+		Map<String, String> params = new LinkedHashMap<>();
+		params.put("access_token", ACCESS_TOKEN);
+		params.put("app_key", APP_KEY);
+		params.put("order_id", orderId);
+		params.put("sign_method", "sha256");
+		params.put("timestamp", String.valueOf(System.currentTimeMillis()));
+
+		String queryString = buildQueryString("/order/items/get", params);
+		String sign = sign(queryString, APP_SECRET);
+		params.put("sign", sign);
+
+		String response = sendGetResponse(API_URL + "/order/items/get", params);
+		JsonNode root = mapper.readTree(response);
+		LOGGER.info("Response từ API /order/items/get cho orderId " + orderId + ": " + response);
+
+		if (!"0".equals(root.path("code").asText())) {
+			LOGGER.warning("Lỗi API /order/items/get - code: " + root.path("code").asText() + ", message: "
+					+ root.path("message").asText());
+			return Collections.emptyList();
+		}
+
+		JsonNode data = root.path("data");
+		if (!data.isArray()) {
+			LOGGER.warning("Dữ liệu không phải mảng cho orderId " + orderId);
+			return Collections.emptyList();
+		}
+
+		List<OrderDetailDTO> result = new ArrayList<>();
+		for (JsonNode itemNode : data) {
+			OrderDetailDTO item = new OrderDetailDTO();
+			item.setSku(itemNode.path("sku").asText(null));
+			item.setName(itemNode.path("name").asText(null));
+			item.setItemPrice(itemNode.path("item_price").asDouble(0.0));
+			if (item.getName().contains("[QUÀ TẶNG]")) {
+				item.setItemPrice(itemNode.path("paid_price").asDouble(0.0));
+			}
+			item.setOrderItemId(itemNode.path("order_item_id").asText(null));
+			item.setOrderId(orderId);
+			item.setLoaitmdt("Lazada");
+			item.setVoucherSeller(itemNode.path("voucher_seller_lpi").asDouble(0.0));
+
+			String variation = itemNode.path("variation").asText(null);
+			item.setVariant(variation != null && !variation.trim().isEmpty());
+			if (item.isVariant()) {
+				item.setName(item.getName() + " - " + variation);
+			}
+
+			item.setQuantity(1);
+			List<OrderDetailDTO> splitItems = splitSku(item);
+			result.addAll(splitItems);
+			LOGGER.info("Đã tách SKU cho item " + item.getOrderItemId() + ", số lượng mục sau khi tách: "
+					+ splitItems.size());
+		}
+
+		return result;
+	}
+
+	private List<OrderDetailDTO> splitSku(OrderDetailDTO detail) {
+		Customer customer = new Customer();
+		customer = customerService.selectByCode("CO648");
+		PricingProgram pricingProgram = priceProgramService.findByCode("DG027968");
+		List<PricingProgramDetail> pricingProgramDetails = pricingProgramDetailService
+				.findAllByPricingProgram(pricingProgram.getId());
+		List<OrderDetailDTO> result = new ArrayList<>();
+		String skuString = detail.getSku();
+
+		if (skuString == null || skuString.trim().isEmpty()) {
+			result.add(detail);
+			LOGGER.info("No SKU to split, kept original: sku=" + detail.getSku() + ", itemPrice="
+					+ detail.getItemPrice() + ", quantity=" + detail.getQuantity());
+			return result;
+		}
+
+		skuString = skuString.trim();
+
+		Pattern pattern = Pattern.compile("^(\\d+)C\\s*-\\s*(.+)$");
+		Matcher matcher = pattern.matcher(skuString);
+		String remainingSku = skuString;
+
+		if (matcher.matches()) {
+			int prefixNumber = Integer.parseInt(matcher.group(1));
+			remainingSku = matcher.group(2).trim();
+			String[] skuParts = remainingSku.split("\\s*\\+\\s*");
+
+			if (skuParts.length == 1) {
+				// Xử lý 2C - A hoặc 3C - A
+				OrderDetailDTO newDetail = new OrderDetailDTO();
+				Product product = productService.selectByCode(skuParts[0].trim());
+				double itemPrice = 0.0;
+				for (PricingProgramDetail item : pricingProgramDetails) {
+					if (item.getProduct() != null && product.getId() != 0
+							&& item.getProduct().getProduct_code().equals(product.getProduct_code())) {
+						itemPrice = item.getUnit_price() != 0 ? item.getUnit_price() : 0.0;
+						break;
+					}
+				}
+				newDetail.setOrderItemId(detail.getOrderItemId());
+				newDetail.setName(detail.getName());
+				newDetail.setSku(skuParts[0].trim());
+				newDetail.setItemPrice(itemPrice);
+				newDetail.setStt(detail.getStt());
+				newDetail.setQuantity(prefixNumber);
+				newDetail.setOrderId(detail.getOrderId());
+				newDetail.setVariant(detail.isVariant());
+				newDetail.setLoaitmdt(detail.getLoaitmdt());
+				result.add(newDetail);
+				LOGGER.info((prefixNumber == 3 ? "3C" : "2C") + " - A: sku=" + newDetail.getSku() + ", itemPrice="
+						+ itemPrice + ", quantity=" + prefixNumber);
+			} else if (skuParts.length == 2) {
+				// Xử lý 2C - A + B hoặc 3C - A + B
+				OrderDetailDTO detailA = new OrderDetailDTO();
+				OrderDetailDTO detailB = new OrderDetailDTO();
+
+				String originalName = detail.getName();
+				int tặngIndex = originalName.toLowerCase().indexOf("tặng");
+				String nameA = tặngIndex != -1 ? originalName.substring(0, tặngIndex).trim() : originalName;
+				String nameB = tặngIndex != -1 ? originalName.substring(tặngIndex + "tặng".length()).trim()
+						: originalName;
+				if (tặngIndex == -1) {
+					LOGGER.warning("No 'tặng' found in name: " + originalName + ", using full name for both.");
+				}
+				nameA = nameA.isEmpty() ? nameA
+						: Character.toUpperCase(nameA.charAt(0)) + (nameA.length() > 1 ? nameA.substring(1) : "");
+				nameB = nameB.isEmpty() ? nameB
+						: Character.toUpperCase(nameB.charAt(0)) + (nameB.length() > 1 ? nameB.substring(1) : "");
+
+				Product productA = productService.selectByCode(skuParts[0].trim());
+				Product productB = productService.selectByCode(skuParts[1].trim());
+
+				double itemPriceA = 0.0;
+				double itemPriceB = 0.0;
+				for (PricingProgramDetail item : pricingProgramDetails) {
+					if (item.getProduct() != null && productA.getId() != 0
+							&& item.getProduct().getProduct_code().equals(productA.getProduct_code())) {
+						itemPriceA = item.getUnit_price() != 0 ? item.getUnit_price() : 0.0;
+					}
+					if (item.getProduct() != null && productB.getId() != 0
+							&& item.getProduct().getProduct_code().equals(productB.getProduct_code())) {
+						itemPriceB = item.getUnit_price() != 0 ? item.getUnit_price() : 0.0;
+					}
+				}
+
+				detailA.setOrderItemId(detail.getOrderItemId());
+				detailA.setName(nameA);
+				detailA.setSku(skuParts[0].trim());
+				detailA.setItemPrice(itemPriceA);
+				detailA.setStt(detail.getStt());
+				detailA.setQuantity(prefixNumber == 3 ? 3 : 2);
+				detailA.setOrderId(detail.getOrderId());
+				detailA.setVariant(detail.isVariant());
+				detailA.setLoaitmdt(detail.getLoaitmdt());
+				result.add(detailA);
+				LOGGER.info((prefixNumber == 3 ? "3C" : "2C") + " - detailA: sku=" + detailA.getSku() + ", itemPrice="
+						+ itemPriceA + ", quantity=" + (prefixNumber == 3 ? 3 : 2));
+
+				detailB.setOrderItemId(detail.getOrderItemId());
+				detailB.setName(nameB);
+				detailB.setSku(skuParts[1].trim());
+				detailB.setItemPrice(itemPriceB);
+				detailB.setStt(detail.getStt());
+				detailB.setQuantity(1);
+				detailB.setOrderId(detail.getOrderId());
+				detailB.setVariant(detail.isVariant());
+				detailB.setLoaitmdt(detail.getLoaitmdt());
+				result.add(detailB);
+				LOGGER.info((prefixNumber == 3 ? "3C" : "2C") + " - detailB: sku=" + detailB.getSku() + ", itemPrice="
+						+ itemPriceB + ", quantity=1");
+			}
+		} else {
+			String[] skuParts = skuString.split("\\s*\\+\\s*");
+			if (skuParts.length > 1) {
+				for (String part : skuParts) {
+					if (!part.trim().isEmpty()) {
+						OrderDetailDTO newDetail = new OrderDetailDTO();
+						Product product = productService.selectByCode(part.trim());
+						double itemPrice = 0.0;
+						for (PricingProgramDetail item : pricingProgramDetails) {
+							if (item.getProduct() != null && product.getId() != 0
+									&& item.getProduct().getProduct_code().equals(product.getProduct_code())) {
+								itemPrice = item.getUnit_price() != 0 ? item.getUnit_price() : 0.0;
+							}
+						}
+						newDetail.setOrderItemId(detail.getOrderItemId());
+						newDetail.setName(detail.getName());
+						newDetail.setSku(part.trim());
+						newDetail.setItemPrice(itemPrice);
+						newDetail.setStt(detail.getStt());
+						newDetail.setQuantity(1);
+						newDetail.setOrderId(detail.getOrderId());
+						newDetail.setVariant(detail.isVariant());
+						newDetail.setLoaitmdt(detail.getLoaitmdt());
+						result.add(newDetail);
+						LOGGER.info("A+B+C - detail: sku=" + newDetail.getSku() + ", itemPrice=" + itemPrice
+								+ ", quantity=1");
+					}
+				}
+			} else {
+				OrderDetailDTO newDetail = new OrderDetailDTO();
+				Product product = productService.selectByCode(skuString);
+				double itemPrice = 0.0;
+				for (PricingProgramDetail item : pricingProgramDetails) {
+					if (item.getProduct() != null && product.getId() != 0
+							&& item.getProduct().getProduct_code().equals(product.getProduct_code())) {
+						itemPrice = item.getUnit_price() != 0 ? item.getUnit_price() : 0.0;
+						break;
+					}
+				}
+				newDetail.setOrderItemId(detail.getOrderItemId());
+				newDetail.setName(detail.getName());
+				newDetail.setSku(skuString);
+				newDetail.setItemPrice(itemPrice);
+				newDetail.setStt(detail.getStt());
+				newDetail.setQuantity(detail.getQuantity());
+				newDetail.setOrderId(detail.getOrderId());
+				newDetail.setVariant(detail.isVariant());
+				newDetail.setLoaitmdt(detail.getLoaitmdt());
+				result.add(newDetail);
+				LOGGER.info("Single SKU: sku=" + skuString + ", itemPrice=" + itemPrice + ", quantity="
+						+ detail.getQuantity());
+			}
+		}
+
+		return result;
+	}
+
+	private String sendGetResponse(String urlStr, Map<String, String> params) throws Exception {
+		StringBuilder urlWithParams = new StringBuilder(urlStr).append("?");
+		for (Map.Entry<String, String> e : params.entrySet()) {
+			urlWithParams.append(e.getKey()).append("=").append(e.getValue()).append("&");
+		}
+		urlWithParams.setLength(urlWithParams.length() - 1);
+
+		URL url = new URL(urlWithParams.toString());
+		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+		conn.setRequestMethod("GET");
+		conn.setConnectTimeout(CONNECTION_TIMEOUT);
+		conn.setReadTimeout(CONNECTION_TIMEOUT);
+
+		try {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+			StringBuilder response = new StringBuilder();
+			String line;
+			while ((line = reader.readLine()) != null) {
+				response.append(line);
+			}
+			reader.close();
+			return response.toString();
+		} catch (Exception e) {
+			LOGGER.severe("Lỗi kết nối API cho URL " + urlWithParams + ": " + e.getMessage());
+			throw e;
+		} finally {
+			conn.disconnect();
+		}
+	}
+
+	private Date parseDate(String dateStr) throws Exception {
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
+		return sdf.parse(dateStr);
+	}
+
+	private String buildQueryString(String api, Map<String, String> params) {
+		StringBuilder sb = new StringBuilder(api);
+		params.entrySet().stream().sorted(Map.Entry.comparingByKey()).filter(e -> !e.getKey().equals("sign"))
+				.forEach(e -> sb.append(e.getKey()).append(e.getValue()));
+		return sb.toString();
+	}
+
+	private String sign(String data, String secret) throws Exception {
+		Mac mac = Mac.getInstance("HmacSHA256");
+		SecretKeySpec keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+		mac.init(keySpec);
+		byte[] raw = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+		StringBuilder sb = new StringBuilder();
+		for (byte b : raw) {
+			sb.append(String.format("%02X", b));
+		}
+		return sb.toString();
+	}
+
+	public static Map<String, OrderDTO> getPendingUpdates() {
+		return pendingUpdates;
+	}
+
+	private OrderDTO createDefaultOrderDTO(String orderId) {
+		OrderDTO dto = new OrderDTO();
+		dto.setOrderId(orderId);
+		dto.seteCommerceType("Lazada");
+		dto.setOrder_status("Unknown");
+		dto.setPrice(0.0);
+		dto.setShippingFee(0.0);
+		dto.setSellerDiscount(0.0);
+		dto.setLastPrice(0.0);
+		dto.setOrderDetails(new ArrayList<>());
+		LOGGER.warning("Tạo DTO mặc định cho orderId " + orderId + " do API thất bại");
+		return dto;
+	}
+
+	private static LazadaAPIServlet instance = new LazadaAPIServlet();
+
+	public static LazadaAPIServlet getInstance() {
+		return instance;
+	}
+}

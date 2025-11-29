@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Khóa
+			dữ liệu (nhập,xuất)</h3>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important; margin-top: 10px;">
+					<div class="row">
+						<div class="col-md-4">
+							<p:panel header="Thông tin">
+								<h:panelGrid id="info">
+									<label>Tháng</label>
+									<p:spinner style="width:90%;"
+										value="#{khoaDuLieuBean.khoaDuLieuCrud.kmonth}" min="1"
+										max="12" />
+									<label>Năm</label>
+									<br />
+									<p:spinner style="width:90%;"  thousandSeparator=""
+										value="#{khoaDuLieuBean.khoaDuLieuCrud.kyear}" min="1990" />
+									<p:selectBooleanCheckbox
+										value="#{khoaDuLieuBean.khoaDuLieuCrud.kkhoa}"
+										itemLabel="Khóa" />
+								</h:panelGrid>
+								<p:separator />
+								<p:commandButton process="@this,info" icon="fa fa-floppy-o"
+									style="padding:4px !important;"
+									action="#{khoaDuLieuBean.saveOrUpdate()}"
+									styleClass="buttonaddrow" update="menuformid:tableid"
+									value="Lưu/Cập nhật" />
+							</p:panel>
+						</div>
+						<div class="col-md-8 pdright3">
+							<p:panel header="Danh sách" id="preview" styleClass="clearfix">
+								<div style="clear: both" />
+								<p:dataTable value="#{khoaDuLieuBean.khoaDuLieus}"
+									paginatorPosition="bottom" style="width:100%"
+									sortBy="#{item.id}" styleClass="tablenhapsp tableright1"
+									paginator="true" rows="50" sortOrder="DESCENDING"
+									rowKey="#{item.id}" id="tableid" scrollHeight="400" scrollable="true"
+									widgetVar="datatb" resizableColumns="true" var="item">
+									<p:column headerText="ID" width="30">
+										<h:outputText value="#{item.id}" />
+									</p:column>
+									<p:column headerText="Tháng" width="50" styleClass="textcenter">
+										<h:outputText value="#{item.kmonth}" />
+									</p:column>
+									<p:column headerText="Năm" width="180" styleClass="textcenter">
+										<h:outputText value="#{item.kyear}" />
+									</p:column>
+									<p:column headerText="Khóa" width="150" styleClass="textcenter">
+										<p:selectBooleanCheckbox value="#{item.kkhoa}" disabled="true" />
+									</p:column>
+									<p:column headerText="Ghi chú" width="150"
+										style="white-space: initial;">
+										<h:outputText value="#{item.note}" />
+									</p:column>
+								</p:dataTable>
+							</p:panel>
+						</div>
+					</div>
+				</div>
+			</h:form>
+			<p:separator />
+			<h:form>
+				<h3
+					style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">
+					Kiểm tra tồn kho</h3>
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important; margin-top: 10px;">
+					<div class="row">
+						<p:panel>
+							<h:panelGrid >
+								<p:selectBooleanCheckbox
+									value="#{khoaDuLieuBean.heThong.kiemton}"
+									itemLabel="Kiểm tra tồn kho trước khi xuất">
+									<p:ajax listener="#{khoaDuLieuBean.updateHeThong()}"
+										update=":messages" />
+										</p:selectBooleanCheckbox>
+							</h:panelGrid>
+						</p:panel>
+					</div>
+				</div>
+			</h:form>
+		</div>
+	</ui:define>
+</ui:composition>

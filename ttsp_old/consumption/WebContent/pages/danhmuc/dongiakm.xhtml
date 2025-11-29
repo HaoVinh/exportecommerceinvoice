@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Đơn
+			giá khuyến mãi</h3>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important;">
+					<div class="col-md-12"></div>
+					<p:fieldset id="searchform"
+						style="margin-bottom:10px;background:#3c8dbc">
+						<div class="row">
+							<div class="ui-g">
+								<div class="ui-md-6 ui-sm-12 ">
+									<div class="ui-g">
+										<div class="ui-md-8 ui-sm-12 ">
+											<div class="nhapdlg">
+												<span class="fa fa-search" />
+												<p:remoteCommand name="searchEnter"
+													actionListener="#{promotionalPricingBean.search()}"
+													update="tablesp" />
+												<p:inputText
+													placeholder="Tìm theo mã sản phẩm, tên sản phẩm.."
+													id="inputsearch" style="width:100%;"
+													value="#{promotionalPricingBean.stextStr}"
+													onkeypress="if (event.keyCode === 13) { searchEnter(); return false; }">
+												</p:inputText>
+											</div>
+										</div>
+										<div class="ui-md-4 ui-sm-12 ">
+											<p:commandLink id="idorder" styleClass="btn_primmary"
+												immediate="true"
+												style="margin-left:5px; margin-right:0px;height:28px !important;line-height:28px !important;">
+												<i class="fa fa-search" aria-hidden="true"></i>
+												<span>Lọc nâng cao</span>
+											</p:commandLink>
+										</div>
+									</div>
+								</div>
+								<div class="ui-md-6 ui-sm-12">
+									<div style="float: right">
+
+										<p:commandLink styleClass="btn_destroy"
+											style="margin-left:1px;height:28px !important;line-height:28px !important;"
+											update=":messages,:menuformid"
+											disabled="#{promotionalPricingBean.promotionalPricingSelect==null}"
+											action="#{promotionalPricingBean.delete()}"
+											title="Xóa đơn giá chọn">
+											<i class="fa fa-trash" aria-hidden="true"></i>
+											<span>Xóa</span>
+											<p:confirm icon="ui-icon-alert" />
+										</p:commandLink>
+
+										<p:commandLink process="@this"
+											action="#{promotionalPricingBean.showDialogEdit()}"
+											disabled="#{promotionalPricingBean.promotionalPricingSelect==null}"
+											title="Chỉnh sửa đơn giá đã chọn" update="editdetail"
+											styleClass="btn_new2" style="margin-left:5px;">
+											<i class="fa fa-edit" aria-hidden="true"></i>
+											<span>Chỉnh sửa</span>
+										</p:commandLink>
+
+										<p:commandLink process="@this"
+											action="#{promotionalPricingBean.showDialog()}"
+											title="Tạo đơn giá mới" update="editdetail"
+											styleClass="btn_primmary" style="margin-left:5px;">
+											<i class="fa fa-plus" aria-hidden="true"></i>
+											<span>Tạo mới</span>
+										</p:commandLink>
+
+										<p:commandLink process="@this"
+											onclick="PF('dongiakm').show();"
+											title="Nạp đơn giá từ file excel" update="dongiakm"
+											styleClass="btn_upload" style="margin-left:5px;">
+											<i class="fa fa-upload" aria-hidden="true"></i>
+											<span>Nhập từ file excel</span>
+										</p:commandLink>
+
+										<p:commandLink id="idmisalist" styleClass="btn_other"
+											onclick="PF('kiemtradongia').show();" immediate="true"
+											update="idfkiemtradongia" title="Kiểm tra đơn giá khuyến mãi"
+											style="margin-left:5px; margin-right:5px; ">
+											<i class="fa fa-paper-plane" aria-hidden="true"></i>
+											<span>Kiểm tra đơn giá khuyến mãi</span>
+										</p:commandLink>
+
+									</div>
+								</div>
+							</div>
+						</div>
+						<p:overlayPanel id="imagePanel" for="idorder" hideEffect="fade"
+							dismissable="false" widgetVar="panelsearch" style="width:350px;">
+							<div class="col-md-12"
+								style="border: 1px solid #ccc; border-radius: 6px; margin-bottom: 5px !important;">
+								<div class="col-md-12"
+									style="padding-top: 10px !important; padding-left: 0px !important; padding-right: 0px !important;">
+									<div class="row">
+										<div class="col-md-6"
+											style="padding-left: 0px !important; padding-right: 5px !important; margin-top: 10px;">
+											<label>Từ ngày</label>
+											<p:calendar value="#{promotionalPricingBean.fromDateSearch}"
+												pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+												showButtonPanel="true" />
+										</div>
+										<div class="col-md-6"
+											style="padding-left: 5px !important; padding-right: 0px !important; margin-top: 10px;">
+											<label>Đến ngày</label>
+											<p:calendar value="#{promotionalPricingBean.toDateSearch}"
+												pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+												showButtonPanel="true" />
+										</div>
+										<div class="col-md-12"
+											style="padding-left: 0px !important; padding-right: 0px !important; margin-top: 5px;">
+											<label>Sản phẩm</label>
+											<p:autoComplete style="width:100%;" queryDelay="1000"
+												maxResults="250"
+												value="#{promotionalPricingBean.productSearch}"
+												converter="abstractConverter" minQueryLength="2"
+												completeMethod="#{promotionalPricingBean.completeProduct}"
+												var="p" itemLabel="#{p.product_name}" itemValue="#{p}"
+												forceSelection="true" onclick="this.select();">
+												<p:column style="width:50px">
+													<h:outputText value="#{p.product_code}" />
+												</p:column>
+												<p:column style="width:150px">
+													<h:outputText value="#{p.product_name}" />
+												</p:column>
+											</p:autoComplete>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important; margin-bottom: 5px;">
+								<div class="pull-right">
+									<p:commandButton value="Tìm" process="menuformid:imagePanel"
+										icon="ui-icon-search" oncomplete="PF('panelsearch').hide()"
+										actionListener="#{promotionalPricingBean.search()}"
+										update="menuformid:tablesp" />
+								</div>
+							</div>
+						</p:overlayPanel>
+					</p:fieldset>
+					<p:sticky target="searchform" />
+					<div class="col-md-12" style="margin-top: 3px;">
+						<p:dataTable
+							value="#{promotionalPricingBean.listPromotionalPricing}"
+							 paginatorPosition="bottom" paginator="true"
+							rowKey="#{item.id}" id="tablesp" styleClass="tablenhapsp"
+							style="width:100%" rows="50" rowsPerPageTemplate="50,100,200"
+							selection="#{promotionalPricingBean.promotionalPricingSelect}"
+							selectionMode="single" resizableColumns="true" var="item">
+							<p:ajax event="rowSelect" update="menuformid:searchform" />
+
+							<p:ajax event="rowDblselect"
+								listener="#{promotionalPricingBean.showDialogEdit()}"
+								update="editdetail" />
+							<p:column headerText="ID" width="50" styleClass="textcenter">
+								<h:outputText value="#{item.id}" />
+							</p:column>
+							<p:column headerText="MASP" width="75">
+								<h:outputText value="#{item.product.product_code}" />
+							</p:column>
+							<p:column headerText="Sản phẩm" width="250">
+								<h:outputText value="#{item.product.product_name}" />
+							</p:column>
+							<p:column headerText="Đơn giá" width="70">
+								<h:outputText value="#{item.unit_price}">
+									<f:convertNumber locale="vi"  pattern="###,###,##0.##" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="Ngày hiệu lực" width="80">
+								<h:outputText value="#{item.effective_date}">
+									<f:convertDateTime pattern="dd/MM/yyyy" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="Ngày kết thúc" width="80">
+								<h:outputText value="#{item.expiry_date}">
+									<f:convertDateTime pattern="dd/MM/yyyy" />
+								</h:outputText>
+							</p:column>
+						</p:dataTable>
+					</div>
+				</div>
+			</h:form>
+		</div>
+
+		<p:dialog styleClass="dialogcommon" resizable="false" width="450"
+			style="oveFrflow: initial;" closeOnEscape="true" header="Chỉnh sửa"
+			widgetVar="dlg1">
+			<h:form id="editdetail" style="width:100%;">
+				<div class="col-md-12 boxCus">
+					<div class="col-md-12">
+						<div class="row">
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<label>Sản phẩm<span style="color: red;">*</span></label>
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important; margin-bottom: 5px;">
+								<p:autoComplete style="width:100%;" placeholder="Tìm sản phẩm"
+									value="#{promotionalPricingBean.promotionalPricingCrud.product}"
+									maxResults="30" converter="abstractConverter"
+									minQueryLength="2" queryDelay="900"
+									completeMethod="#{abstractAutoComplete.completeProduct}"
+									var="p" itemLabel="#{p.product_name}" itemValue="#{p}"
+									forceSelection="true" onclick="this.select();">
+									<p:column style="width:50px">
+										<h:outputText value="#{p.product_code}" />
+									</p:column>
+									<p:column style="width:150px">
+										<h:outputText value="#{p.product_name}" />
+									</p:column>
+								</p:autoComplete>
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<label>Đơn giá KM</label>
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important; margin-bottom: 5px;">
+								<p:inputNumber
+									value="#{promotionalPricingBean.promotionalPricingCrud.unit_price}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="3"
+									decimalSeparator="," thousandSeparator="." />
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 0px !important; padding-right: 5px !important;">
+								<label>Ngày hiệu lực<span style="color: red;">*</span></label>
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 5px !important; padding-right: 0px !important;">
+								<label>Ngày hết hạn</label>
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 0px !important; padding-right: 5px !important; margin-bottom: 5px;">
+								<p:calendar
+									value="#{promotionalPricingBean.promotionalPricingCrud.effective_date}"
+									pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+									showButtonPanel="true" />
+							</div>
+							<div class="col-md-6"
+								style="padding-left: 5px !important; padding-right: 0px !important; margin-bottom: 5px;">
+								<p:calendar
+									value="#{promotionalPricingBean.promotionalPricingCrud.expiry_date}"
+									pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+									showButtonPanel="true" />
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="col-md-12" style="padding: 10px 0px;">
+					<p:commandButton value="Lưu/Cập nhật"
+						update=":messages,menuformid:tablesp"
+						actionListener="#{promotionalPricingBean.saveOrUpdate()}" />
+				</div>
+			</h:form>
+		</p:dialog>
+
+		<p:dialog widgetVar="dongiakm" resizable="false" width="400"
+			header="Tải đơn giá khuyến mãi">
+			<h:form id="dongiakm" enctype="multipart/form-data">
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important;">
+					<div class="col-md-12">
+						<div class="row">
+							<div class="col-md-6">
+								<label>Từ ngày</label>
+							</div>
+							<div class="col-md-6">
+								<p:calendar value="#{promotionalPricingBean.tungay}"
+									pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+									showButtonPanel="true">
+									<p:ajax event="change" process="@this" />
+									<p:ajax event="dateSelect" process="@this" />
+								</p:calendar>
+							</div>
+						</div>
+						<div class="row">
+							<div class="col-md-6">
+								<label>Đến ngày</label>
+							</div>
+							<div class="col-md-6">
+								<p:calendar value="#{promotionalPricingBean.denngay}"
+									pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+									showButtonPanel="true">
+									<p:ajax event="change" process="@this" />
+									<p:ajax event="dateSelect" process="@this" />
+								</p:calendar>
+							</div>
+						</div>
+						<br />
+						<div class="row">
+							<p:fileUpload style="text-align:center" id="fileupload"
+								dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+								label="Chọn file từ máy tính" cancelLabel="Huỷ"
+								update=":messages" uploadLabel="Tải lên" multiple="false"
+								listener="#{promotionalPricingBean.napDonGiaKM}"
+								mode="advanced" process="@this,menuformid" />
+						</div>
+					</div>
+					<div class="col-md-12" style="margin-bottom: 10px;">
+						<div class="row">
+							<div class="col-md-6">
+								<a
+									href="#{request.contextPath}/resources/upload/filemau/file_mau_don_gia_km.xlsx"
+									style="color: #0077b3; text-decoration: underline;">Xem
+									file excel mẫu</a>
+							</div>
+						</div>
+					</div>
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="kiemtradongia" resizable="false" width="1024"
+			header="Kiểm tra đơn giá khuyến mãi">
+			<h:form id="idfkiemtradongia">
+				<div class="col-md-12">
+
+					<div class="col-md-12">
+						<p:fieldset>
+							<div class="row">
+								<div class="col-md-6">
+									<div class="row">
+										<div class="col-md-7">
+											<p:outputPanel id="sedate">
+												<label style="width: 80px">Từ ngày</label>
+												<p:calendar value="#{promotionalPricingBean.psDate}"
+													styleClass="ui-calendarw100" pattern="dd/MM/yyyy"
+													showOn="button" mask="99/99/9999" showButtonPanel="true">
+												</p:calendar>
+												<br />
+												<label style="width: 80px">Đến ngày</label>
+												<p:calendar value="#{promotionalPricingBean.peDate}"
+													styleClass="ui-calendarw100" pattern="dd/MM/yyyy"
+													showOn="button" mask="99/99/9999" showButtonPanel="true">
+												</p:calendar>
+											</p:outputPanel>
+										</div>
+										<div class="col-md-5">
+											<label style="width: 60px">Tháng</label>
+											<p:spinner value="#{promotionalPricingBean.pmonth}" size="3"
+												min="1" max="12">
+												<p:ajax listener="#{promotionalPricingBean.ajax_setDate()}"
+													update="sedate" process="@this" />
+											</p:spinner>
+											<br /> <label style="width: 60px">Năm</label>
+
+											<p:spinner value="#{promotionalPricingBean.pyear}" size="3" thousandSeparator=""
+												min="2015" max="2050">
+												<p:ajax listener="#{promotionalPricingBean.ajax_setDate()}"
+													update="sedate" process="@this" />
+											</p:spinner>
+										</div>
+									</div>
+								</div>
+								<div class="col-md-6">
+									<p:commandLink styleClass="btn_download"
+										style="margin-left:1px;height:28px !important;line-height:28px !important;"
+										update="idfkiemtradongia"
+										action="#{promotionalPricingBean.kiemTraDonGiaKM()}">
+										<i class="fa fa-search" aria-hidden="true"></i>
+										<span>Kiểm tra đơn giá KM</span>
+									</p:commandLink>
+									<p:commandLink styleClass="btn_new" update="idfkiemtradongia"
+										style="margin-left:5px;background-color: #149d0f !important;"
+										action="#{promotionalPricingBean.apDungDonGiaDung()}">
+										<i class="fa fa-arrow-circle-o-down" aria-hidden="true"></i>
+										<span>Áp dụng đơn giá KM đúng</span>
+									</p:commandLink>
+								</div>
+							</div>
+						</p:fieldset>
+					</div>
+
+					<div class="col-md-12">
+						<p:outputLabel
+							value="Chỉ kiểm tra các phiếu có mã xuất nhập 'A', 'P', '5', '&amp;', 'M', '+', '(','Q' và hệ số thuế bằng 0"/>
+							<p:dataTable value="#{promotionalPricingBean.invoices}"
+								styleClass="tablenhapsp" widgetVar="tablesp" scrollable="true"
+								scrollHeight="200" rowKey="#{item.id}" id="tablehd"
+								style="width:100%;" sortBy="#{item.id}" sortOrder="descending"
+								selection="#{promotionalPricingBean.invoiceSelect}"
+								selectionMode="single" var="item">
+								<p:ajax event="rowSelect"
+									listener="#{promotionalPricingBean.selectInvoice()}"
+									update="idfkiemtradongia:tablehdct" />
+								<p:column style="width:10px" styleClass="textcenter">
+									<f:facet name="header">
+										<p:selectBooleanCheckbox value="#{promotionalPricingBean.chonhet}">
+											<p:ajax update="@(.stchoose)"
+												listener="#{promotionalPricingBean.chonHetPhieu()}" />
+										</p:selectBooleanCheckbox>
+									</f:facet>
+									<p:selectBooleanCheckbox value="#{item.chonphieu}"
+										styleClass="stchoose">
+										<p:ajax process="@this" />
+									</p:selectBooleanCheckbox>
+								</p:column>
+								<p:column headerText="Id" style="width:40px"
+									styleClass="textcenter" sortBy="#{item.id}">
+									<h:outputText value="#{item.id}" />
+								</p:column>
+								<p:column headerText="Số CT" width="70"
+									sortBy="#{item.voucher_code}">
+									<h:outputText value="#{item.voucher_code}" />
+								</p:column>
+								<p:column headerText="Ngày ĐH" width="70"
+									sortBy="#{item.invoice_date}">
+									<h:outputText value="#{item.invoice_date}">
+										<f:convertDateTime pattern="dd/MM/yyyy" />
+									</h:outputText>
+								</p:column>
+								<p:column headerText="Khách hàng" width="350"
+									sortBy="#{item.customer.customer_name}">
+									<h:outputText style="white-space: initial;"
+										value="#{item.customer.customer_name}" />
+								</p:column>
+							</p:dataTable>
+					</div>
+					<div class="col-md-12">
+						<p:dataTable value="#{promotionalPricingBean.invoiceDetails}"
+							scrollable="true" scrollHeight="200" rows="10"
+							rowIndexVar="indexd" rowKey="#{item.id}" style="width:100%;"
+							styleClass="tablenhapsp" id="tablehdct" var="item">
+							<p:column headerText="ID" width="40" styleClass="textcenter">
+								<h:outputText value="#{item.id}" />
+							</p:column>
+							<p:column headerText="Mã SP" width="30">
+								<h:outputText value="#{item.product.product_code}" />
+							</p:column>
+							<p:column headerText="Tên sản phẩm" width="250">
+								<h:outputText value="#{item.product.product_name}" />
+							</p:column>
+							<p:column headerText="Số lượng" width="50" styleClass="textright">
+								<h:outputText value="#{item.quantity}">
+									<f:convertNumber locale="vi"  pattern="###,###,##0.##" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="Đơn giá" width="50" styleClass="textright">
+								<h:outputText value="#{item.unit_price}">
+									<f:convertNumber locale="vi"  pattern="###,###,##0.##" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="Đơn giá ss" width="50"
+								styleClass="textright">
+								<h:outputText value="#{item.unit_price_ss}">
+									<f:convertNumber locale="vi"  pattern="###,###,##0.##" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="Tổng tiền" width="60"
+								styleClass="textright">
+								<h:outputText value="#{item.total}">
+									<f:convertNumber locale="vi"  pattern="###,###,##0.##" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="Chênh lệch đg" width="70"
+								styleClass="textright"
+								style="background: #{item.chenhlechgiakm?'#fbbfbf':''}">
+								<h:outputText value="#{item.unit_price_ss-item.unit_price}">
+									<f:convertNumber locale="vi"  pattern="###,###,##0.##" />
+								</h:outputText>
+							</p:column>
+						</p:dataTable>
+					</div>
+				</div>
+			</h:form>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

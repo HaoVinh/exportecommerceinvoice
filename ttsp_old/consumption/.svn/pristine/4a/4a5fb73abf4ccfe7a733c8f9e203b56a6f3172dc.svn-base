@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<style>
+.ui-selectoneradio label {
+	font-weight: normal;
+}
+</style>
+		<h:form id="titleId">
+			<h3
+				style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">#{reportInSanPhamBean.title}</h3>
+		</h:form>
+		<p:separator />
+		<div class="col-md-12">
+			<p:tabView id="tabview1" styleClass="clearfix label12 tabview_lix"
+				widgetVar="tabViewVar">
+				<p:tab id="tab1" title="Danh sách báo cáo">
+					<div class="row row-centered">
+						<p:fieldset>
+							<p:fieldset style="width:750px;margin:auto">
+								<h:form id="menuformid">
+									<p:selectOneRadio id="customRadio" columns="3"
+										value="#{reportInSanPhamBean.loaiBaoCaoInSanPhamSelect}"
+										converter="abstractConverter" layout="responsive">
+										<f:selectItems
+											value="#{reportInSanPhamBean.listLoaiBaoCaoInSanPham}"
+											var="item" itemLabel="#{item.name}" itemValue="#{item}" />
+										<p:ajax process="@this" update="tabview1:menuformid2,titleId" />
+									</p:selectOneRadio>
+								</h:form>
+							</p:fieldset>
+						</p:fieldset>
+					</div>
+				</p:tab>
+				<p:tab id="tab2" title="Dữ liệu báo cáo">
+					<h:form id="menuformid2">
+						<ui:include src="#{reportInSanPhamBean.includeViewPage()}" />
+					</h:form>
+				</p:tab>
+			</p:tabView>
+		</div>
+		<p:dialog styleClass="dialogcommon dialogcommon_size90" resizable="false" closeOnEscape="true"
+			header="Nội dung báo cáo" widgetVar="showImg">
+			<h:form id="showImg" >
+				<div id="example1"
+					style="width: 98%; height: 98%; border: 1px solid #cccccc; position: absolute; z-index: 1000; float: right;"></div>
+			</h:form>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

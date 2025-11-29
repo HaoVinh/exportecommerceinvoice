@@ -1,0 +1,67 @@
+package trong.lixco.com.entity;
+
+
+import javax.persistence.Entity;
+
+/*
+ * 1. Host quan ly account (Account database)
+ * 2. Host web
+ */
+@Entity
+public class AccountDatabase extends AbstractEntity{
+	private String address;
+	private String name;
+	private String addressPublic;
+	private String token;
+	private String linkConfirmEmail;
+
+	public String getAddress() {
+		return address;
+	}
+
+	public void setAddress(String address) {
+		this.address = address;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+	
+
+	public String getAddressPublic() {
+		return addressPublic;
+	}
+
+	public void setAddressPublic(String addressPublic) {
+		this.addressPublic = addressPublic;
+	}
+
+	public String getToken() {
+		return token;
+	}
+
+	public void setToken(String token) {
+		this.token = token;
+	}
+
+	public String getLinkConfirmEmail() {
+		return linkConfirmEmail;
+	}
+
+	public void setLinkConfirmEmail(String linkConfirmEmail) {
+		this.linkConfirmEmail = linkConfirmEmail;
+	}
+
+	@Override
+	public String toString() {
+		return "AccountDatabase [address=" + address + ", name=" + name + ", id=" + id + ", createdDate=" + createdDate
+				+ ", modifiedDate=" + modifiedDate + ", createdUser=" + createdUser + ", note=" + note + "]";
+	}
+
+	
+	
+}

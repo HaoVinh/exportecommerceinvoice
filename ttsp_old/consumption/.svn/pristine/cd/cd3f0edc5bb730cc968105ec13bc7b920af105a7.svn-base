@@ -1,0 +1,220 @@
+package lixco.com.service;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Objects;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.ParameterExpression;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import javax.persistence.criteria.Subquery;
+
+import org.jboss.logging.Logger;
+
+import com.google.gson.JsonObject;
+
+import lixco.com.commom_ejb.HolderParser;
+import lixco.com.commom_ejb.JsonParserUtil;
+import lixco.com.commom_ejb.ToolTimeCustomer;
+import lixco.com.entity.XacNhanKiemTra;
+import lixco.com.entity.XacNhanKiemTraDetail;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.CONTAINER)
+public class XacNhanKiemTraService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource
+	private SessionContext ct;
+
+	public int search(String json, List<XacNhanKiemTra> list) {
+		int res = -1;
+		try {
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+			HolderParser hstextStr = JsonParserUtil.getValueString(j.get("xacnhankiemtra"), "stextStr", null);
+			HolderParser hFromDate = JsonParserUtil.getValueString(j.get("xacnhankiemtra"), "from_date", null);
+			HolderParser hToDate = JsonParserUtil.getValueString(j.get("xacnhankiemtra"), "to_date", null);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<XacNhanKiemTra> cq = cb.createQuery(XacNhanKiemTra.class);
+			Root<XacNhanKiemTra> root_ = cq.from(XacNhanKiemTra.class);
+			ParameterExpression<Date> pFromDate = cb.parameter(Date.class);
+			ParameterExpression<Date> pToDate = cb.parameter(Date.class);
+			List<Predicate> predicates = new ArrayList<Predicate>();
+			Predicate dis = cb.disjunction();
+			dis.getExpressions().add(cb.isNull(pFromDate));
+			dis.getExpressions().add(cb.greaterThanOrEqualTo(root_.get("requestDate"), pFromDate));
+			predicates.add(dis);
+			Predicate dis1 = cb.disjunction();
+			dis1.getExpressions().add(cb.isNull(pToDate));
+			dis1.getExpressions().add(cb.lessThanOrEqualTo(root_.get("requestDate"), pToDate));
+			predicates.add(dis1);
+
+			List<Predicate> predicatesStr = new ArrayList<Predicate>();
+
+			String stextStr = Objects.toString(hstextStr.getValue());
+			if (hstextStr.getValue() != null && !"".equals(stextStr.trim())) {
+				Predicate predicatevoucher_code = cb.like(root_.get("requestCode"), "%" + stextStr + "%");
+				predicatesStr.add(predicatevoucher_code);
+				Predicate predicatecreated_by = cb.like(root_.get("createdBy"), "%" + stextStr + "%");
+				predicatesStr.add(predicatecreated_by);
+
+				List<Predicate> subpredicates = new LinkedList<Predicate>();
+				Subquery<XacNhanKiemTraDetail> sqOne = cq.subquery(XacNhanKiemTraDetail.class);
+				Root subroot = sqOne.from(XacNhanKiemTraDetail.class);
+				Predicate predicatePdCode = cb.like(subroot.get("product").get("product_code"), "%" + stextStr + "%");
+				subpredicates.add(predicatePdCode);
+				Predicate predicatePdName = cb.like(subroot.get("product").get("product_name"), "%" + stextStr + "%");
+				subpredicates.add(predicatePdName);
+				sqOne.select(subroot.get("xacNhanKiemTra")).where(cb.or(subpredicates.toArray(new Predicate[0])));
+				Predicate predicateSub = cb.equal(root_, cb.any(sqOne));
+				predicatesStr.add(predicateSub);// truy cap chi tiet
+			}
+			if (predicatesStr.size() != 0) {
+				cq.select(root_)
+						.where(cb.and(predicates.toArray(new Predicate[0])),
+								cb.or(predicatesStr.toArray(new Predicate[0])))
+						.orderBy(cb.desc(root_.get("requestDate")));
+			} else {
+				cq.select(root_).where(cb.and(predicates.toArray(new Predicate[0])))
+						.orderBy(cb.desc(root_.get("requestDate")));
+			}
+			TypedQuery<XacNhanKiemTra> query = em.createQuery(cq);
+			query.setParameter(pFromDate,
+					ToolTimeCustomer.convertStringToDate(Objects.toString(hFromDate.getValue(), null), "dd/MM/yyyy"));
+			query.setParameter(pToDate,
+					ToolTimeCustomer.convertStringToDate(Objects.toString(hToDate.getValue(), null), "dd/MM/yyyy"));
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	public boolean checkDataIsAvailable(Date requestDate) {
+		try {
+			StringBuilder sql = new StringBuilder();
+			sql.append("SELECT 1 FROM XacNhanKiemTra WHERE requestDate=:requestDate");
+			Query query = em.createNativeQuery(sql.toString());
+			query.setParameter("requestDate", requestDate);
+			List<BigInteger> results = (List<BigInteger>) query.getResultList();
+			if (results.size()!=0&&results.get(0).intValue() == 1)
+				return true;
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNote.selectByIdToExcel:" + e.getMessage(), e);
+		}
+		return false;
+	}
+
+	public int insert(XacNhanKiemTra p) {
+		int res = -1;
+		try {
+			if (p != null) {
+				em.persist(p);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	public int update(XacNhanKiemTra p) {
+		int res = -1;
+		try {
+			if (p != null) {
+				p = em.merge(p);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	public XacNhanKiemTra findById(long id) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<XacNhanKiemTra> cq = cb.createQuery(XacNhanKiemTra.class);
+			Root<XacNhanKiemTra> root = cq.from(XacNhanKiemTra.class);
+			cq.select(root).where(cb.equal(root.get("id"), id));
+			TypedQuery<XacNhanKiemTra> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	public int deleteById(long id) {
+		int res = -1;
+		try {
+			XacNhanKiemTra t = em.find(XacNhanKiemTra.class, id);
+			if (t != null) {
+				em.remove(t);
+				res = 0;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	public int selectByIdToExcel(List<Long> receiptIds, List<Object[]> list) {
+		int res = -1;
+		try {
+			// Object[] title = { "ID", "Số CT", "Ngày", "Nhân viên tạo",
+			// "Ghi chú", "Đã kiểm tra", "Ngày kiểm tra",
+			// "Nhân viên kiểm tra", "IDCT", "Mã SP", "Tên SP", "Số lượng(ĐVT)",
+			// "Số lượng (thùng)",
+			// "Lô hàng", "Nguồn gốc", "Tình trạng", "Kết quả đạt",
+			// "Ngày gia hạn", "TC hóa lý vi sinh",
+			// "Nguyên nhân", "Kết luận" };
+			if (receiptIds.size() != 0) {
+				StringBuilder sql = new StringBuilder();
+				sql.append("SELECT ")
+						.append("i.id, ")
+						.append("i.requestCode, ")
+						.append("i.requestDate, i.createdBy, ")
+						.append("i.note, ")
+						.append("i.dakiemtra, ")
+						.append("DATE_FORMAT(i.ngayKiemTra, '%d/%m/%Y'), ")
+						.append("i.createdCheck, ")
+						.append("ind.id as idct, ")
+						.append("pd.product_code, ")
+						.append("pd.product_name, ")
+						.append("ind.quantity,ROUND(ind.quantity/pd.specification,2), ind.lohang, ")
+						.append("CASE WHEN nguongoc = 1 THEN 'Hàng lưu kho' WHEN nguongoc = 2 THEN 'Hàng trả về' WHEN nguongoc = 3 THEN 'Hàng đổi trả' ELSE '' END AS ket_qua,  ")
+						.append("ind.tinhtrang, ind.kiemtradat, ")
+						.append("DATE_FORMAT(ind.giahanluukho, '%d/%m/%Y'), ind.tieuchuan, ind.nguyennhan, ind.huonggiaiquyet ")
+						.append("FROM ").append("XacNhanKiemTra AS i ").append(" LEFT JOIN ")
+						.append("XacNhanKiemTraDetail AS ind ON i.id = ind.XacNhanKiemTra_id ").append("LEFT JOIN ")
+						.append("product AS pd ON pd.id = ind.product_id ");
+				sql.append("WHERE ").append("i.id IN :idInvs");
+
+				Query query = em.createNativeQuery(sql.toString());
+				query.setParameter("idInvs", receiptIds);
+				list.addAll(query.getResultList());
+				res = 0;
+			}
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNote.selectByIdToExcel:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+}

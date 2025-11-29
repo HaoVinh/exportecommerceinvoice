@@ -1,0 +1,172 @@
+package vinh.lixco.com.apiecommerce;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.logging.Logger;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import lixco.com.entity.EcomOrder;
+import lixco.com.service.EcomOrderService;
+
+@Path("shopee")
+public class ShopeeAPIServlet {
+    private static final long PARTNER_ID = 2012115L;
+    private static final String API_PARTNER_KEY = "shpk76694e444a51764f786775544b7a64446577784f7652476b72556b485163";
+    private static final long SHOP_ID = 779607831L;
+    private static final Logger LOGGER = Logger.getLogger(ShopeeAPIServlet.class.getName());
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    @Inject
+    private EcomOrderService ecomOrderService;
+
+    @POST
+    @Path("/webhook/order")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response webhookShopee(@Context HttpHeaders headers, String inputJson) {
+        LOGGER.info("Webhook Shopee: " + inputJson);
+        try {
+            JsonNode jsonNode = mapper.readTree(inputJson);
+            JsonNode dataNode = jsonNode.path("data");
+
+            if (dataNode.has("verify_info")) {
+                ObjectNode verifyResp = mapper.createObjectNode();
+                verifyResp.put("code", 0);
+                verifyResp.put("message", "Verified OK");
+                return Response.ok(verifyResp).build();
+            }
+
+            String orderSn = dataNode.path("ordersn").asText(null);
+            if (orderSn == null) throw new IllegalArgumentException("Thiếu ordersn trong webhook Shopee");
+
+            String accessToken = ShopeeTokenManager.getInstance().getAccessToken();
+            OrderDTO orderDTO = fetchOrderDetail(orderSn);
+            if (orderDTO != null) saveOrUpdateOrder(orderDTO);
+
+            ObjectNode successResp = mapper.createObjectNode();
+            successResp.put("status", "success");
+            successResp.put("message", "Shopee webhook xử lý thành công");
+            successResp.put("ordersn", orderSn);
+            return Response.ok(successResp).build();
+
+        } catch (Exception e) {
+            LOGGER.severe("Webhook Shopee error: " + e.getMessage());
+            ObjectNode err = mapper.createObjectNode();
+            err.put("error", e.getMessage());
+            return Response.status(500).entity(err).build();
+        }
+    }
+
+    public OrderDTO fetchOrder(String orderSn) throws Exception {
+        long timestamp = System.currentTimeMillis() / 1000L;
+        String path = "/api/v2/order/get_order_detail";
+
+        String accessToken = TokenManager.getAccessToken(); // ✅ tự động lấy
+        String baseString = PARTNER_ID + path + timestamp + accessToken + SHOP_ID;
+        String sign = generateHmacSHA256(baseString, API_PARTNER_KEY);
+
+        String url = "https://partner.shopeemobile.com" + path
+                + "?partner_id=" + PARTNER_ID
+                + "&timestamp=" + timestamp
+                + "&access_token=" + accessToken
+                + "&shop_id=" + SHOP_ID
+                + "&sign=" + sign;
+
+        String payload = "{\"ordersn\":\"" + orderSn + "\"}";
+
+        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setRequestProperty("Content-Type", "application/json");
+
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(payload.getBytes(StandardCharsets.UTF_8));
+        }
+
+        StringBuilder response = new StringBuilder();
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+            String line;
+            while ((line = in.readLine()) != null) response.append(line);
+        }
+
+        JsonNode json = mapper.readTree(response.toString());
+        JsonNode data = json.path("response");
+
+        OrderDTO dto = new OrderDTO();
+        dto.setOrderId(orderSn);
+        dto.setOrder_status(data.path("order_status").asText());
+        dto.setCreatedAt(new Date(data.path("create_time").asLong() * 1000));
+        dto.setUpdatedAt(new Date(data.path("update_time").asLong() * 1000));
+        dto.setPrice(data.path("total_amount").asDouble(0.0));
+        dto.setCustomerFirstName(data.path("recipient_address").path("name").asText());
+        dto.setCustomerLastName("");
+        dto.seteCommerceType("Shopee");
+
+        return dto;
+    }
+
+
+    public void saveOrUpdateOrder(OrderDTO dto) {
+        EcomOrder existing = ecomOrderService.findByCode(dto.getOrderId());
+        if (existing == null) {
+            EcomOrder order = new EcomOrder();
+            order.setOrderNumber(dto.getOrderId());
+            order.setCustomerFirstName(dto.getCustomerFirstName());
+            order.setCustomerLastName(dto.getCustomerLastName());
+            order.setCreatedAt(dto.getCreatedAt());
+            order.setUpdatedAt(dto.getUpdatedAt());
+            order.setPrice(dto.getPrice());
+            order.setStatus(dto.getOrder_status());
+            order.setLoaitmdt(dto.geteCommerceType());
+            order.setThoigiancapnhat(new Date());
+            ecomOrderService.create(order);
+            LOGGER.info("Đã lưu đơn hàng Shopee mới: " + dto.getOrderId());
+        } else {
+            existing.setStatus(dto.getOrder_status());
+            existing.setUpdatedAt(dto.getUpdatedAt());
+            existing.setThoigiancapnhat(new Date());
+            ecomOrderService.update(existing);
+            LOGGER.info("Đã cập nhật đơn hàng Shopee: " + dto.getOrderId());
+        }
+    }
+
+    private String generateHmacSHA256(String data, String key) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        mac.init(secretKey);
+        byte[] hashBytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder();
+        for (byte b : hashBytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
+    private static ShopeeAPIServlet instance = new ShopeeAPIServlet();
+
+    public static ShopeeAPIServlet getInstance() {
+        return instance;
+    }
+}

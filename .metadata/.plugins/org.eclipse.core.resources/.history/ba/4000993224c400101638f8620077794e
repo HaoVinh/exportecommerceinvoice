@@ -1,0 +1,305 @@
+package lixco.com.service;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Expression;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.ParameterExpression;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import javax.persistence.criteria.Subquery;
+import javax.sql.DataSource;
+import javax.transaction.SystemException;
+import javax.transaction.UserTransaction;
+
+import org.jboss.logging.Logger;
+
+import com.google.gson.JsonObject;
+
+import lixco.com.commom_ejb.HolderParser;
+import lixco.com.commom_ejb.JsonParserUtil;
+import lixco.com.commom_ejb.ToolTimeCustomer;
+import lixco.com.entity.GoodsReceiptNote;
+import lixco.com.entity.GoodsReceiptNoteDetail;
+import lixco.com.entity.Product;
+import lixco.com.entity.XacNhanKiemTra;
+import lixco.com.entity.XacNhanKiemTraDetail;
+import lixco.com.entity.YeuCauKiemTraHang;
+import lixco.com.entity.YeuCauKiemTraHangDetail;
+import lixco.com.entityapi.XacNhanKiemTraDTO;
+import lixco.com.entityapi.XacNhanKiemTraDetailDTO;
+import lixco.com.entityapi.YeuCauKiemTraHangDTO;
+import lixco.com.entityapi.YeuCauKiemTraHangDetailDTO;
+import lixco.com.reqInfo.Message;
+import lixco.com.reqInfo.WrapGoodsReceiptNoteReqInfo;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.BEAN)
+public class XacNhanKiemTraProccessService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource
+	private SessionContext ct;
+	@Resource(lookup = "java:/consumption")
+	DataSource datasource;
+	@Resource
+	UserTransaction ut;
+	@Inject
+	XacNhanKiemTraDetailService xacNhanKiemTraDetailService;
+	public List<XacNhanKiemTraDTO> searchAPI(Date startDate, Date endDate) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<XacNhanKiemTraDTO> cq = cb.createQuery(XacNhanKiemTraDTO.class);
+			Root<XacNhanKiemTra> root_ = cq.from(XacNhanKiemTra.class);
+			List<Predicate> predicates = new ArrayList<Predicate>();
+			predicates.add(cb.greaterThanOrEqualTo(root_.get("requestDate"), startDate));
+			predicates.add(cb.lessThanOrEqualTo(root_.get("requestDate"), endDate));
+			cq.select(
+					cb.construct(XacNhanKiemTraDTO.class, root_.get("id"), root_.get("createdBy"),
+							root_.get("requestCode"), root_.get("requestDate"), root_.get("trangthaicl"),
+							root_.get("note"), root_.get("dakiemtra"), root_.get("ngayKiemTra"),
+							root_.get("createdCheck"))).where(cb.and(predicates.toArray(new Predicate[0])))
+					.orderBy(cb.desc(root_.get("requestDate")));
+			TypedQuery<XacNhanKiemTraDTO> query = em.createQuery(cq);
+			List<XacNhanKiemTraDTO> xacNhanKiemTraDTOs = query.getResultList();
+			int sizeYCs = xacNhanKiemTraDTOs.size();
+			for (int i = 0; i < sizeYCs; i++) {
+				List<XacNhanKiemTraDetailDTO> xacNhanKiemTraDetailDTOs = xacNhanKiemTraDetailService
+						.findByXacNhanKiemTraDTO(xacNhanKiemTraDTOs.get(i).getId());
+				xacNhanKiemTraDTOs.get(i).setXacNhanKiemTraDetailDTOs(xacNhanKiemTraDetailDTOs);
+
+			}
+			return xacNhanKiemTraDTOs;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return new ArrayList<XacNhanKiemTraDTO>();
+	}
+	public List<XacNhanKiemTraDTO> searchAPIKhongDat(Date startDate, Date endDate) {
+	    try {
+	        CriteriaBuilder cb = em.getCriteriaBuilder();
+	        CriteriaQuery<XacNhanKiemTraDTO> cq = cb.createQuery(XacNhanKiemTraDTO.class);
+	        Root<XacNhanKiemTra> root = cq.from(XacNhanKiemTra.class);
+
+	        List<Predicate> predicates = new ArrayList<>();
+	        predicates.add(cb.greaterThanOrEqualTo(root.get("requestDate"), startDate));
+	        predicates.add(cb.lessThanOrEqualTo(root.get("requestDate"), endDate));
+
+	        cq.select(cb.construct(
+	            XacNhanKiemTraDTO.class,
+	            root.get("id"),
+	            root.get("createdBy"),
+	            root.get("requestCode"),
+	            root.get("requestDate"),
+	            root.get("note"),
+	            root.get("dakiemtra"),
+	            root.get("ngayKiemTra"),
+	            root.get("createdCheck")
+	        ))
+	        .where(cb.and(predicates.toArray(new Predicate[0])))
+	        .orderBy(cb.desc(root.get("requestDate")));
+
+	        List<XacNhanKiemTraDTO> xacNhanKiemTraDTOs = em.createQuery(cq).getResultList();
+
+	        // Duyệt và chỉ gán chi tiết nếu có ít nhất 1 dòng không đạt (trangthaicl = 3)
+	        for (XacNhanKiemTraDTO dto : xacNhanKiemTraDTOs) {
+	            List<XacNhanKiemTraDetailDTO> details = xacNhanKiemTraDetailService
+	                    .findChiTietKhongDatByPhieuId(dto.getId()); // Hàm mới, chỉ lấy không đạt
+	            
+	            if (!details.isEmpty()) {
+	                dto.setXacNhanKiemTraDetailDTOs(details);
+	            } else {
+	                // Nếu không có chi tiết không đạt → không gán gì cả (phiếu này sẽ không hiển thị chi tiết)
+	                dto.setXacNhanKiemTraDetailDTOs(new ArrayList<>());
+	            }
+	        }
+
+	        return xacNhanKiemTraDTOs.stream()
+	                .filter(dto -> !dto.getXacNhanKiemTraDetailDTOs().isEmpty())
+	                .collect(Collectors.toList());
+
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        logger.error("Lỗi searchAPIKhongDat: ", e);
+	    }
+	    return new ArrayList<>();
+	}
+	public int updateKetQuaKiemTra(XacNhanKiemTraDTO pDTO, StringBuilder messages) throws IllegalStateException,
+			SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		try {
+			List<XacNhanKiemTraDetailDTO> xacNhanKiemTraDetailDTOs = pDTO.getXacNhanKiemTraDetailDTOs();
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			if (pDTO.getId() != 0) {
+				XacNhanKiemTra p = em.find(XacNhanKiemTra.class, pDTO.getId());
+				if (p == null) {
+					res = -1;
+					messages.append("Phiếu không tồn tại.");
+					ut.rollback();
+					return res;
+				}
+				/*
+				 * KCS kiem tra
+				 */
+				p.setDakiemtra(pDTO.isDakiemtra());
+				p.setNgayKiemTra(pDTO.getNgayKiemTra());
+				p.setCreatedCheck(pDTO.getCreatedCheck());
+				p.setTrangthaicl(pDTO.getTrangthaicl());
+				p = em.merge(p);
+				if (p == null) {
+					res = -1;
+					messages.append("Không cập nhật được phiếu, kiểm tra log.");
+					ut.rollback();
+					return res;
+				}
+				if (xacNhanKiemTraDetailDTOs != null) {
+					for (XacNhanKiemTraDetailDTO dtDTO : xacNhanKiemTraDetailDTOs) {
+						XacNhanKiemTraDetail ycOld = xacNhanKiemTraDetailService.findById(dtDTO.getId());
+						if (ycOld != null) {
+							ycOld.setTrangthaicl(dtDTO.getTrangthaicl());
+							ycOld.setNote(dtDTO.getNote());
+							ycOld = em.merge(ycOld);
+							if (ycOld == null) {
+								res = -1;
+								messages.append("error update row detail id: " + ycOld.getId() + " - "
+										+ ycOld.getProduct().getProduct_code());
+								ut.rollback();
+								return res;
+							}
+						}
+					}
+				}
+			}
+			res = 0;
+			ut.commit();
+		} catch (Exception e) {
+			e.printStackTrace();
+			res = -1;
+			messages.append("Không cập nhật được phiếu, kiểm tra log.");
+			ut.rollback();
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	public int saveOrUpdate(XacNhanKiemTra xacNhanKiemTra, Message messages) throws IllegalStateException,
+			SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			List<XacNhanKiemTraDetail> listDetail = xacNhanKiemTra.getXacNhanKiemTraDetails();
+			if (xacNhanKiemTra != null) {
+				ut.begin();
+				con = datasource.getConnection();
+				con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+				xacNhanKiemTra.setXacNhanKiemTraDetails(null);
+				initCode(xacNhanKiemTra);
+				em.persist(xacNhanKiemTra);
+				if (xacNhanKiemTra.getId() == 0) {
+					res = -1;
+					messages.setUser_message("Lưu phiếu không thành công.");
+					ut.rollback();
+					return res;
+				}
+				int stt = 0;
+				for (XacNhanKiemTraDetail dt : listDetail) {
+					stt++;
+					Product product = dt.getProduct();
+					// lưu chi tiết phiếu nhập
+					dt.setCreated_by(xacNhanKiemTra.getCreatedBy());
+					dt.setCreated_date(new Date());
+					dt.setXacNhanKiemTra(xacNhanKiemTra);
+					em.persist(dt);
+					if (dt.getId() == 0) {
+						res = -1;
+						messages.setUser_message("Không lưu được: " + product.getProduct_code());
+						ut.rollback();
+						return res;
+					}
+
+				}
+			}
+			res = 0;
+			ut.commit();
+		} catch (Exception e) {
+			res = -1;
+			messages.setUser_message("Lưu phiếu không thành công.");
+			ut.rollback();
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	
+	private int initCode(XacNhanKiemTra t) {
+		int res = -1;
+		try {
+			Date date = t.getRequestDate();
+			int year = ToolTimeCustomer.getYearM(date);
+			int month = ToolTimeCustomer.getMonthM(date);
+
+			String voucher = "/" + String.format("%02d", month) + "" + String.format("%02d", year % 2000);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<String> cq = cb.createQuery(String.class);
+			Root<XacNhanKiemTra> root = cq.from(XacNhanKiemTra.class);
+			cq.select(root.get("requestCode"))
+					.where(cb.equal(cb.function("MONTH", Integer.class, root.get("requestDate")), month),
+							cb.equal(cb.function("YEAR", Integer.class, root.get("requestDate")), year))
+					.orderBy(cb.desc(root.get("requestDate")), cb.desc(root.get("id")));
+			TypedQuery<String> query = em.createQuery(cq);
+			List<String> list = query.getResultList();
+			if (list.size() > 0) {
+				String temp = list.get(0);
+				if (temp != null) {
+					int last = temp.indexOf("/");
+					String sub = temp.substring(0, last);
+					voucher = String.format("%03d", Integer.parseInt(sub) + 1) + voucher;
+					t.setRequestCode(voucher);
+				}
+			} else {
+				voucher = String.format("%03d", 1)+voucher;
+				t.setRequestCode(voucher);
+			}
+			res = 0;
+		} catch (Exception e) {
+			Date date = t.getRequestDate();
+			int year = ToolTimeCustomer.getYearM(date);
+			int month = ToolTimeCustomer.getMonthM(date);
+			String voucher = "/" + String.format("%02d", month) + "" + String.format("%02d", year % 2000) + "KT";
+			voucher = String.format("%03d", 1)+voucher;
+			t.setRequestCode(voucher);
+		}
+		return res;
+	}
+
+}

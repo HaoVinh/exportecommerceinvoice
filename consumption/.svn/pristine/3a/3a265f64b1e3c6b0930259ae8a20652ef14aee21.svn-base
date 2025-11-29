@@ -1,0 +1,5286 @@
+package lixco.com.bean;
+
+import huyen.lixco.com.service.HoaDonC2DetailService;
+import huyen.lixco.com.service.HoaDonC2Service;
+import huyen.lixco.com.service.InvoiceDetailTempService;
+import huyen.lixco.com.service.InvoiceTempService;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import javax.faces.application.FacesMessage;
+import javax.faces.context.FacesContext;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import lixco.com.commom_ejb.MyMath;
+import lixco.com.commom_ejb.PagingInfo;
+import lixco.com.common.FormatHandler;
+import lixco.com.common.JsonParserUtil;
+import lixco.com.common.NavigationInfo;
+import lixco.com.common.SessionHelper;
+import lixco.com.common.ToolTimeCustomer;
+import lixco.com.einvoice_data.EInvoiceV3;
+import lixco.com.einvoice_service.ConfigSystemService;
+import lixco.com.einvoice_service.EInvoiceService;
+import lixco.com.entity.Batch;
+import lixco.com.entity.Car;
+import lixco.com.entity.CarOwner;
+import lixco.com.entity.CarType;
+import lixco.com.entity.Contract;
+import lixco.com.entity.CotHienThi;
+import lixco.com.entity.Customer;
+import lixco.com.entity.CustomerChannel;
+import lixco.com.entity.CustomerTypes;
+import lixco.com.entity.DeliveryPricing;
+import lixco.com.entity.ExportBatch;
+import lixco.com.entity.FormUpGoods;
+import lixco.com.entity.FreightContract;
+import lixco.com.entity.HeThong;
+import lixco.com.entity.HoaDonC2;
+import lixco.com.entity.HoaDonChiTietC2;
+import lixco.com.entity.IECategories;
+import lixco.com.entity.Invoice;
+import lixco.com.entity.InvoiceDetail;
+import lixco.com.entity.InvoiceDetailTemp;
+import lixco.com.entity.InvoiceTemp;
+import lixco.com.entity.OrderDetail;
+import lixco.com.entity.OrderLix;
+import lixco.com.entity.PaymentMethod;
+import lixco.com.entity.PricingProgram;
+import lixco.com.entity.Product;
+import lixco.com.entity.PromotionOrderDetail;
+import lixco.com.entity.PromotionProgram;
+import lixco.com.entity.PromotionProgramDetail;
+import lixco.com.entity.Stevedore;
+import lixco.com.entity.Stocker;
+import lixco.com.entityapi.InvoiceDetailDTO3;
+import lixco.com.hddt.KetQua;
+import lixco.com.hddt.LoaiMaXuatNhap;
+import lixco.com.hddt.MisaInvoice;
+import lixco.com.interfaces.IBatchService;
+import lixco.com.interfaces.ICarOwnerService;
+import lixco.com.interfaces.ICarService;
+import lixco.com.interfaces.ICarTypeService;
+import lixco.com.interfaces.IContractService;
+import lixco.com.interfaces.ICustomerChannelService;
+import lixco.com.interfaces.ICustomerPricingProgramService;
+import lixco.com.interfaces.ICustomerPromotionProgramService;
+import lixco.com.interfaces.ICustomerService;
+import lixco.com.interfaces.IDeliveryPricingService;
+import lixco.com.interfaces.IFormUpGoodsService;
+import lixco.com.interfaces.IFreightContractService;
+import lixco.com.interfaces.IIECategoriesService;
+import lixco.com.interfaces.IIEInvoiceService;
+import lixco.com.interfaces.IInvoiceDetailService;
+import lixco.com.interfaces.IInvoiceService;
+import lixco.com.interfaces.IOrderDetailService;
+import lixco.com.interfaces.IOrderLixService;
+import lixco.com.interfaces.IPaymentMethodService;
+import lixco.com.interfaces.IPricingProgramDetailService;
+import lixco.com.interfaces.IProcessLogicInvoiceService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.interfaces.IPromotionOrderDetailService;
+import lixco.com.interfaces.IPromotionProgramDetailService;
+import lixco.com.interfaces.IPromotionalPricingService;
+import lixco.com.interfaces.IStevedoreService;
+import lixco.com.interfaces.IWarehouseService;
+import lixco.com.reportInfo.LenhDieuDong;
+import lixco.com.reportInfo.PhieuNhapKho;
+import lixco.com.reportInfo.PhieuXuatKho;
+import lixco.com.reportInfo.PhieuXuatKhoKiemVCNB;
+import lixco.com.reqInfo.BatchReqInfo;
+import lixco.com.reqInfo.CarReqInfo;
+import lixco.com.reqInfo.CustomerPricingProgramReqInfo;
+import lixco.com.reqInfo.CustomerPromotionProgramReqInfo;
+import lixco.com.reqInfo.InvoiceDetailReqInfo;
+import lixco.com.reqInfo.InvoiceReqInfo;
+import lixco.com.reqInfo.InvoiceTempReqInfo;
+import lixco.com.reqInfo.Message;
+import lixco.com.reqInfo.OrderLixReqInfo;
+import lixco.com.reqInfo.PhieuXuatKhoLever;
+import lixco.com.reqInfo.PricingProgramDetailReqInfo;
+import lixco.com.reqInfo.PromotionalPricingReqInfo;
+import lixco.com.reqInfo.ReportTypeIEInVoice;
+import lixco.com.reqInfo.WrapDelInvoiceDetailReqInfo;
+import lixco.com.reqInfo.WrapExportDataReqInfo;
+import lixco.com.reqInfo.WrapExtensionOrderReqInfo;
+import lixco.com.reqInfo.WrapInvoiceDelInfo;
+import lixco.com.reqInfo.WrapInvoiceDetailReqInfo;
+import lixco.com.reqInfo.WrapInvoiceDetailTempReqInfo;
+import lixco.com.reqInfo.WrapOrderDetailLixReqInfo;
+import lixco.com.service.BienNhanVanChuyenService;
+import lixco.com.service.CotHienThiService;
+import lixco.com.service.HeThongService;
+import lixco.com.service.TonKhoThucTeService;
+import lombok.Getter;
+import lombok.Setter;
+import net.sf.jasperreports.engine.JREmptyDataSource;
+import net.sf.jasperreports.engine.JRParameter;
+import net.sf.jasperreports.engine.JasperExportManager;
+import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperPrint;
+import okhttp3.Call;
+import okhttp3.Response;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.jboss.logging.Logger;
+import org.omnifaces.cdi.ViewScoped;
+import org.primefaces.PrimeFaces;
+import org.primefaces.event.FileUploadEvent;
+import org.primefaces.event.SelectEvent;
+import org.primefaces.event.TabChangeEvent;
+import org.primefaces.event.ToggleEvent;
+import org.primefaces.model.Visibility;
+import org.primefaces.model.file.UploadedFile;
+
+import trong.lixco.com.account.servicepublics.Account;
+import trong.lixco.com.account.servicepublics.Member;
+import trong.lixco.com.api.SecurityConfig;
+import trong.lixco.com.bean.AbstractBean;
+import trong.lixco.com.entity.AccountAPI;
+import trong.lixco.com.entity.ParamReportDetail;
+import trong.lixco.com.info.DuLieuHoaDonDonHang;
+import trong.lixco.com.service.AccountAPIService;
+import trong.lixco.com.service.DongBoService;
+import trong.lixco.com.service.ParamReportDetailService;
+import trong.lixco.com.util.ConvertNumberToText;
+import trong.lixco.com.util.MyStringUtil;
+import trong.lixco.com.util.MyUtil;
+import trong.lixco.com.util.MyUtilExcel;
+import trong.lixco.com.util.Notify;
+import trong.lixco.com.util.ToolReport;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.pdf.PdfCopy;
+import com.lowagie.text.pdf.PdfImportedPage;
+import com.lowagie.text.pdf.PdfReader;
+import com.opencsv.CSVWriter;
+
+@Named
+@ViewScoped
+public class InvoiceTempBean extends AbstractBean {
+	private static final long serialVersionUID = 1L;
+	private final long EINVOICE_TYPE = 1;
+	private final String MAKT_NVC[] = { "X", "A", "V", "E", "5", "%", "1", "^", "+", "-", "Y" };
+	@Inject
+	private Logger logger;
+	@Inject
+	private IProcessLogicInvoiceService processLogicInvoiceService;
+	@Inject
+	private ICustomerService customerService;
+	@Inject
+	private IPaymentMethodService paymentMethodService;
+	@Inject
+	private IWarehouseService warehouseService;
+	@Inject
+	private ICarService carService;
+	@Inject
+	private IStevedoreService stevedoreService;
+	@Inject
+	private IFormUpGoodsService formUpGoodsService;
+	@Inject
+	private IInvoiceService invoiceService;
+	@Inject
+	private IInvoiceDetailService invoiceDetailService;
+	@Inject
+	private IBatchService batchService;
+	@Inject
+	private EInvoiceService eInvoiceService;
+	@Inject
+	private ConfigSystemService configSystemService;
+	@Inject
+	private IContractService contractService;
+	@Inject
+	private ICarTypeService carTypeService;
+	@Inject
+	private ICarOwnerService carOwnerService;
+	@Inject
+	private IFreightContractService freightContractService;
+	@Inject
+	private IDeliveryPricingService deliveryPricingService;
+	@Inject
+	private IPricingProgramDetailService pricingProgramDetailService;
+	@Inject
+	private IIECategoriesService ieCategoriesService;
+	private InvoiceTemp invoiceCrud;
+	private InvoiceTemp invoiceSelect;
+	private List<InvoiceTemp> listInvoiceTemp;
+	private WrapInvoiceDetailTempReqInfo wrapInvoiceDetailCrud;
+	private WrapInvoiceDetailTempReqInfo wrapInvoiceDetailSelect;
+	private List<WrapInvoiceDetailTempReqInfo> listWrapInvoiceDetail;
+	private List<WrapInvoiceDetailTempReqInfo> listWrapInvoiceDetailFilter;
+	private List<PaymentMethod> listPaymentMethod;
+	private List<Stevedore> listStevedores;
+	private List<FormUpGoods> listFormUpGoods;
+	private FormatHandler formatHandler;
+	private Date fromDateFCFilter;
+	private Date toDateFCFilter;
+	private CustomerTypes customerTypesFCFilter;
+	private Customer customerFcFilter;
+	private String contractNoFCFilter;
+	private List<FreightContract> listFreightContractSelect;
+	private int pageSizeHDVC;
+	private NavigationInfo navigationInfoHDVC;
+	private List<Integer> listRowPerPageHDVC;
+	private String keySearchCustomer;
+	private List<Customer> listCustomerSelect;
+	/* nơi giao hàng */
+	private List<DeliveryPricing> listDeliveryPricing;
+	/* search invoice */
+	@Getter
+	@Setter
+	private Date fromDateSearch;
+	@Getter
+	@Setter
+	private Date toDateSearch;
+	@Getter
+	@Setter
+	private Customer customerSearch;
+	@Getter
+	@Setter
+	private CustomerTypes customerTypesSearch;
+	@Getter
+	@Setter
+	private CustomerChannel customerChannelSearch;
+	@Getter
+	@Setter
+	private long idInvoice;
+	@Getter
+	@Setter
+	private String voucherCodeSearch;
+	@Getter
+	@Setter
+	private IECategories ieCategoriesSearch;
+	@Getter
+	@Setter
+	private String poNoSearch;
+	@Getter
+	@Setter
+	private String orderVoucherSearch;
+	@Getter
+	@Setter
+	private String orderCodeSearch;
+	@Getter
+	@Setter
+	private int paymentSearch;
+	private Account account;
+	/* Export lô hàng */
+	private WrapInvoiceDetailReqInfo wrapInvoiceDetailPick;
+	private List<WrapExportDataReqInfo> listWrapExportData;
+	private int checkOutServer;
+	/* report */
+	private List<ReportTypeIEInVoice> listSelectReport;
+	private ReportTypeIEInVoice reportTypeIEInVoiceSelect;
+	/* xe */
+	private Car carCrud;
+	private Car carSelect;
+	private List<Car> listCar;
+	private List<CarType> listCarType;
+	private List<CarOwner> listCarOwner;
+	private CarType carTypeSearch;
+	private CarOwner carOwnerSearch;
+	private String licensePlateSearch;
+	private String phoneNumberSearch;
+	final String INSERTINVOICE = "v3sainvoice/code";
+	final String DELETEINVOICE = "v3sainvoice/code";
+	final String GETINVOICE = "v3sainvoice/code";
+
+	@Getter
+	@Setter
+	private int monthDms;
+	@Getter
+	@Setter
+	private int yearDms;
+
+	@Inject
+	CotHienThiService cotHienThiService;
+	Gson gson;
+	@Getter
+	List<Boolean> cotdsdonhang = Arrays.asList(true, true, true, true, true, true, true, true, true, true, true, true,
+			true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+			true);
+	final String TENBANG = "DSHOADON";
+	@Getter
+	@Setter
+	private String memberName;
+	@Getter
+	@Setter
+	private String memberCode;
+
+	public void onToggle(ToggleEvent e) {
+		if (cotdsdonhang.size() < 31)
+			cotdsdonhang.add(true);
+		cotdsdonhang.set((Integer) e.getData(), e.getVisibility() == Visibility.VISIBLE);
+		String jsondatacot = gson.toJson(cotdsdonhang);
+		cotHienThiService.saveOrUpdate(jsondatacot, TENBANG, getAccount().getUserName());
+	}
+
+	@Getter
+	@Setter
+	private HoaDonChiTietC2 hoaDonC2ChiTietSelect;
+	@Getter
+	@Setter
+	private HoaDonChiTietC2 hoaDonC2ChiTietCrud;
+
+	@Override
+	protected void initItem() {
+		try {
+			formatHandler = FormatHandler.getInstance();
+
+			gson = new Gson();
+			Member member = getAccount().getMember();
+			memberCode = member.getCode();
+			memberName = member.getName();
+			CotHienThi cothienthi = cotHienThiService.find(TENBANG, getAccount().getUserName());
+			if (cothienthi != null) {
+				Type type = new TypeToken<List<Boolean>>() {
+				}.getType();
+				cotdsdonhang = gson.fromJson(cothienthi.getCothienthi(), type);
+			}
+
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletRequest request = (HttpServletRequest) facesContext.getExternalContext().getRequest();
+			account = SessionHelper.getInstance().getSession("account", request, Account.class);
+			listPaymentMethod = new ArrayList<>();
+			paymentMethodService.selectAll(listPaymentMethod);
+			listStevedores = new ArrayList<>();
+			stevedoreService.selectAll(listStevedores);
+			listFormUpGoods = new ArrayList<>();
+			formUpGoodsService.selectAll(listFormUpGoods);
+			paymentSearch = -1;
+			fromDateSearch = ToolTimeCustomer.plusDayNow(-15);
+			monthDms = ToolTimeCustomer.getMonthCurrent();
+			yearDms = ToolTimeCustomer.getYearCurrent();
+			ngayinphieuvc = new Date();
+			// search();
+			createdNew();
+			/* init report */
+			listSelectReport = new ArrayList<>();
+			listSelectReport.add(new ReportTypeIEInVoice(1, "In hóa đơn"));
+			// listSelectReport.add(new ReportTypeIEInVoice(2,
+			// "Phiếu xuất kho_VCNB"));
+			listSelectReport.add(new ReportTypeIEInVoice(3, "In phiếu xuất kho"));
+			listSelectReport.add(new ReportTypeIEInVoice(4, "Lệnh điều động Lix"));
+			listSelectReport.add(new ReportTypeIEInVoice(5, "In phiếu xuất kho(lever)"));
+			// listSelectReport.add(new ReportTypeIEInVoice(6,
+			// "In Hóa Đơn Xuất Khẩu(VNĐ)"));
+			listSelectReport.add(new ReportTypeIEInVoice(7, "In Lệnh điều động (lever)"));
+			listSelectReport.add(new ReportTypeIEInVoice(8, "Phiếu nhập kho sp"));
+			listSelectReport.add(new ReportTypeIEInVoice(9, "L.điều động Lix(nhiều phiếu)"));
+			// List<InvoiceTemp> test =
+			// invoiceService.findAllTemp(fromDateSearch, toDateSearch);
+			// System.out.println();
+
+//			List<InvoiceTemp> test = invoiceService.findAllTemp(fromDateSearch, toDateSearch);
+//			System.out.println();
+
+			String code = "admin";
+
+		} catch (Exception e) {
+			logger.error("InvoiceBean.initItem:" + e.getMessage(), e);
+		}
+
+	}
+
+	public void ajaxCustomer() {
+		try {
+			customerChange();
+			if (invoiceCrud.getIe_categories() == null) {
+				// khach hang noi bo -> ma nhap xuat Y
+				Customer cus = customerService.findById(invoiceCrud.getCustomer().getId());
+				if (cus.getCustomer_types() != null)
+					if ("NB".equals(cus.getCustomer_types().getCode())) {
+						invoiceCrud.setIe_categories(ieCategoriesService.selectByCodeOld("Y"));
+					}
+			}
+		} catch (Exception e) {
+			// TODO: handle exception
+		}
+
+	}
+
+	@Inject
+	ICustomerPricingProgramService customerPricingProgramService;
+	@Inject
+	ICustomerPromotionProgramService customerPromotionProgramService;
+
+	public void customerChange() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (invoiceCrud != null) {
+				// orderLixCrud.setFlag_up(true);
+				Customer obj = invoiceCrud.getCustomer();
+				if (obj != null) {
+					// tìm địa điểm đơn giá giao hàng
+					if (invoiceCrud.getInvoice_temp_date() != null) {
+						// cập nhật chương trình đơn giá cho đơn hàng
+						JsonObject json = new JsonObject();
+						json.addProperty("date",
+								ToolTimeCustomer.convertDateToString(invoiceCrud.getInvoice_temp_date(), "dd/MM/yyyy"));
+						json.addProperty("customer_id", obj.getId());
+						CustomerPricingProgramReqInfo t = new CustomerPricingProgramReqInfo();
+						customerPricingProgramService.selectForCustomer(JsonParserUtil.getGson().toJson(json), t);
+						PricingProgram dongiamoi = t.getCustomer_pricing_program() == null ? null : t
+								.getCustomer_pricing_program().getPricing_program();
+						/* cập nhật chương trình khuyến mãi cho khách hàng */
+						CustomerPromotionProgramReqInfo t1 = new CustomerPromotionProgramReqInfo();
+						customerPromotionProgramService.selectForCustomer(JsonParserUtil.getGson().toJson(json), t1);
+						PromotionProgram khuyenmaimoi = t1.getCustomer_promotion_program() == null ? null : t1
+								.getCustomer_promotion_program().getPromotion_program();
+						if (invoiceCrud.getId() != 0) {
+						} else {
+							invoiceCrud.setPricing_program(dongiamoi);
+							invoiceCrud.setPromotion_program(khuyenmaimoi);
+						}
+					}
+				}
+			}
+
+		} catch (Exception e) {
+			logger.error("OrderLixBean.customerChange:" + e.getMessage(), e);
+		}
+	}
+
+	public void viewInventory() {
+		try {
+			if (invoiceCrud != null) {
+				List<Long> listProductId = new ArrayList<>();
+				for (WrapInvoiceDetailTempReqInfo w : listWrapInvoiceDetail) {
+					listProductId.add(w.getInvoice_detail().getProduct().getId());
+				}
+				List<Object[]> list = new ArrayList<>();
+				invoiceService.getListInventory(listProductId, invoiceCrud.getInvoice_temp_date(), list);
+				if (list.size() > 0) {
+					Map<Long, Double[]> map = new LinkedHashMap<Long, Double[]>();
+					for (Object[] p : list) {
+						Double[] arr = { Double.parseDouble(Objects.toString(p[1], "0")),
+								Double.parseDouble(Objects.toString(p[2], "0")) };
+						map.put(Long.parseLong(Objects.toString(p[0])), arr);
+					}
+					for (WrapInvoiceDetailTempReqInfo w : listWrapInvoiceDetail) {
+						long id = w.getInvoice_detail().getProduct().getId();
+						if (map.containsKey(id)) {
+							w.setInv_quantity(map.get(id)[0]);
+							w.setInv_quantity_cal(map.get(id)[1]);
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.viewInventory:" + e.getMessage(), e);
+		}
+	}
+
+	// public void completeInvoice() {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// if (invoiceCrud != null && invoiceCrud.getId() != 0) {
+	// Message message = new Message();
+	// int code =
+	// processLogicInvoiceService.completeInvoice(invoiceCrud.getId(), message);
+	// if (code == 0) {
+	// current.executeScript("swaldesigntimer('Thành công','Hóa đơn đã hoàn
+	// thành
+	// việc ghi nhận doanh thu','success',2000)");
+	// // load lại invoice
+	// InvoiceReqInfo invoiceReqInfo = new InvoiceReqInfo();
+	// invoiceService.selectById(invoiceCrud.getId(), invoiceReqInfo);
+	// int index = listInvoiceTemp.indexOf(invoiceCrud);
+	// if (index != -1) {
+	// listInvoiceTemp.set(index, invoiceReqInfo.getInvoice());
+	// }
+	// invoiceCrud = invoiceReqInfo.getInvoice();
+	// } else {
+	// String m = message.getUser_message() + " \\n" +
+	// message.getInternal_message();
+	// current.executeScript("swaldesignclose('Không thành công', '" + m +
+	// "','warning');");
+	// }
+	// } else {
+	// current.executeScript("swaldesigntimer('Không thành công','Hóa đơn chưa
+	// được
+	// lưu','warning',2000)");
+	// }
+	// } catch (Exception e) {
+	// logger.error("InvoiceBean.completeInvoice:" + e.getMessage(), e);
+	// }
+	// current.executeScript("PF('tablect').clearFilters();");
+	// }
+
+	// public void comfirmDestroyInvoice() {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// if (invoiceCrud != null && invoiceCrud.getId() != 0) {
+	// current.executeScript("swalfunction('Thông báo', 'Hóa đơn này sẽ không
+	// được
+	// ghi nhận doanh thu nhưng vẫn tính tồn kho, bạn có muốn cập nhật
+	// không?','info','destroyInvoice()');");
+	// } else {
+	// current.executeScript("swaldesigntimer('Cảnh báo!', 'Hóa đơn không tồn
+	// tại','warning',2000);");
+	// }
+	// } catch (Exception e) {
+	// logger.error("InvoiceBean.comfirmDestroyInvoice:" + e.getMessage(), e);
+	// }
+	// }
+
+	// public void destroyInvoice() {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// Message message = new Message();
+	// int code = processLogicInvoiceService.destroyInvoice(invoiceCrud.getId(),
+	// message);
+	// if (code == 0) {
+	// current.executeScript("swaldesigntimer2('Thành công','Hóa đơn đã hủy việc
+	// ghi
+	// nhận doanh thu','success',2000)");
+	// // load lại invoice
+	// InvoiceReqInfo invoiceReqInfo = new InvoiceReqInfo();
+	// invoiceService.selectById(invoiceCrud.getId(), invoiceReqInfo);
+	// int index = listInvoiceTemp.indexOf(invoiceCrud);
+	// if (index != -1) {
+	// listInvoiceTemp.set(index, invoiceReqInfo.getInvoice());
+	// }
+	// invoiceCrud = invoiceReqInfo.getInvoice();
+	// } else {
+	// String m = message.getUser_message() + " \\n" +
+	// message.getInternal_message();
+	// current.executeScript("swaldesignclose2('Không thành công', '" + m +
+	// "','warning');");
+	// }
+	// } catch (Exception e) {
+	// logger.error("InvoiceBean.destroyInvoice:" + e.getMessage(), e);
+	// }
+	// current.executeScript("PF('tablect').clearFilters();");
+	// }
+
+	public void nextOrPrev(int next) {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (listInvoiceTemp != null && listInvoiceTemp.size() > 0) {
+				int index = listInvoiceTemp.indexOf(invoiceCrud);
+				int size = listInvoiceTemp.size() - 1;
+				if (index == -1) {
+					invoiceSelect = listInvoiceTemp.get(0);
+					invoiceCrud = invoiceSelect.clone();
+				} else {
+					switch (next) {
+					case 1:
+						if (index == size) {
+							warning("Hết danh sách");
+							// invoiceSelect = listInvoiceTemp.get(0);
+							// invoiceCrud = invoiceSelect.clone();
+						} else {
+							invoiceSelect = listInvoiceTemp.get(index + 1);
+							invoiceCrud = invoiceSelect.clone();
+						}
+						break;
+
+					default:
+						if (index == 0) {
+							warning("Hết danh sách");
+							// invoiceSelect = listInvoiceTemp.get(size);
+							// invoiceCrud = invoiceSelect.clone();
+						} else {
+							invoiceSelect = listInvoiceTemp.get(index - 1);
+							invoiceCrud = invoiceSelect.clone();
+						}
+						break;
+					}
+				}
+				// show thông tin chi tiết hóa đơn
+				listWrapInvoiceDetail = new ArrayList<>();
+				List<InvoiceDetailTemp> listInvoiceTempDetail = new ArrayList<>();
+				invoiceDetailService.selectByInvoiceTemp(invoiceCrud.getId(), listInvoiceTempDetail);
+				for (InvoiceDetailTemp dt : listInvoiceTempDetail) {
+					List<ExportBatch> list = new ArrayList<>();
+					invoiceService.getListExportBatch(dt.getId(), list);
+					WrapInvoiceDetailTempReqInfo w = new WrapInvoiceDetailTempReqInfo(dt, list);
+					listWrapInvoiceDetail.add(w);
+				}
+				// tính tổng tiền hóa đơn
+				// sumInvoice();
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.nextOrPrev:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tablect').clearFilters();");
+	}
+
+	public void processPrintPDFReport() {
+		try {
+			if (reportTypeIEInVoiceSelect != null) {
+				long id = reportTypeIEInVoiceSelect.getId();
+				if (id == 2) {
+
+				} else if (id == 3) {
+					exportPhieuXuatKho();
+				} else if (id == 4) {
+					exportLenhDieuDong();
+				} else if (id == 5) {
+					exportPhieuXuatKhoLever();
+				} else if (id == 6) {
+				} else if (id == 8) {
+					exportPhieuNhapKho();
+				} else if (id == 7) {
+					exportLenhDieuDongLever();
+				} else if (id == 9) {
+					exportLenhDieuDongNhieuPhieu();
+				}
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.processPrintPDFReport:" + e.getMessage(), e);
+		}
+	}
+
+	public void exportLenhDieuDongLever() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/invoice/lenhdieudonglever.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam.put("car_code", invoiceCrud.getCar() == null ? "" : invoiceCrud.getCar().getLicense_plate());
+			importParam.put("voucher_code", invoiceCrud.getVoucher_code());
+			importParam.put("cangden", invoiceCrud.getHarbor_category() == null ? "" : invoiceCrud.getHarbor_category()
+					.getHarbor_name());
+			int day = ToolTimeCustomer.getDayM(invoiceCrud.getInvoice_temp_date());
+			int month = ToolTimeCustomer.getMonthM(invoiceCrud.getInvoice_temp_date());
+			int year = ToolTimeCustomer.getYearM(invoiceCrud.getInvoice_temp_date());
+			importParam.put("day", String.format("%02d", day));
+			importParam.put("month", String.format("%02d", month));
+			importParam.put("year", String.format("%04d", year));
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("InvoiceBean.exportLenhDieuDongLever:" + e.getMessage(), e);
+		}
+	}
+
+	public void exportPhieuXuatKhoLever() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/invoice/phieuxuatkholever.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			List<ParamReportDetail> listConfig = paramReportDetailService.findByParamReportName("thongtinchung");
+			for (ParamReportDetail p : listConfig) {
+				importParam.put(p.getKey(), p.getValue());
+			}
+			List<PhieuXuatKhoLever> list = new ArrayList<>();
+			invoiceService.reportPhieuXuatKhoLever(invoiceCrud.getId(), list);
+			importParam.put("list_data", list);
+			Date invoiceDate = invoiceCrud.getInvoice_temp_date();
+			importParam.put("created_by", invoiceCrud.getCreated_by());
+			importParam.put("ghi_chu", invoiceCrud.getNote());
+			importParam.put("nguoi_vc", invoiceCrud.getCarrier() == null ? "" : invoiceCrud.getCarrier()
+					.getCarrier_name());
+			importParam.put("cangden", invoiceCrud.getHarbor_category() == null ? "" : invoiceCrud.getHarbor_category()
+					.getHarbor_name());
+			int day = ToolTimeCustomer.getDayM(invoiceDate);
+			int month = ToolTimeCustomer.getMonthM(invoiceDate);
+			int year = ToolTimeCustomer.getYearM(invoiceDate);
+			importParam.put("day", String.format("%02d", day));
+			importParam.put("month", String.format("%02d", month));
+			importParam.put("year", String.format("%04d", year));
+			Car car = invoiceCrud.getCar();
+			importParam.put("license_plate", car == null ? "" : car.getLicense_plate());
+			importParam.put("content_qd", invoiceCrud.getContent_qd());
+			double sum = 0;
+			for (PhieuXuatKhoLever d : list) {
+				sum = BigDecimal.valueOf(sum).add(BigDecimal.valueOf(d.getBox_quantity())).doubleValue();
+			}
+			importParam.put("sum_box", sum);
+			importParam.put("lenh_dieu_dong", invoiceCrud.getMovement_commands_no());
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("InvoiceBean.exportPhieuXuatKhoLever:" + e.getMessage(), e);
+		}
+	}
+
+	public void exportLenhDieuDongNhieuPhieu() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (invoiceCrud != null && invoiceCrud.getId() != 0) {
+				// lệnh điều động
+				String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+						.getRealPath("/resources/reports/invoice/lenhdieudong_m.jasper");
+				Map<String, Object> importParam = new HashMap<String, Object>();
+				Locale locale = new Locale("vi", "VI");
+				importParam.put(JRParameter.REPORT_LOCALE, locale);
+				List<ParamReportDetail> listConfig = paramReportDetailService.findByParamReportName("thongtinchung");
+				for (ParamReportDetail p : listConfig) {
+					importParam.put(p.getKey(), p.getValue());
+				}
+				Date invoiceDate = invoiceCrud.getInvoice_temp_date();
+				int day = ToolTimeCustomer.getDayM(invoiceDate);
+				int month = ToolTimeCustomer.getMonthM(invoiceDate);
+				int year = ToolTimeCustomer.getYearM(invoiceDate);
+				importParam.put(
+						"title_day",
+						"TP. Hồ Chí Minh, Ngày " + String.format("%02d", day) + " Tháng "
+								+ String.format("%02d", month) + " Năm " + String.format("%04d", year));
+				importParam.put("movement_commands_no", invoiceCrud.getMovement_commands_no());
+				Customer customer = invoiceCrud.getCustomer();
+				if (customer != null) {
+					importParam.put("customer_name", customer.getCustomer_name());
+					importParam.put("address", customer.getAddress());
+				}
+				JasperPrint jasperPrint = JasperFillManager
+						.fillReport(reportPath, importParam, new JREmptyDataSource());
+				byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+				// phiếu xuất kho kiêm vcnb
+				List<PhieuXuatKhoKiemVCNB> list = new ArrayList<>();
+				/* {invoice_date:'',customer_id:0,movement_commands_no:'' } */
+				JsonObject json = new JsonObject();
+				json.addProperty("invoice_date",
+						ToolTimeCustomer.convertDateToString(invoiceCrud.getInvoice_temp_date(), "dd/MM/yyyy"));
+				json.addProperty("customer_id", customer == null ? 0 : customer.getId());
+				json.addProperty("movement_commands_no", invoiceCrud.getMovement_commands_no());
+				invoiceService.reportPhieuXuatKhoKiemVCNB(JsonParserUtil.getGson().toJson(json), list);
+				String reportPath2 = FacesContext.getCurrentInstance().getExternalContext()
+						.getRealPath("/resources/reports/invoice/bangkephieuxuatkiemvcnb.jasper");
+				Map<String, Object> importParam2 = new HashMap<String, Object>();
+				for (ParamReportDetail p : listConfig) {
+					importParam2.put(p.getKey(), p.getValue());
+				}
+				importParam2.put("movement_commands_no", invoiceCrud.getMovement_commands_no());
+				importParam2.put("list_data", list);
+				JasperPrint jasperPrint2 = JasperFillManager.fillReport(reportPath2, importParam2,
+						new JREmptyDataSource());
+				byte[] data2 = JasperExportManager.exportReportToPdf(jasperPrint2);
+				List<byte[]> listByte = new ArrayList<>();
+				listByte.add(data);
+				listByte.add(data2);
+				String ba = Base64.getEncoder().encodeToString(mergePDF(listByte));
+				current.executeScript("utility.printPDF('" + ba + "')");
+			} else {
+				current.executeScript("swaldesigntimer('Không thành công','Hóa đơn không tồn tại','warning',2000)");
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.exportLenhDieuDongNhieuPhieu:" + e.getMessage(), e);
+		}
+	}
+
+	private byte[] mergePDF(List<byte[]> pdfFilesAsByteArray) throws DocumentException, IOException {
+
+		ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+		Document document = null;
+		PdfCopy writer = null;
+		for (byte[] pdfByteArray : pdfFilesAsByteArray) {
+
+			try {
+				PdfReader reader = new PdfReader(pdfByteArray);
+				int numberOfPages = reader.getNumberOfPages();
+
+				if (document == null) {
+					document = new Document(reader.getPageSizeWithRotation(1));
+					writer = new PdfCopy(document, outStream); // new
+					document.open();
+				}
+				PdfImportedPage page;
+				for (int i = 0; i < numberOfPages;) {
+					++i;
+					page = writer.getImportedPage(reader, i);
+					writer.addPage(page);
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+
+		}
+		document.close();
+		outStream.close();
+		return outStream.toByteArray();
+
+	}
+
+	public void exportLenhDieuDong() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/invoice/lenhdieudong.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			List<ParamReportDetail> listConfig = paramReportDetailService.findByParamReportName("thongtinchung");
+			for (ParamReportDetail p : listConfig) {
+				importParam.put(p.getKey(), p.getValue());
+			}
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<LenhDieuDong> list = new ArrayList<>();
+			invoiceService.reportLenhDieuDong(invoiceCrud.getId(), list);
+			importParam.put("list_data", list);
+			Date invoiceDate = invoiceCrud.getInvoice_temp_date();
+			importParam.put("voucher_code", invoiceCrud.getVoucher_code());
+			int day = ToolTimeCustomer.getDayM(invoiceDate);
+			int month = ToolTimeCustomer.getMonthM(invoiceDate);
+			int year = ToolTimeCustomer.getYearM(invoiceDate);
+			importParam.put("title_day",
+					"TP. Hồ Chí Minh, Ngày " + String.format("%02d", day) + " Tháng " + String.format("%02d", month)
+							+ " Năm " + String.format("%04d", year));
+			importParam.put("movement_commands_no", invoiceCrud.getMovement_commands_no());
+			Car car = invoiceCrud.getCar();
+			importParam.put("license_plate", car == null ? "" : car.getLicense_plate());
+			Customer customer = invoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("InvoiceBean.exportLenhDieuDong:" + e.getMessage(), e);
+		}
+	}
+
+	public void exportPhieuXuatKho() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/invoice/phieuxuatkho.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			List<ParamReportDetail> listConfig = paramReportDetailService.findByParamReportName("thongtinchung");
+			for (ParamReportDetail p : listConfig) {
+				importParam.put(p.getKey(), p.getValue());
+			}
+			List<ParamReportDetail> listConfig2 = paramReportDetailService.findByParamReportName("phieuxuatkho");
+			for (ParamReportDetail p : listConfig2) {
+				importParam.put(p.getKey(), p.getValue());
+			}
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<PhieuXuatKho> list = new ArrayList<>();
+			invoiceService.reportPhieuXuatKho(invoiceCrud.getId(), list);
+			importParam.put("list_data", list);
+			Date invoiceDate = invoiceCrud.getInvoice_temp_date();
+			importParam.put("voucher_code", invoiceCrud.getVoucher_code());
+			int day = ToolTimeCustomer.getDayM(invoiceDate);
+			int month = ToolTimeCustomer.getMonthM(invoiceDate);
+			int year = ToolTimeCustomer.getYearM(invoiceDate);
+			importParam.put("day", day);
+			importParam.put("month", month);
+			importParam.put("year", year);
+			importParam.put("ie_reason", invoiceCrud.getNote());
+			Car car = invoiceCrud.getCar();
+			importParam.put("license_plate", car == null ? "" : car.getLicense_plate());
+			Customer customer = invoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+			}
+			// tổng thùng
+			double totalQuantityExport = 0;
+			double totalAmount = 0;
+			for (PhieuXuatKho i : list) {
+				// số lượng và tổng tiền
+				totalQuantityExport = BigDecimal.valueOf(totalQuantityExport).add(BigDecimal.valueOf(i.getQuantity()))
+						.doubleValue();
+				totalAmount = BigDecimal.valueOf(totalAmount).add(BigDecimal.valueOf(i.getTotal_amount()))
+						.doubleValue();
+			}
+			// làm tròn
+			totalAmount = MyMath.roundCustom(totalAmount, 3);
+			importParam.put("total_quantity", totalQuantityExport);
+			importParam.put("total_amount", totalAmount);
+			importParam.put("words_total_amount", ConvertNumberToText.docSo(Math.abs(totalAmount), "ĐỒNG"));
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("InvoiceBean.exportPhieuXuatKho:" + e.getMessage(), e);
+		}
+	}
+
+	public void exportPhieuNhapKho() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/invoice/phieunhapkho.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			List<ParamReportDetail> listConfig = paramReportDetailService.findByParamReportName("thongtinchung");
+			for (ParamReportDetail p : listConfig) {
+				importParam.put(p.getKey(), p.getValue());
+			}
+
+			List<PhieuNhapKho> list = new ArrayList<>();
+			invoiceService.reportPhieuNhapKho(invoiceCrud.getId(), list);
+			importParam.put("list_data", list);
+			Date invoiceDate = invoiceCrud.getInvoice_temp_date();
+			importParam.put("voucher_code", invoiceCrud.getVoucher_code());
+			importParam.put("invoice_date", invoiceDate);
+			int day = ToolTimeCustomer.getDayM(invoiceDate);
+			int month = ToolTimeCustomer.getMonthM(invoiceDate);
+			int year = ToolTimeCustomer.getYearM(invoiceDate);
+			importParam.put("day", String.format("%02d", day));
+			importParam.put("month", String.format("%02d", month));
+			importParam.put("year", String.format("%04d", year));
+			importParam.put("ie_categories_name", invoiceCrud.getIe_categories() == null ? "" : invoiceCrud
+					.getIe_categories().getContent());
+			Car car = invoiceCrud.getCar();
+			importParam.put("license_plate", car == null ? "" : car.getLicense_plate());
+			Customer customer = invoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+			}
+			// tổng thùng
+			double totalAmount = 0;
+			for (PhieuNhapKho i : list) {
+				// số lượng và tổng tiền
+				totalAmount = BigDecimal.valueOf(totalAmount).add(BigDecimal.valueOf(i.getTotal_amount()))
+						.doubleValue();
+			}
+			// làm tròn
+			totalAmount = MyMath.roundCustom(totalAmount, 3);
+			importParam.put("total_amount", totalAmount);
+			importParam.put("words_total_amount", ConvertNumberToText.docSo(Math.abs(totalAmount), "ĐỒNG"));
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("InvoiceBean.exportPhieuNhapKho:" + e.getMessage(), e);
+		}
+	}
+
+	@Getter
+	@Setter
+	private String stextStr;
+	@Getter
+	@Setter
+	private boolean sxeptheosohoadon;
+	@Getter
+	@Setter
+	private Stocker stockerSearch;
+	public void search() {
+		try {
+			listInvoiceTemp = new ArrayList<>();
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("stextStr", MyStringUtil.replaceD(stextStr));
+			jsonInfo.addProperty("from_date", ToolTimeCustomer.convertDateToString(fromDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("to_date", ToolTimeCustomer.convertDateToString(toDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("customer_id", customerSearch == null ? 0 : customerSearch.getId());
+			jsonInfo.addProperty("customer_type_id", customerTypesSearch == null ? 0 : customerTypesSearch.getId());
+			jsonInfo.addProperty("customer_channel_id",
+					customerChannelSearch == null ? 0 : customerChannelSearch.getId());
+			jsonInfo.addProperty("id", idInvoice);
+			jsonInfo.addProperty("voucher_code", voucherCodeSearch);
+			jsonInfo.addProperty("ie_categories_id", ieCategoriesSearch == null ? 0 : ieCategoriesSearch.getId());
+			jsonInfo.addProperty("po_no", poNoSearch);
+			jsonInfo.addProperty("order_code", orderCodeSearch);
+			jsonInfo.addProperty("order_voucher", orderVoucherSearch);
+			jsonInfo.addProperty("payment", paymentSearch);
+			jsonInfo.addProperty("xeptheosohoadon", sxeptheosohoadon);
+			jsonInfo.addProperty("stocker_id", stockerSearch == null ? 0 : stockerSearch.getId());
+			JsonArray array = new JsonArray();
+			jsonInfo.add("status", array);
+			JsonObject json = new JsonObject();
+			json.add("invoice_info", jsonInfo);
+			invoiceService.search2(JsonParserUtil.getGson().toJson(json), listInvoiceTemp);
+		} catch (Exception e) {
+			logger.error("InvoiceBean.search:" + e.getMessage(), e);
+		}
+	}
+
+	public void onTabChange(TabChangeEvent event) {
+		if (event.getTab() != null) {
+			if ("Danh sách hóa đơn".equals(event.getTab().getTitle())) {
+				if (listInvoiceTemp == null || listInvoiceTemp.size() == 0) {
+					search();
+					PrimeFaces.current().ajax().update("menuformid:tabview1:tablesp");
+				}
+			}
+		}
+
+	}
+
+	public void createdNew() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			Customer customer = null;
+			IECategories ieCategories = null;
+			if (invoiceCrud != null) {
+				customer = invoiceCrud.getCustomer();
+				ieCategories = invoiceCrud.getIe_categories();
+			}
+			invoiceCrud = new InvoiceTemp();
+			invoiceCrud.setInvoice_temp_date(ToolTimeCustomer.getFirstDateOfDay(new Date()));
+			invoiceCrud.setCreated_by(account.getMember().getName());
+			invoiceCrud.setCustomer(customer);
+			invoiceCrud.setIe_categories(ieCategories);
+			invoiceCrud.setWarehouse(warehouseService.selectByCode("F"));// F:kho
+																			// thanh
+																			// pham
+			listWrapInvoiceDetail = new ArrayList<>();
+			ajaxCustomer();
+		} catch (Exception e) {
+			logger.error("InvoiceBean.createNew:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tablect').clearFilters();");
+	}
+
+	public List<Customer> completeCustomerFC(String text) {
+		try {
+			List<Customer> list = new ArrayList<>();
+			if (customerTypesFCFilter != null) {
+				customerService.complete(formatHandler.converViToEn(text), customerTypesFCFilter, list);
+			} else {
+				customerService.complete(formatHandler.converViToEn(text), list);
+			}
+			return list;
+		} catch (Exception e) {
+			logger.error("InvoiceBean.completeCustomerFC:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public void paginatorChangeHDVC(int currentPage) {
+		try {
+			/*
+			 * {freight_contract_info:{contract_no:
+			 * '',from_date:'',to_date:'',customer_id:0,car_id:0,payment_method_id:0,payment
+			 * :-1}, page:{page_index:0, page_size:0}}
+			 */
+			navigationInfoHDVC.setLimit(pageSizeHDVC);
+			navigationInfoHDVC.setMaxIndices(5);
+			listFreightContractSelect = new ArrayList<>();
+			PagingInfo page = new PagingInfo();
+			// thông tin phân trang
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("contract_no", contractNoFCFilter);
+			jsonInfo.addProperty("from_date", ToolTimeCustomer.convertDateToString(fromDateFCFilter, "dd/MM/yyyy"));
+			jsonInfo.addProperty("to_date", ToolTimeCustomer.convertDateToString(toDateFCFilter, "dd/MM/yyyy"));
+			jsonInfo.addProperty("customer_id", customerFcFilter == null ? 0 : customerFcFilter.getId());
+			JsonObject jsonPage = new JsonObject();
+			jsonPage.addProperty("page_index", currentPage);
+			jsonPage.addProperty("page_size", pageSizeHDVC);
+			JsonObject json = new JsonObject();
+			json.add("freight_contract_info", jsonInfo);
+			json.add("page", jsonPage);
+			freightContractService.search(JsonParserUtil.getGson().toJson(json), listFreightContractSelect);
+			navigationInfoHDVC.setTotalRecords((int) page.getTotalRow());
+			navigationInfoHDVC.setCurrentPage(currentPage);
+		} catch (Exception e) {
+			logger.error("InvoiceBean.paginatorChangeHDVC:" + e.getMessage(), e);
+		}
+	}
+
+	public void rowFreightContractClick(SelectEvent event) {
+		try {
+			FreightContract obj = (FreightContract) event.getObject();
+			if (invoiceCrud != null) {
+				invoiceCrud.setFreight_contract(obj);
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.rowFreightContractClick:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogPickHDVC() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			fromDateFCFilter = ToolTimeCustomer.getDateMinCustomer(ToolTimeCustomer.getMonthCurrent(),
+					ToolTimeCustomer.getYearCurrent());
+			toDateFCFilter = ToolTimeCustomer.getDateMaxCustomer(ToolTimeCustomer.getMonthCurrent(),
+					ToolTimeCustomer.getYearCurrent());
+			contractNoFCFilter = null;
+			keySearchCustomer = null;
+			listCustomerSelect = null;
+			customerFcFilter = null;
+			customerTypesFCFilter = null;
+			current.executeScript("PF('dlg2').show();");
+		} catch (Exception e) {
+			logger.error("InvoiceBean.showDialogPickHDVC:" + e.getMessage(), e);
+		}
+	}
+
+	public void closeDialogPickHDVC() {
+
+		try {
+			listFreightContractSelect = null;
+			contractNoFCFilter = null;
+			customerFcFilter = null;
+			customerTypesFCFilter = null;
+			listRowPerPageHDVC = null;
+			navigationInfoHDVC = null;
+		} catch (Exception e) {
+			logger.error("InvoiceBean.closeDialogPickHDVC:" + e.getMessage(), e);
+		}
+	}
+
+	public void searchHDVC() {
+		try {
+			listFreightContractSelect = new ArrayList<>();
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("contract_no", contractNoFCFilter);
+			jsonInfo.addProperty("from_date", ToolTimeCustomer.convertDateToString(fromDateFCFilter, "dd/MM/yyyy"));
+			jsonInfo.addProperty("to_date", ToolTimeCustomer.convertDateToString(toDateFCFilter, "dd/MM/yyyy"));
+			jsonInfo.addProperty("customer_type_id", customerTypesFCFilter == null ? 0 : customerTypesFCFilter.getId());
+			jsonInfo.addProperty("customer_id", customerFcFilter == null ? 0 : customerFcFilter.getId());
+			jsonInfo.addProperty("payment", -1);
+			JsonObject json = new JsonObject();
+			json.add("contract", jsonInfo);
+			freightContractService.searchType(JsonParserUtil.getGson().toJson(json), listFreightContractSelect);
+		} catch (Exception e) {
+			logger.error("InvoiceBean.searchHDVC:" + e.getMessage(), e);
+		}
+	}
+
+	@Inject
+	IOrderDetailService orderDetailService;
+
+	// public void capnhatiddonhang() {
+	// int sodonhangcnduoc = 0;
+	// for (int i = 0; i < listInvoiceTemp.size(); i++) {
+	// if (listInvoiceTemp.get(i).getIdorderlix() == 0) {
+	// List<InvoiceDetail> listInvoiceTempDetail = new ArrayList<>();
+	// invoiceDetailService.selectByInvoice(listInvoiceTemp.get(i).getId(),
+	// listInvoiceTempDetail);
+	// long idchitietdonhang = 0;
+	// for (InvoiceDetail dt : listInvoiceTempDetail) {
+	// if (dt.getDetail_own_id() != null && dt.getDetail_own_id() != 0) {
+	// idchitietdonhang = dt.getDetail_own_id();
+	// break;
+	// }
+	// }
+	// if (idchitietdonhang != 0) {
+	// InvoiceDetail od = invoiceDetailService.selectById(idchitietdonhang);
+	// if (od != null && od.getInvoice().getIdorderlix() != 0) {
+	// listInvoiceTemp.get(i).setOrder_voucher(od.getInvoice().getOrder_voucher());
+	// listInvoiceTemp.get(i).setIdorderlix(od.getInvoice().getIdorderlix());
+	// invoiceService.updateDonHang(listInvoiceTemp.get(i));
+	// sodonhangcnduoc++;
+	// }
+	// }
+	// }
+	// }
+	// notice("Cap nhat duoc: " + sodonhangcnduoc + " don hang.");
+	// }
+
+	@Inject
+	IOrderLixService orderLixService;
+	//
+	// public void capnhatiddonhang2() {
+	// int sodonhangcnduoc = 0;
+	// for (int i = 0; i < listInvoiceTemp.size(); i++) {
+	// if (listInvoiceTemp.get(i).getOrder_voucher() != null
+	// && !"".equals(listInvoiceTemp.get(i).getOrder_voucher())
+	// && listInvoiceTemp.get(i).getIdorderlix() == 0) {
+	// List<OrderLix> orderLixs = orderLixService.selectByOrderVoucher(
+	// listInvoiceTemp.get(i).getOrder_voucher(),
+	// listInvoiceTemp.get(i).getCustomer().getId());
+	//
+	// if (orderLixs.size() == 1) {
+	// listInvoiceTemp.get(i).setOrder_voucher(orderLixs.get(0).getVoucher_code());
+	// listInvoiceTemp.get(i).setIdorderlix(orderLixs.get(0).getId());
+	// invoiceService.updateDonHang(listInvoiceTemp.get(i));
+	// sodonhangcnduoc++;
+	// }
+	// }
+	// }
+	// notice("Cap nhat duoc: " + sodonhangcnduoc + " don hang.");
+	// }
+
+	// public void capnhatsodonhang() {
+	// int sodonhangcnduoc = 0;
+	// for (int i = 0; i < listInvoiceTemp.size(); i++) {
+	// if (listInvoiceTemp.get(i).getIdorderlix() != 0) {
+	// OrderLix orderLix =
+	// orderLixService.findById(listInvoiceTemp.get(i).getIdorderlix());
+	// if (orderLix != null) {
+	// listInvoiceTemp.get(i).setOrder_voucher(orderLix.getVoucher_code());
+	// listInvoiceTemp.get(i).setIdorderlix(orderLix.getId());
+	// invoiceService.updateDonHang(listInvoiceTemp.get(i));
+	// sodonhangcnduoc++;
+	// }
+	// }
+	// }
+	// notice("Cap nhat duoc: " + sodonhangcnduoc + " don hang.");
+	// }
+
+	@Inject
+	BienNhanVanChuyenService bienNhanVanChuyenService;
+	@Inject
+	ParamReportDetailService paramReportDetailService;
+	@Getter
+	@Setter
+	Date ngayinphieuvc;
+
+	// public void inPhieuVanChuyenHangHoa() {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// Gson gson = new Gson();
+	// List<Invoice> invoiceChoose = new ArrayList<Invoice>();
+	// // Car carChoose = null;
+	// for (int i = 0; i < listInvoiceTemp.size(); i++) {
+	// if (listInvoiceTemp.get(i).isChonphieu()) {
+	// if (listInvoiceTemp.get(i).getCar() != null) {
+	// listInvoiceTemp.get(i).setSoxe(listInvoiceTemp.get(i).getCar().getLicense_plate());
+	// } else {
+	// listInvoiceTemp.get(i).setSoxe("");
+	// }
+	// invoiceChoose.add(listInvoiceTemp.get(i));
+	// }
+	// }
+	// Map<String, List<Invoice>> datagroupsphieus = invoiceChoose.stream()
+	// .collect(Collectors.groupingBy(p -> p.getSoxe(), Collectors.toList()));
+	// List<BienNhanVanChuyen> list = new ArrayList<>();
+	// for (String key_0 : datagroupsphieus.keySet()) {
+	// List<Invoice> invoiceChoose1 = datagroupsphieus.get(key_0);
+	//
+	// if (key_0 != null && invoiceChoose1.size() != 0) {
+	// List<BienNhanVanChuyenChiTiet> bienNhanVanChuyenChiTiets = new
+	// ArrayList<BienNhanVanChuyenChiTiet>();
+	// Map<Customer, List<Invoice>> datagroups1 = invoiceChoose1.stream()
+	// .collect(Collectors.groupingBy(p -> p.getCustomer(),
+	// Collectors.toList()));
+	// double tongkhoiluong = 0;
+	// String nguoivanchuyen = null;
+	// for (Customer key : datagroups1.keySet()) {
+	// double khoiluong = 0;
+	// StringBuilder hoadonbuild = new StringBuilder();
+	// List<Invoice> invs = datagroups1.get(key);
+	//
+	// int size = invs.size();
+	// for (int i = 0; i < size; i++) {
+	// hoadonbuild.append(invs.get(i).getVoucher_code());
+	// if (i + 1 != size)
+	// hoadonbuild.append(", ");
+	// if (invs.get(i).getCarrier() != null && nguoivanchuyen == null)
+	// nguoivanchuyen = invs.get(i).getCarrier().getCarrier_name();
+	// List<InvoiceDetail> invoiceDetails = new ArrayList<InvoiceDetail>();
+	// invoiceDetailService.selectByInvoice(invs.get(i).getId(),
+	// invoiceDetails);
+	// for (int j = 0; j < invoiceDetails.size(); j++) {
+	// double kl = (invoiceDetails.get(j).getQuantity()
+	// * invoiceDetails.get(j).getProduct().getFactor());
+	// khoiluong += kl;
+	// }
+	// }
+	// BienNhanVanChuyenChiTiet bnchitiet = new BienNhanVanChuyenChiTiet();
+	// bnchitiet.setMakh(key.getCustomer_code());
+	// StringBuilder tenKH = new StringBuilder();
+	// String customer_name = key.getCustomer_name();
+	// // if (customer_name != null &&
+	// // !"".equals(customer_name)) {
+	// tenKH.append(customer_name);
+	// // }
+	// // String company_name = key.getCompany_name();
+	// // if (company_name != null) {
+	// // if (customer_name != null &&
+	// // !"".equals(customer_name)) {
+	// // tenKH.append(" - ");
+	// // }
+	// // tenKH.append(company_name);
+	// // }
+	// bnchitiet.setTenkh(tenKH.toString());
+	// bnchitiet.setKhoiluong(khoiluong);
+	// bnchitiet.setHoadon(hoadonbuild.toString());
+	// bienNhanVanChuyenChiTiets.add(bnchitiet);
+	// tongkhoiluong += khoiluong;
+	// }
+	// if (bienNhanVanChuyenChiTiets.size() != 0) {
+	// BienNhanVanChuyen bienNhanVanChuyen = new BienNhanVanChuyen();
+	// bienNhanVanChuyen.setCreated_date(new Date());
+	// bienNhanVanChuyen.setCreated_by(account.getMember().getName());
+	// if (invoiceChoose1.get(0).getCar() != null) {
+	// bienNhanVanChuyen.setCar(carService.selectById(invoiceChoose1.get(0).getCar().getId()));
+	// bienNhanVanChuyen.setCargroup(key_0);
+	// } else {
+	// bienNhanVanChuyen.setCargroup("");
+	// }
+	// bienNhanVanChuyen.setBienNhanVanChuyenChiTiets(bienNhanVanChuyenChiTiets);
+	// String chitiet = gson.toJson(bienNhanVanChuyenChiTiets);
+	// bienNhanVanChuyen.setChitiet(chitiet);
+	// bienNhanVanChuyen.setSophieuvc(invoiceChoose1.get(0).getSophieuvc());
+	// bienNhanVanChuyen.setNguoivanchuyen(nguoivanchuyen == null ? "" :
+	// nguoivanchuyen.trim());
+	// bienNhanVanChuyen.setTongkhoiluong(tongkhoiluong);
+	// bienNhanVanChuyenService.insert(bienNhanVanChuyen);
+	// list.add(bienNhanVanChuyen);
+	// }
+	//
+	// }
+	// }
+	// if (list.size() != 0) {
+	// String reportPath =
+	// FacesContext.getCurrentInstance().getExternalContext()
+	// .getRealPath("/resources/reports/hopdongvc/hopdongvc_A5ngang.jasper");
+	// Map<String, Object> importParam = new HashMap<String, Object>();
+	// Locale locale = new Locale("vi", "VI");
+	// importParam.put(JRParameter.REPORT_LOCALE, locale);
+	// importParam.put("ngayin", ngayinphieuvc);
+	//
+	// List<ParamReportDetail> listConfig =
+	// paramReportDetailService.findByParamReportName("thongtinchung");
+	// for (ParamReportDetail p : listConfig) {
+	// importParam.put(p.getKey(), p.getValue());
+	// }
+	// importParam.put(JRParameter.REPORT_LOCALE, Locale.ITALY);
+	// JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath,
+	// importParam,
+	// new JRBeanCollectionDataSource(list));
+	// byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+	// String ba = Base64.getEncoder().encodeToString(data);
+	// current.executeScript("utility.printPDF('" + ba + "')");
+	// } else {
+	// noticeError("Chưa chọn phiếu để in.");
+	// }
+	// } catch (Exception e) {
+	// current.executeScript("swaldesigntimer('Xảy ra lỗi!', '" + e.getMessage()
+	// + "','error',2000);");
+	// logger.error("FreightContractBean.reportBienBangVanChuyenHangHoa:" +
+	// e.getMessage(), e);
+	// }
+	// }
+
+	@Inject
+	AccountAPIService accountAPIService;
+	@Inject
+	DongBoService dongBoService;
+
+	// public void taoHoaDonChiNhanh() {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// Gson gson = new Gson();
+	// List<InvoiceTemp> invoiceChoose = new ArrayList<InvoiceTemp>();
+	// Car carChoose = null;
+	// boolean status = true;
+	// for (int i = 0; i < listInvoiceTemp.size(); i++) {
+	// if (listInvoiceTemp.get(i).isChonphieu()) {
+	// if (listInvoiceTemp.get(i).isPhieudacopy()) {
+	// status = false;
+	// break;
+	// } else {
+	// if (carChoose == null) {
+	// carChoose = listInvoiceTemp.get(i).getCar();
+	// } else {
+	// if (!carChoose.equals(listInvoiceTemp.get(i).getCar())) {
+	// status = false;
+	// break;
+	// }
+	// }
+	// if (listInvoiceTemp.get(i).getLookup_code() == null
+	// || "".equals(listInvoiceTemp.get(i).getLookup_code())) {
+	// status = false;
+	// break;
+	// }
+	// invoiceChoose.add(listInvoiceTemp.get(i));
+	// }
+	// }
+	// }
+	// if (status == false) {
+	// canhbao("Các phiếu chọn tạo hóa đơn không cùng số xe, chưa cập nhật số hóa đơn hoặc đã copy.");
+	// } else {
+	// if (invoiceChoose.size() != 0) {
+	// String makhachhang = null;
+	// String manoiden = null;
+	// StringBuilder poBuilder = new StringBuilder();
+	// List<Long> idinvoices = new ArrayList<Long>();
+	// for (int i = 0; i < invoiceChoose.size(); i++) {
+	// poBuilder.append(invoiceChoose.get(i).getVoucher_code());
+	// if (invoiceChoose.size() != i + 1) {
+	// poBuilder.append(";");
+	// }
+	// idinvoices.add(invoiceChoose.get(i).getId());
+	// }
+	// List<InvoiceDetail> invoiceDetails =
+	// invoiceDetailService.selectByInvoices(idinvoices);
+	// Map<Product, List<InvoiceDetail>> datagroupschitiets =
+	// invoiceDetails.stream()
+	// .collect(Collectors.groupingBy(p -> p.getProduct(),
+	// Collectors.toList()));
+	// List<InvoiceDetailDTO> invoiceDetailDTOs = new ArrayList<>();
+	// for (Product keyP : datagroupschitiets.keySet()) {
+	// List<InvoiceDetail> details = datagroupschitiets.get(keyP);
+	// InvoiceDetailDTO inv = new InvoiceDetailDTO(details.get(0));
+	// double quantity = details.stream().mapToDouble(f ->
+	// f.getQuantity()).sum();
+	// inv.setQuantity(quantity);
+	// invoiceDetailDTOs.add(inv);
+	// }
+	// invoiceDetailDTOs = invoiceDetailDTOs.stream()
+	// .sorted(Comparator.comparingLong(InvoiceDetailDTO::getIdtc)).collect(Collectors.toList());
+	// String chinhanh = getDatabase();
+	// if ("HO CHI MINH".equals(chinhanh)) {
+	// manoiden = "0247";
+	// makhachhang = "CO125";
+	// } else if ("BINH DUONG".equals(chinhanh)) {
+	// manoiden = "0537";
+	// makhachhang = "BL146";
+	// }
+	// InvoiceDTO invoiceDTO = new InvoiceDTO(invoiceChoose.get(0),
+	// invoiceDetailDTOs,
+	// poBuilder.toString(), manoiden, makhachhang);
+	// StringBuffer message = new StringBuffer();
+	// String token = "";
+	//
+	// String path = StaticPath.getPathBD();
+	// String taochinhanh = "";
+	// if ("HO CHI MINH".equals(chinhanh)) {
+	// path = StaticPath.getPathBD();
+	// taochinhanh = "BD";
+	// } else if ("BINH DUONG".equals(chinhanh)) {
+	// path = StaticPath.getPathHCM();
+	// taochinhanh = "HCM";
+	// }
+	//
+	// AccountAPI accountAPI = SecurityConfig.getTokenTime(accountAPIService,
+	// taochinhanh);
+	// if (accountAPI == null) {
+	// noticeError("Không có tài khoản đăng nhập API.");
+	// return;
+	// }
+	//
+	// String[] tokentime = new String[] { accountAPI.getToken(),
+	// accountAPI.getTimetoken() + "" };
+	// if (tokentime != null && (tokentime[1] != null
+	// && new Date().getTime() < Long.parseLong(tokentime[1]) && tokentime[0] !=
+	// null)) {
+	// token = tokentime[0];
+	// } else {
+	// dangnhapAPIdongbo(gson, path, taochinhanh);
+	// }
+	// String datajson = gson.toJson(new InvoiceAsyncDTO(invoiceDTO));
+	// DataAPI dataAPI = new DataAPI(datajson);
+	//
+	// // Goi ham dong bo
+	// Call call = trong.lixco.com.api.CallAPI.getInstance(token)
+	// .getMethodPost(path + "/api/data/taohoadon", gson.toJson(dataAPI));
+	// Response response = call.execute();
+	//
+	// String data = response.body().string();
+	// JsonObject jdata = gson.fromJson(data, JsonObject.class);
+	// String err = jdata.get("err").getAsString();
+	// String msg = jdata.get("msg").getAsString();
+	// message.append(msg);
+	// if (response.isSuccessful()) {
+	// if (err.equals("-1")) {
+	// noticeError(msg);
+	// } else {
+	// invoiceService.updateHDCopy(idinvoices);
+	// search();
+	// notice("Tạo hóa đơn " + taochinhanh + " thành công.");
+	// updateform(":menuformid:tabview1:tablesp");
+	// }
+	// } else {
+	// if (response.code() == 401) {
+	// dangnhapAPIdongbo(gson, path, taochinhanh);
+	// } else {
+	// noticeError(msg);
+	// }
+	// }
+	// } else {
+	// warning("Không có phiếu được chọn.");
+	// }
+	//
+	// }
+	// } catch (Exception e) {
+	// current.executeScript("swaldesigntimer('Xảy ra lỗi!', '" + e.getMessage()
+	// + "','error',2000);");
+	// logger.error("FreightContractBean.reportBienBangVanChuyenHangHoa:" +
+	// e.getMessage(), e);
+	// }
+	// }
+
+	private void dangnhapAPIdongbo(Gson gson, String path, String taochinhanh) throws IOException {
+		AccountAPI accountAPI = SecurityConfig.getTokenTime(accountAPIService, taochinhanh);
+		String[] tokentime = new String[2];
+		Call call = trong.lixco.com.api.CallAPI.getInstance("").getMethodPost(path + "/api/account/login",
+				gson.toJson(accountAPI));
+		Response response = call.execute();
+		if (response.isSuccessful()) {
+			String data = response.body().string();
+			JsonObject jsonObject = gson.fromJson(data, JsonObject.class);
+			tokentime[0] = jsonObject.get("access_token").getAsString();
+			tokentime[1] = jsonObject.get("expires_in").getAsString();
+			SecurityConfig.saveToken(accountAPIService, tokentime[0], Long.parseLong(tokentime[1]), taochinhanh);
+			notice("Đã liên kết đến hệ thống " + response.toString() + ". Vui lòng thực hiện chuyển lại");
+		} else {
+			noticeError("Tài khoản đăng nhập API " + taochinhanh + " không đúng hoặc lỗi " + response.toString());
+		}
+	}
+
+	@Getter
+	@Setter
+	boolean chonhet = false;
+	@Getter
+	int sophieuchon = 0;
+
+	public void chonHetPhieu() {
+		sophieuchon = 0;
+		if (listInvoiceTemp != null) {
+			for (int i = 0; i < listInvoiceTemp.size(); i++) {
+				listInvoiceTemp.get(i).setChonphieu(chonhet);
+			}
+			if (chonhet)
+				sophieuchon = listInvoiceTemp.size();
+		}
+	}
+
+	public void chonPhieu() {
+		sophieuchon = 0;
+		if (listInvoiceTemp != null) {
+			for (int i = 0; i < listInvoiceTemp.size(); i++) {
+				if (listInvoiceTemp.get(i).isChonphieu()) {
+					sophieuchon++;
+				}
+			}
+		}
+	}
+
+	@Getter
+	@Setter
+	private List<PromotionOrderDetail> listPromotionOrderDetail;
+
+	public void showEditInvoice() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (invoiceSelect != null) {
+				invoiceCrud = invoiceService.findById2(invoiceSelect.getId());
+				// show thông tin chi tiết hóa đơn
+				listWrapInvoiceDetail = new ArrayList<>();
+				List<InvoiceDetailTemp> listInvoiceTempDetail = new ArrayList<>();
+				invoiceDetailService.selectByInvoiceTemp(invoiceCrud.getId(), listInvoiceTempDetail);
+				for (InvoiceDetailTemp dt : listInvoiceTempDetail) {
+					WrapInvoiceDetailTempReqInfo w = new WrapInvoiceDetailTempReqInfo(dt);
+					listWrapInvoiceDetail.add(w);
+				}
+
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.showEditInvoice:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tablect').clearFilters();");
+		current.executeScript("setTimeout(utility.expandTable('.ui-row-toggler'),1000)");
+	}
+
+	public void showEditInvoiceDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (wrapInvoiceDetailSelect != null) {
+				wrapInvoiceDetailCrud = wrapInvoiceDetailSelect.clone();
+				wrapInvoiceDetailCrud.getInvoice_detail().setInvoicetemp(invoiceCrud);
+				current.executeScript("PF('dlgc1').show();");
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.showEditInvoiceDetail:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogInvoiceDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (invoiceCrud != null && invoiceCrud.getId() != 0) {
+				wrapInvoiceDetailCrud = new WrapInvoiceDetailTempReqInfo();
+				InvoiceDetailTemp invoiceDetail = new InvoiceDetailTemp();
+				invoiceDetail.setInvoicetemp(invoiceCrud);
+				wrapInvoiceDetailCrud.setInvoice_detail(invoiceDetail);
+				current.executeScript("PF('dlgc1').show();");
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.showDialogInvoiceDetail:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogPrint() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (invoiceCrud != null && invoiceCrud.getId() != 0 && listWrapInvoiceDetail != null
+					&& listWrapInvoiceDetail.size() > 0) {
+				current.executeScript("PF('idlg2').show();");
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo', 'Hóa đơn không tồn tại!','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.showDialogPrint:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogCar() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			listCarOwner = new ArrayList<>();
+			carOwnerService.selectAll(listCarOwner);
+			listCarType = new ArrayList<>();
+			carTypeService.selectAll(listCarType);
+			createNewCar();
+			current.executeScript("PF('dlgcar').show();");
+		} catch (Exception e) {
+			logger.error("InvoiceBean.showDialogCar:" + e.getMessage(), e);
+		}
+	}
+
+	public void createNewCar() {
+		carCrud = new Car();
+	}
+
+	public void saveOrUpdateCar() {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (carCrud != null) {
+				String licensePlate = carCrud.getLicense_plate();
+				String driver = carCrud.getDriver();
+				if (licensePlate != null && !"".equals(licensePlate) && driver != null && !"".equals(driver)
+						&& carCrud.getCar_type() != null && carCrud.getCar_owner() != null) {
+					CarReqInfo t = new CarReqInfo(carCrud);
+					if (carCrud.getId() == 0) {
+						// check code đã tồn tại chưa
+						if (allowSave(new Date())) {
+							carCrud.setCreated_date(new Date());
+							carCrud.setCreated_by(account.getMember().getName());
+							if (carService.insert(t) != -1) {
+								notify.success("Thêm thành công");
+								Car clone = carCrud.clone();
+								invoiceCrud.setCar(clone);
+								Car carIn = carCrud.clone();
+								listCar.add(0, carIn);
+								createNewCar();
+							} else {
+								notify.warning("Thêm Không thành công");
+							}
+
+						} else {
+							notify.warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!");
+						}
+					} else {
+						// check code update đã tồn tại chưa
+						if (allowUpdate(new Date(), null)) {
+							carCrud.setLast_modifed_by(account.getMember().getName());
+							carCrud.setLast_modifed_date(new Date());
+							if (carService.update(t) != -1) {
+								notify.success("Cập nhật thành công");
+								listCar.set(listCar.indexOf(carCrud), t.getCar());
+							} else {
+								notify.warning("Cập nhật Không thành công!");
+							}
+						} else {
+							notify.warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!");
+						}
+					}
+				} else {
+					notify.warning("Thông tin không đầy đủ, điền đủ thông tin chứa(*)");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.saveOrUpdateCar:" + e.getMessage(), e);
+		}
+	}
+
+	public void showEditCar() {
+		try {
+			if (carSelect != null) {
+				Car clone = carSelect.clone();
+				invoiceCrud.setCar(clone);
+				carCrud = clone;
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.showEditCar:" + e.getMessage(), e);
+		}
+	}
+
+	public void searchCar() {
+		try {
+			listCar = new ArrayList<Car>();
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("car_owner_id", carOwnerSearch == null ? 0 : carOwnerSearch.getId());
+			jsonInfo.addProperty("car_type_id", carTypeSearch == null ? 0 : carTypeSearch.getId());
+			jsonInfo.addProperty("license_plate", licensePlateSearch);
+			jsonInfo.addProperty("phone_number", phoneNumberSearch);
+			JsonObject json = new JsonObject();
+			json.add("car_info", jsonInfo);
+			carService.search(JsonParserUtil.getGson().toJson(json), listCar);
+		} catch (Exception e) {
+			logger.error("InvoiceBean.searchCar:" + e.getMessage(), e);
+		}
+	}
+
+	public List<Car> completeCar(String text) {
+		try {
+			if (text != null && !"".equals(text)) {
+				List<Car> list = new ArrayList<>();
+				carService.complete(formatHandler.converViToEn(text), list);
+				return list;
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.completeCar:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public List<Customer> completeCustomer(String text) {
+		try {
+			List<Customer> list = new ArrayList<>();
+			customerService.complete(formatHandler.converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("InvoiceBean.completeCustomer:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public List<Contract> completeContract(String text) {
+		try {
+			List<Contract> list = new ArrayList<>();
+			contractService.complete(formatHandler.converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("InvoiceBean.completeContract:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public List<PricingProgram> completePricingProgram(String text) {
+		try {
+			List<PricingProgram> list = new ArrayList<>();
+			if (invoiceCrud.getCustomer() != null && invoiceCrud.getCustomer().getId() != 0
+					&& invoiceCrud.getInvoice_temp_date() != null) {
+				JsonObject json = new JsonObject();
+				json.addProperty("date",
+						ToolTimeCustomer.convertDateToString(invoiceCrud.getInvoice_temp_date(), "dd/MM/yyyy"));
+				json.addProperty("customer_id", invoiceCrud.getCustomer().getId());
+				customerPricingProgramService.selectForCustomerDate(JsonParserUtil.getGson().toJson(json), list);
+			}
+			return list;
+		} catch (Exception e) {
+			logger.error("InvoiceBean.completePricingProgram:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public List<PromotionProgram> completePromotionProgram(String text) {
+		try {
+			List<PromotionProgram> list = new ArrayList<>();
+			if (invoiceCrud.getCustomer() != null && invoiceCrud.getCustomer().getId() != 0
+					&& invoiceCrud.getInvoice_temp_date() != null) {
+				JsonObject json = new JsonObject();
+				json.addProperty("date",
+						ToolTimeCustomer.convertDateToString(invoiceCrud.getInvoice_temp_date(), "dd/MM/yyyy"));
+				json.addProperty("customer_id", invoiceCrud.getCustomer().getId());
+				customerPromotionProgramService.selectForCustomerDate(JsonParserUtil.getGson().toJson(json), list);
+			}
+			return list;
+		} catch (Exception e) {
+			logger.error("InvoiceBean.completePromotionProgram:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public void ajaxBlurIdHoaHonGoc() {
+		try {
+			Invoice iv = invoiceService.findByIdSafe(Long.parseLong(invoiceCrud.getIdhoadongoc()));
+			if (iv != null) {
+				invoiceCrud.setSohoadongoc(iv.getVoucher_code());
+			} else {
+				invoiceCrud.setSohoadongoc("");
+			}
+		} catch (Exception e) {
+		}
+
+	}
+
+	public void ajaxTotal() {
+		// if (wrapInvoiceDetailCrud.getInvoice_detail().getTotal() >= 0) {
+		double total = 0;
+		try {
+			total = wrapInvoiceDetailCrud.getInvoice_detail().getQuantity()
+					* wrapInvoiceDetailCrud.getInvoice_detail().getUnit_price();
+		} catch (Exception e) {
+		}
+		wrapInvoiceDetailCrud.getInvoice_detail().setTotal(MyMath.round(total));
+		// }
+	}
+
+	public void ajaxSoTien() {
+		// if (wrapInvoiceDetailCrud.getInvoice_detail().getTotal() >= 0
+		// && wrapInvoiceDetailCrud.getInvoice_detail().getQuantity() > 0) {
+		// double price = 0;
+		// try {
+		// price = wrapInvoiceDetailCrud.getInvoice_detail().getTotal()
+		// / wrapInvoiceDetailCrud.getInvoice_detail().getQuantity();
+		// } catch (Exception e) {
+		// }
+		// wrapInvoiceDetailCrud.getInvoice_detail().setUnit_price(price);
+		// }
+	}
+
+	// private void sumInvoice() {
+	// try {
+	// if (listWrapInvoiceDetail != null) {
+	// double totalevent = listWrapInvoiceDetail.stream().mapToDouble(f ->
+	// f.getInvoice_detail().getTotal())
+	// .sum();
+	// invoiceCrud.setTongtien(MyMath.round(totalevent));
+	// if (invoiceCrud.getTax_edit() != 0) {
+	// invoiceCrud.setThue(invoiceCrud.getTax_edit());
+	// } else {
+	// invoiceCrud.setThue(MyMath.round(invoiceCrud.getTongtien() *
+	// invoiceCrud.getTax_value()));
+	// }
+	// invoiceService.updateTotalTax(invoiceCrud, getAccount().getUserName());
+	// }
+	// } catch (Exception e) {
+	// e.printStackTrace();
+	// invoiceCrud.setTongtien(0);
+	// invoiceCrud.setThue(0);
+	// invoiceService.updateTotalTax(invoiceCrud, getAccount().getUserName());
+	// logger.error("InvoiceBean.sumInvoice:" + e.getMessage(), e);
+	// }
+	// updateform("menuformid:tabview1:tongtien");
+	// }
+	//
+	// private void sumInvoiceIsSave() {
+	// try {
+	// List<InvoiceDetail> listInvoiceTempDetail = new ArrayList<>();
+	// invoiceDetailService.selectByInvoice(invoiceCrud.getId(),
+	// listInvoiceTempDetail);
+	// double totalevent = listInvoiceTempDetail.stream().mapToDouble(f ->
+	// f.getTotal()).sum();
+	// invoiceCrud.setTongtien(MyMath.round(totalevent));
+	// if (invoiceCrud.getTax_edit() != 0) {
+	// invoiceCrud.setThue(invoiceCrud.getTax_edit());
+	// } else {
+	// invoiceCrud.setThue(MyMath.round(invoiceCrud.getTongtien() *
+	// invoiceCrud.getTax_value()));
+	// }
+	// invoiceService.updateTotalTax(invoiceCrud, getAccount().getUserName());
+	// } catch (Exception e) {
+	// e.printStackTrace();
+	// invoiceCrud.setTongtien(0);
+	// invoiceCrud.setThue(0);
+	// invoiceService.updateTotalTax(invoiceCrud, getAccount().getUserName());
+	// logger.error("InvoiceBean.sumInvoice:" + e.getMessage(), e);
+	// }
+	// updateform("menuformid:tabview1:tongtien");
+	// }
+
+	// public void deleteInvoiceDetail() {
+	// PrimeFaces current = PrimeFaces.current();
+	// Notify notify = new Notify(FacesContext.getCurrentInstance());
+	// try {
+	// current.executeScript("PF('tablect').clearFilters();");
+	// if (wrapInvoiceDetailSelect != null) {
+	// if
+	// (allowDelete(wrapInvoiceDetailSelect.getInvoice_detail().getInvoice().getInvoice_temp_date(),
+	// wrapInvoiceDetailSelect.getInvoice_detail().getInvoice().getCreated_by()))
+	// {
+	// InvoiceDetailReqInfo tempReqInfo = new InvoiceDetailReqInfo();
+	// invoiceDetailService.selectById(wrapInvoiceDetailSelect.getInvoice_detail().getId(),
+	// tempReqInfo);
+	// InvoiceDetail detail = tempReqInfo.getInvoice_detail();
+	// if (detail != null) {
+	// if (detail.getInvoice() != null &&
+	// allowDelete(detail.getInvoice().getInvoice_temp_date(),
+	// detail.getInvoice().getCreated_by())) {
+	// acceptDelInvoiceDetail();
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá.','warning',2000);");
+	// }
+	// }
+	// } else {
+	// warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá");
+	// }
+	// } else {
+	// notify.warning("Chưa chọn dòng chi tiết để xóa!");
+	// }
+	//
+	// } catch (Exception e) {
+	// logger.error("InvoiceBean.deleteInvoiceDetail:" + e.getMessage(), e);
+	// }
+	// current.executeScript("PF('tablect').clearFilters();");
+	// }
+
+	// public void acceptDelInvoiceDetail() {
+	// PrimeFaces current = PrimeFaces.current();
+	// Notify notify = new Notify(FacesContext.getCurrentInstance());
+	// try {
+	// if
+	// (allowDelete(wrapInvoiceDetailSelect.getInvoice_detail().getInvoice().getInvoice_temp_date(),
+	// wrapInvoiceDetailSelect.getInvoice_detail().getInvoice().getCreated_by()))
+	// {
+	// WrapDelInvoiceDetailReqInfo t1 = new
+	// WrapDelInvoiceDetailReqInfo(account.getMember().getId(),
+	// account.getMember().getName(),
+	// wrapInvoiceDetailSelect.getInvoice_detail().getId());
+	// List<String> list = new ArrayList<>();
+	// invoiceService.prepareDataDelInvoiceDetail(wrapInvoiceDetailSelect.getInvoice_detail().getId(),
+	// list);
+	// Message message = new Message();
+	// int code = processLogicInvoiceService.deleteInvoiceDetailMaster(t1,
+	// message,
+	// getAccount().getUserName());
+	// if (code == 0) {
+	// listWrapInvoiceDetail.remove(wrapInvoiceDetailSelect);
+	// notify.success("Xóa thành công!");
+	// sumInvoice();// tinh lai tong tien
+	// } else {
+	// // đưa ra mã lỗi
+	// String m = message.getUser_message() + " \\n" +
+	// message.getInternal_message();
+	// warning(m);
+	// }
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+	// }
+	// } catch (Exception e) {
+	// logger.error("InvoiceBean.acceptDelInvoiceDetail:" + e.getMessage(), e);
+	// }
+	// current.executeScript("PF('tablect').clearFilters();");
+	// }
+
+	public void deleteInvoice() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			current.executeScript("PF('tablect').clearFilters();");
+			if (invoiceSelect != null) {
+				if (allowDelete(invoiceSelect.getInvoice_temp_date(), invoiceSelect.getCreated_by())) {
+					InvoiceTempReqInfo t = new InvoiceTempReqInfo();
+					// Nếu đây là hóa đơn khuyến mãi
+					// lấy hóa đơn chính
+					invoiceService.selectById2(invoiceSelect.getId(), t);
+					InvoiceTemp invoiceTemp = t.getInvoice();
+					if (invoiceTemp != null) {
+						if (invoiceTemp.getStatus() == 1) {
+							error("Phiếu đã chuyển qua hóa đơn, không xóa được");
+						} else {
+							acceptDelInvoice();
+						}
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+				}
+			} else {
+				notify.warning("Chưa chọn dòng để xóa!");
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.deleteInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	// public void deleteInvoiceFromBean(long invoice_id) {
+	// try {
+	// Invoice invoice = invoiceService.findByIdSafe(invoice_id);
+	// if (allowDelete(invoice.getInvoice_temp_date(), invoice.getCreated_by()))
+	// {
+	//
+	// WrapInvoiceDelInfo t1 = new WrapInvoiceDelInfo(invoice_id,
+	// account.getMember().getId(),
+	// account.getMember().getName());
+	// // chuẩn bị dữ liệu để delete
+	// List<String> list = new ArrayList<>();
+	// invoiceService.prepareDataDelInvoice(invoice_id, list);
+	// Message message = new Message();
+	// int code = processLogicInvoiceService.deleteInvoiceMaster(t1, message,
+	// getAccount().getUserName());
+	// } else {
+	// executeScript(
+	// "swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+	// }
+	// } catch (Exception e) {
+	// logger.error("InvoiceBean.acceptDelInvoice:" + e.getMessage(), e);
+	// }
+	// }
+
+	// public void exportIEInvoiceListExcel() {
+	// try {
+	// List<Long> idInvoices = new ArrayList<Long>();
+	// int size = listInvoiceTemp.size();
+	// for (int i = 0; i < size; i++) {
+	// idInvoices.add(listInvoiceTemp.get(i).getId());
+	// }
+	// List<InvoiceDetail> listInvoiceTempDetail = new ArrayList<>();
+	// invoiceDetailService.selectByInvoices(idInvoices, listInvoiceTempDetail);
+	//
+	// // xuat file excel.
+	// if (listInvoiceTempDetail.size() > 0) {
+	// List<Object[]> results = new ArrayList<Object[]>();
+	// Object[] title = { "Số CT", "Ngày", "Mã KH", "Mã kho", "Mã XN", "Số HĐ",
+	// "Mã SP", "Tên SP", "Số lượng",
+	// "ID", "Số xe", "Đơn giá", "Thành tiền", "Đơn giá NT", "Hệ số thuế",
+	// "Số serie", "Số ĐH",
+	// "Mã SPĐH", "Ghi chú" };
+	// results.add(title);
+	// for (InvoiceDetail it : listInvoiceTempDetail) {
+	// String cus = it.getInvoice().getCustomer() != null
+	// ? it.getInvoice().getCustomer().getCustomer_code()
+	// : "";
+	// String wah = it.getInvoice().getWarehouse() != null ?
+	// it.getInvoice().getWarehouse().getCode() : "";
+	// String ie = it.getInvoice().getIe_categories() != null
+	// ? it.getInvoice().getIe_categories().getCode()
+	// : "";
+	// String ct = it.getInvoice().getContract() != null ?
+	// it.getInvoice().getContract().getContract_code()
+	// : "";
+	// String car = it.getInvoice().getCar() != null ?
+	// it.getInvoice().getCar().getLicense_plate() : "";
+	// Object[] row = { Objects.toString(it.getInvoice().getVoucher_code(), ""),
+	// it.getInvoice().getInvoice_temp_date(), cus, wah, ie, ct,
+	// it.getProduct().getProduct_code(),
+	// it.getProduct().getProduct_name(), it.getQuantity(),
+	// it.getInvoice().getId(), car,
+	// it.getUnit_price(), it.getTotal(), it.getForeign_unit_price(),
+	// it.getInvoice().getTax_value(), it.getInvoice().getInvoice_serie(),
+	// it.getInvoice().getOrder_voucher(), it.getProductdh_code(),
+	// it.getInvoice().getNote() };
+	// results.add(row);
+	// }
+	// ToolReport.printReportExcelRaw(results, "xuathoadon");
+	// }
+	// } catch (Exception e) {
+	// logger.error("IEInvoiceBean.exportIEInvoiceListByContNoReport:" +
+	// e.getMessage(), e);
+	// }
+	// }
+
+	@Inject
+	ICustomerChannelService customerChannelService;
+
+	public void exportIEInvoiceListExcelTongHop() {
+		try {
+			List<Long> idInvoices = new ArrayList<Long>();
+			int size = listInvoiceTemp.size();
+			for (int i = 0; i < size; i++) {
+				idInvoices.add(listInvoiceTemp.get(i).getId());
+			}
+			List<Object[]> datas = new ArrayList<>();
+			invoiceDetailService.selectByInvoicesToExcel(idInvoices, datas);
+
+			// xuat file excel.
+			if (datas.size() > 0) {
+				List<Object[]> results = new ArrayList<Object[]>();
+				Object[] title = { "Mã KH xuất", "Số CT", "Ngày", "Mã KH", "Mã kho", "Mã XN", "Số HĐ", "Mã SP",
+						"Tên SP", "Số lượng", "ID", "Số xe", "Đơn giá", "Thành tiền", "Đơn giá NT", "Số tiền NT",
+						"Hệ số thuế", "Số serie", "Số ĐH", "Mã SPĐH", "Ghi chú", "Số lượng(kg)", "Số thùng",
+						"Đã thanh toán", "HT bốc xếp", "HT thanh toán", "Mã BX", "Mã nơi VC", "NV bán hàng", "Mã CTKM",
+						"Ngoài giờ", "Mã lô hàng", "Mã số", "ID đơn hàng", "Mã CTĐG", "Địa chỉ", "Số PO", "Tên KH",
+						"Tên NVVC", "Mã SP_Com", "Tên SP_Com", "Mã SP_Brand", "Tên SP_Brand", "Loại KH", "Kênh",
+						"Ngày giao hàng", "Số HĐ hủy", "Mã tra cứu", "Quy đổi", "Mã NVVC", "ID Chi tiết",
+						"Mã SP chính", "Quy đổi SP chính", "Mã SP KM", "Quy đổi SP KM", "Thủ Kho" };
+				results.add(title);
+				String chinhanh = getDatabase();
+				String nameCN = "";
+				String makhachhang = "";
+				if ("HO CHI MINH".equals(chinhanh)) {
+					nameCN = "HCM_";
+					makhachhang = "CO125";
+				} else if ("BINH DUONG".equals(chinhanh)) {
+					nameCN = "BD_";
+					makhachhang = "BL146";
+				} else if ("BAC NINH".equals(chinhanh)) {
+					nameCN = "BN_";
+					makhachhang = "CO400";
+				}
+				for (Object[] it : datas) {
+					it[0] = makhachhang;
+					String maspchinh = String.valueOf(it[51]);
+					if (maspchinh != null && !"".equals(maspchinh)) {
+						Product pd = productService.selectByCodeAll(maspchinh);
+						if (pd != null) {
+							it[52] = pd.getFactor();
+						}
+					}
+					results.add(it);
+				}
+				String ngayxuat = "";
+				try {
+					ngayxuat = MyUtil.chuyensangStrCode(fromDateSearch) + "_" + MyUtil.chuyensangStrCode(toDateSearch);
+				} catch (Exception e) {
+					// TODO: handle exception
+				}
+				ToolReport.printReportExcelRawXLSX(results, nameCN + "xuathoadon_" + ngayxuat);
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportIEInvoiceListByContNoReport:" + e.getMessage(), e);
+		}
+	}
+
+	String[] dmshoadonphiabac = { "CL056", "CL449", "CS169", "CL317", "CL326", "CL405", "DN089", "CO299", "CL523" };
+
+	public void exportCSVDMS() {
+		try {
+			List<Long> idInvoices = new ArrayList<Long>();
+			int size = listInvoiceTemp.size();
+			for (int i = 0; i < size; i++) {
+				idInvoices.add(listInvoiceTemp.get(i).getId());
+			}
+			List<Object[]> datas = invoiceDetailService.selectByInvoicesToDMS(monthDms, yearDms);
+			SimpleDateFormat sf = new SimpleDateFormat("dd/MM/yyyy");
+			// xuat file excel.
+			if (datas != null && datas.size() > 0) {
+				List<String[]> results = new ArrayList<String[]>();
+				String[] title = { "id", "Mã KH xuất", "Số CT", "Ngày", "Mã KH", "Mã XN", "Số HĐ", "Mã SP", "Số lượng",
+						"Đơn giá", "Thành tiền", "Hệ số thuế", "Số ĐH", "Ghi chú", "Số thùng", "Tiền thuế",
+						"Mã lô hàng", "Mã tra cứu", "Mã sản phẩm ĐH" };
+				results.add(title);
+				List<String[]> results_bs = new ArrayList<String[]>();
+				results_bs.add(title);
+				for (int i = 0; i < datas.size(); i++) {
+					try {
+
+						String[] dataitem = new String[19];
+						dataitem[0] = datas.get(i)[0] == null ? "" : datas.get(i)[0].toString();
+						dataitem[1] = datas.get(i)[1] == null ? "" : datas.get(i)[1].toString();
+						dataitem[2] = datas.get(i)[2] == null ? "" : datas.get(i)[2].toString();
+						dataitem[3] = datas.get(i)[3] == null ? "" : sf.format((Date) datas.get(i)[3]);
+						dataitem[4] = datas.get(i)[4] == null ? "" : datas.get(i)[4].toString();
+						dataitem[5] = datas.get(i)[5] == null ? "" : datas.get(i)[5].toString();
+						dataitem[6] = datas.get(i)[6] == null ? "" : datas.get(i)[6].toString();
+						dataitem[7] = datas.get(i)[7] == null ? "" : datas.get(i)[7].toString();
+
+						dataitem[8] = datas.get(i)[8] == null ? "" : datas.get(i)[8].toString();
+						dataitem[9] = datas.get(i)[9] == null ? "" : datas.get(i)[9].toString();
+						dataitem[10] = datas.get(i)[10] == null ? "" : datas.get(i)[10].toString();
+						dataitem[11] = datas.get(i)[11] == null ? "" : datas.get(i)[11].toString();
+						dataitem[12] = datas.get(i)[12] == null ? "" : datas.get(i)[12].toString();
+
+						dataitem[12] = datas.get(i)[12] == null ? "" : datas.get(i)[12].toString();// Số
+																									// thùng
+
+						dataitem[13] = datas.get(i)[13] == null ? "" : datas.get(i)[13].toString();
+						dataitem[14] = datas.get(i)[14] == null ? "" : datas.get(i)[14].toString();
+						dataitem[15] = datas.get(i)[15] == null ? "" : datas.get(i)[15].toString();
+						dataitem[16] = datas.get(i)[16] == null ? "" : datas.get(i)[16].toString();
+						dataitem[17] = datas.get(i)[17] == null ? "" : datas.get(i)[17].toString();
+						dataitem[18] = datas.get(i)[18] == null ? "" : datas.get(i)[18].toString();
+
+						boolean status = false;
+						for (int j = 0; j < dmshoadonphiabac.length; j++) {
+							if (dataitem[4].equals(dmshoadonphiabac[j])) {
+								status = true;
+								break;
+							}
+						}
+						if (status) {
+							results_bs.add(dataitem);
+
+						} else {
+							results.add(dataitem);
+						}
+					} catch (Exception e) {
+						// TODO: handle exception
+					}
+				}
+				OutputStream os = new FileOutputStream(configSystemService.findByKey("dmscsv").getLixvalue());
+				os.write(239);
+				os.write(187);
+				os.write(191);
+				try (CSVWriter writer = new CSVWriter(new OutputStreamWriter(os, "UTF-8"))) {
+					writer.writeAll(results);
+					notice("Đã xuất file.");
+				}
+				// DMS bổ sung hoặc miền bắc xuất cho miền nam
+				OutputStream os_bs = new FileOutputStream(configSystemService.findByKey("dmscsv_bs").getLixvalue());
+				os_bs.write(239);
+				os_bs.write(187);
+				os_bs.write(191);
+				try (CSVWriter writer_bs = new CSVWriter(new OutputStreamWriter(os_bs, "UTF-8"))) {
+					writer_bs.writeAll(results_bs);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportIEInvoiceListByContNoReport:" + e.getMessage(), e);
+		}
+	}
+
+	public void deleteInvoiceDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			current.executeScript("PF('tablect').clearFilters();");
+			if (wrapInvoiceDetailSelect != null) {
+				if (allowDelete(wrapInvoiceDetailSelect.getInvoice_detail().getInvoicetemp().getInvoice_temp_date(),
+						wrapInvoiceDetailSelect.getInvoice_detail().getInvoicetemp().getCreated_by())) {
+					InvoiceDetailReqInfo tempReqInfo = new InvoiceDetailReqInfo();
+					invoiceDetailService.selectById(wrapInvoiceDetailSelect.getInvoice_detail().getId(), tempReqInfo);
+					InvoiceDetail detail = tempReqInfo.getInvoice_detail();
+					if (detail != null) {
+						if (detail.getInvoice() != null && allowDelete(detail.getInvoice().getInvoice_date(),
+								detail.getInvoice().getCreated_by())) {
+							acceptDelInvoiceDetail();
+						} else {
+							current.executeScript(
+									"swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá.','warning',2000);");
+						}
+					}
+				} else {
+					warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá");
+				}
+			} else {
+				notify.warning("Chưa chọn dòng chi tiết để xóa!");
+			}
+
+		} catch (Exception e) {
+			logger.error("InvoiceBean.deleteInvoiceDetail:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tablect').clearFilters();");
+	}
+
+	public void acceptDelInvoiceDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (allowDelete(wrapInvoiceDetailSelect.getInvoice_detail().getInvoicetemp().getInvoice_temp_date(),
+					wrapInvoiceDetailSelect.getInvoice_detail().getInvoicetemp().getCreated_by())) {
+				WrapDelInvoiceDetailReqInfo t1 = new WrapDelInvoiceDetailReqInfo(account.getMember().getId(),
+						account.getMember().getName(), wrapInvoiceDetailSelect.getInvoice_detail().getId());
+				List<String> list = new ArrayList<>();
+				invoiceService.prepareDataDelInvoiceDetail(wrapInvoiceDetailSelect.getInvoice_detail().getId(), list);
+				Message message = new Message();
+				int code = processLogicInvoiceService.deleteInvoiceDetailTempMaster(t1, message, getAccount().getUserName());
+				if (code == 0) {
+					listWrapInvoiceDetail.remove(wrapInvoiceDetailSelect);
+					notify.success("Xóa thành công!");
+					// sumInvoice();// tinh lai tong tien
+				} else {
+					// đưa ra mã lỗi
+					String m = message.getUser_message() + " \\n" + message.getInternal_message();
+					warning(m);
+				}
+			} else {
+				current.executeScript(
+						"swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.acceptDelInvoiceDetail:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tablect').clearFilters();");
+	}
+
+	public void acceptDelInvoice() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (allowDelete(invoiceSelect.getInvoice_temp_date(), invoiceSelect.getCreated_by())) {
+				WrapInvoiceDelInfo t1 = new WrapInvoiceDelInfo(invoiceSelect.getId(), account.getMember().getId(),
+						account.getMember().getName());
+				// chuẩn bị dữ liệu để delete
+				Message message = new Message();
+				int code = processLogicInvoiceService.deleteInvoiceTempMaster(t1, message, getAccount().getUserName());
+				if (code == 0) {
+					search();
+					notify.success("Xóa thành công!");
+					createdNew();
+				} else {
+					// đưa ra mã lỗi
+					String m = message.getUser_message() + " \\n" + message.getInternal_message();
+					current.executeScript("swaldesignclose('Không thành công', '" + m + "','warning');");
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.acceptDelInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	@Inject
+	IPromotionalPricingService promotionalPricingService;
+
+	public void changeProduct(boolean tinhsolieu) {
+		try {
+			if (tinhsolieu == false) {
+
+			} else {
+				if (wrapInvoiceDetailCrud != null) {
+					InvoiceDetailTemp invoiceDetail = wrapInvoiceDetailCrud.getInvoice_detail();
+					Product product = invoiceDetail.getProduct();
+					if (product != null) {
+						if ("CKDH".equals(product.getProduct_code())) {
+							double tongcong = 0;
+							for (int i = 0; i < listWrapInvoiceDetail.size(); i++) {
+								tongcong += listWrapInvoiceDetail.get(i).getInvoice_detail().getTotal();
+							}
+							double chietkhau = tongcong * invoiceCrud.getDiscount() / 100;
+							invoiceDetail.setTotal(MyMath.round(chietkhau * -1));
+						} else {
+							PricingProgram pricingProgram = invoiceCrud.getPricing_program();
+							invoiceDetail.setUnit_price(0);
+							if (pricingProgram != null) {
+								boolean statusPrice = true;
+								PricingProgramDetailReqInfo t1 = new PricingProgramDetailReqInfo();
+								long idPriceSub = customerPricingProgramService.selectForCustomerSub(
+										pricingProgram.getId(), invoiceCrud.getInvoice_temp_date(), product.getId());
+								if (idPriceSub != 0) {
+
+									pricingProgramDetailService.findSettingPricing(idPriceSub, product.getId(), t1);
+
+									if (t1.getPricing_program_detail() != null) {
+										if (t1.getPricing_program_detail().getUnit_price() != 0) {
+											invoiceDetail.setUnit_price(t1.getPricing_program_detail().getUnit_price());
+											statusPrice = false;
+										}
+									}
+								}
+								if (statusPrice) {
+									pricingProgramDetailService.findSettingPricing(pricingProgram.getId(),
+											product.getId(), t1);
+									if (t1.getPricing_program_detail() != null) {
+										if (t1.getPricing_program_detail().getUnit_price() != 0) {
+											invoiceDetail.setUnit_price(t1.getPricing_program_detail().getUnit_price());
+										}
+									}
+								}
+							}
+							// tim nạp đơn giá sản phẩm khuyến mãi
+							boolean caidgkm = false;
+							String[] maspcaidgkm = LoaiMaXuatNhap.makhuyenmailaygiavon;
+							if (invoiceCrud.getIe_categories() != null)
+								for (int i = 0; i < maspcaidgkm.length; i++) {
+									if (maspcaidgkm[i].equals(invoiceCrud.getIe_categories().getCode())
+											&& invoiceCrud.getTax_value() == 0) {
+										caidgkm = true;
+										break;
+									}
+								}
+							if (caidgkm) {
+								invoiceDetail.setUnit_price(0);
+								PromotionalPricingReqInfo ppr = new PromotionalPricingReqInfo();
+								JsonObject json = new JsonObject();
+								json.addProperty("date", ToolTimeCustomer.convertDateToString(
+										invoiceCrud.getInvoice_temp_date(), "dd/MM/yyyy"));
+								json.addProperty("product_id", product.getId());
+								promotionalPricingService.findSettingPromotionalPricing(JsonParserUtil.getGson()
+										.toJson(json), ppr);
+								if (ppr.getPromotional_pricing() != null) {
+									invoiceDetail.setUnit_price(ppr.getPromotional_pricing().getUnit_price());
+								}
+							}
+							ajaxTotal();
+						}
+					}
+				}
+			}
+
+		} catch (Exception e) {
+			logger.error("InvoiceBean.changeProduct:" + e.getMessage(), e);
+		}
+	}
+
+	public Object[] dutonkho(InvoiceDetail invoiceDetail) {
+		HeThong ht = heThongService.findById(1);
+		boolean dutonkho = true;
+		double tonkho = 0;
+		if (ht.isKiemton()) {
+			tonkho = tonKhoThucTeService.kiemton(invoiceDetail.getProduct().getId());
+			if (tonkho < invoiceDetail.getQuantity()) {
+				dutonkho = false;
+			}
+		}
+		return new Object[] { dutonkho, tonkho };
+	}
+
+	@Inject
+	TonKhoThucTeService tonKhoThucTeService;
+
+	// public void saveOrUpdateInvoiceDetail(boolean hdsuagia) {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// if (invoiceCrud != null && invoiceCrud.getId() != 0) {
+	// if (wrapInvoiceDetailCrud != null) {
+	// InvoiceDetail invoiceDetail = wrapInvoiceDetailCrud.getInvoice_detail();
+	// invoiceDetail.setReal_quantity(invoiceDetail.getQuantity());
+	// Product product = invoiceDetail.getProduct();
+	// if (product != null) {
+	// WrapPMInvoiceDetailReqInfo wrap = new
+	// WrapPMInvoiceDetailReqInfo(invoiceDetail.clone(),
+	// account.getMember().getName());
+	// Message message = new Message();
+	// HeThong ht = heThongService.findById(1);
+	// if (invoiceDetail.getId() == 0) {
+	// if (allowSave(invoiceCrud.getInvoice_temp_date(),
+	// invoiceCrud.getCreated_by())) {
+	// Object[] dutk = dutonkho(invoiceDetail);
+	// if ((boolean) dutk[0]) {
+	// int code = processLogicInvoiceService.saveOrUpdateInvoiceDetail2(wrap,
+	// message,
+	// getAccount().getUserName(), hdsuagia);
+	// if (code == 0) {
+	// success();
+	// InvoiceDetailReqInfo t = new InvoiceDetailReqInfo();
+	// invoiceDetailService.selectById(wrap.getInvoice_detail().getId(), t);
+	// List<ExportBatch> list = new ArrayList<>();
+	// WrapInvoiceDetailReqInfo w = new
+	// WrapInvoiceDetailReqInfo(t.getInvoice_detail(),
+	// list);
+	// listWrapInvoiceDetail.add(0, w);
+	// // refesh lại dialog
+	// resetDialogThemCT();
+	// sumInvoice();// tinh lai tong cong
+	// // call api foxpro
+	// // saveOrUpdateApiFoxInvoiceDetail(wrap.getInvoice_detail().getId());
+	// } else {
+	// // đưa ra lỗi
+	// String m = message.getUser_message() + " \\n" +
+	// message.getInternal_message();
+	// current.executeScript(
+	// "swaldesignclose('Không thành công', '" + m + "','warning');");
+	// }
+	// } else {
+	// noticeError("Sản phẩm: " + invoiceDetail.getProduct().getProduct_code()
+	// + " không đủ tồn kho (tồn kho: " + MyUtilEJB.dinhdangso((double) dutk[1])
+	// + ")");
+	// }
+	// } else {
+	// warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá.");
+	// }
+	// } else {
+	// Invoice invoiceOld = invoiceService.findByIdSafe(invoiceCrud.getId());
+	// if (invoiceOld != null
+	// && allowUpdate(invoiceOld.getInvoice_temp_date(),
+	// invoiceOld.getCreated_by())
+	// && allowUpdate(invoiceCrud.getInvoice_temp_date(),
+	// invoiceCrud.getCreated_by())) {
+	//
+	// double tonkho = 0;
+	// Object[] dutk = dutonkho(invoiceDetail);
+	// if ((boolean) dutk[0]) {
+	// int code = processLogicInvoiceService.saveOrUpdateInvoiceDetail2(wrap,
+	// message,
+	// getAccount().getUserName(), hdsuagia);
+	// if (code == 0) {
+	// success();
+	// // load lại chi tiết hóa đơn
+	// InvoiceDetailReqInfo t = new InvoiceDetailReqInfo();
+	// invoiceDetailService.selectById(wrap.getInvoice_detail().getId(), t);
+	// List<ExportBatch> list = new ArrayList<>();
+	// invoiceService.getListExportBatch(t.getInvoice_detail().getId(), list);
+	// WrapInvoiceDetailReqInfo w = new
+	// WrapInvoiceDetailReqInfo(t.getInvoice_detail(),
+	// list);
+	// int index = listWrapInvoiceDetail.indexOf(wrapInvoiceDetailCrud);
+	// if (index != -1) {
+	// listWrapInvoiceDetail.set(index, w);
+	// }
+	// resetDialogThemCT();
+	// sumInvoice();// tinh lai tong cong
+	// // call api foxpro
+	// // saveOrUpdateApiFoxInvoiceDetail(wrap.getInvoice_detail().getId());
+	// } else {
+	// // đưa ra mã lỗi
+	// String m = message.getUser_message() + " \\n" +
+	// message.getInternal_message();
+	// current.executeScript(
+	// "swaldesignclose('Không thành công', '" + m + "','warning');");
+	// }
+	// } else {
+	// noticeError("Sản phẩm: " + invoiceDetail.getProduct().getProduct_code()
+	// + " không đủ tồn kho (tồn kho: " + MyUtilEJB.dinhdangso((double) dutk[1])
+	// + ")");
+	// }
+	// } else {
+	// warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá.");
+	// }
+	// }
+	// } else {
+	// warning("Thông tin không đầy đủ.");
+	// }
+	// }
+	// }
+	// } catch (Exception e) {
+	// logger.error("InvoiceBean.saveOrUpdateInvoiceDetail:" + e.getMessage(),
+	// e);
+	// }
+	// current.executeScript("PF('tablect').clearFilters();");
+	// }
+
+	public void napTuExcelChiTiet() {
+		if (allowSave(invoiceCrud.getInvoice_temp_date(), invoiceCrud.getCreated_by())) {
+			showDialog("dlnapchitiethoadon");
+		} else {
+			warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!");
+		}
+	}
+
+	// public void resetDialogThemCT() {
+	// wrapInvoiceDetailCrud = new WrapInvoiceDetailReqInfo();
+	// InvoiceDetail invoiceDetail2 = new InvoiceDetail();
+	// invoiceDetail2.setInvoice(invoiceCrud);
+	// wrapInvoiceDetailCrud.setInvoice_detail(invoiceDetail2);
+	// }
+	//
+	// public void saveOrUpdateInvoice() {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// if (invoiceCrud != null) {
+	// IECategories ieCategories = invoiceCrud.getIe_categories();
+	// Customer customer = invoiceCrud.getCustomer();
+	// Date invoiceDate = invoiceCrud.getInvoice_temp_date();
+	// Warehouse warehouse = invoiceCrud.getWarehouse();
+	// Carrier carrier = invoiceCrud.getCarrier();
+	// if (ieCategories != null && customer != null && invoiceDate != null &&
+	// warehouse != null
+	// && invoiceCrud.getVoucher_code() != null &&
+	// !"".equals(invoiceCrud.getVoucher_code())) {
+	// // Kiem tra rang buoc nguoi van chuyen (X;A;V;E;5;%;1;^;+;-)
+	// boolean statusNVC = true;
+	// for (int i = 0; i < MAKT_NVC.length; i++) {
+	// if (ieCategories.getCode().equals(MAKT_NVC[i])) {
+	// if (carrier == null) {
+	// statusNVC = false;
+	// }
+	// break;
+	// }
+	// }
+	// if (statusNVC == false) {
+	// noticeError("Chưa cài đặt người vận chuyển.");
+	// } else {
+	//
+	// InvoiceReqInfo clone = new InvoiceReqInfo(invoiceCrud.clone());
+	// if (listWrapInvoiceDetail.size() != 0)
+	// sumInvoice();
+	// if (invoiceCrud.getId() == 0) {
+	// if (allowSave(invoiceCrud.getInvoice_temp_date())) {
+	// if (invoiceService.insert(clone) == 0) {
+	// success();
+	// // load lại invocie
+	// InvoiceReqInfo invoiceReqInfo = new InvoiceReqInfo();
+	// invoiceService.selectById(clone.getInvoice().getId(), invoiceReqInfo);
+	// Invoice invoiceTemp = invoiceReqInfo.getInvoice();
+	// if (invoiceTemp != null) {
+	// if (listInvoiceTemp == null)
+	// search();
+	// listInvoiceTemp.add(0, invoiceTemp);
+	// invoiceCrud = invoiceTemp.clone();
+	// }
+	// // saveOrUpdateApiFoxInvoice();
+	// } else {
+	// error("Lưu Không thành công");
+	// }
+	// } else {
+	// warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá");
+	// }
+	// } else {
+	// Invoice invoiceOld = invoiceService.findByIdSafe(invoiceCrud.getId());
+	// if (invoiceOld != null
+	// && allowUpdate(invoiceOld.getInvoice_temp_date(),
+	// invoiceOld.getCreated_by())
+	// && allowUpdate(invoiceCrud.getInvoice_temp_date(),
+	// invoiceCrud.getCreated_by())) {
+	//
+	// // Phiếu đã chuyển hóa đơn điện tử
+	// if (invoiceOld.getStatus() == 1) {
+	// if (!allowUserAdmin()) {
+	// warning("Phiếu đã có số hóa đơn không cập nhật được các trường sau: Số chứng từ, Ngày hóa đơn, Đơn giá, Khuyến mãi, Hệ số thuế, Tỷ lệ CK.");
+	// invoiceCrud.setVoucher_code(invoiceOld.getVoucher_code());
+	// invoiceCrud.setInvoice_date(invoiceOld.getInvoice_temp_date());
+	// invoiceCrud.setPricing_program(invoiceOld.getPricing_program());
+	// invoiceCrud.setPromotion_program(invoiceOld.getPromotion_program());
+	// invoiceCrud.setTax_value(invoiceOld.getTax_value());
+	// invoiceCrud.setDiscount(invoiceOld.getDiscount());
+	// }
+	// }
+	// // cap nhat user tao khi duoc chuyen tu chi
+	// // nhanh
+	// if (invoiceCrud.getCreated_by() == null ||
+	// "".equals(invoiceCrud.getCreated_by()))
+	// invoiceCrud.setCreated_by(account.getMember().getName());
+	// sumInvoiceIsSave();
+	// if (invoiceService.updateSelect(invoiceCrud.clone(),
+	// getAccount().getUserName()) > 0) {
+	// success();
+	// // load lại invocie
+	// InvoiceReqInfo invoiceReqInfo = new InvoiceReqInfo();
+	// invoiceService.selectById(clone.getInvoice().getId(), invoiceReqInfo);
+	// Invoice invoiceTemp = invoiceReqInfo.getInvoice();
+	// if (invoiceTemp != null) {
+	// int index = listInvoiceTemp.indexOf(invoiceCrud);
+	// if (index != -1) {
+	// listInvoiceTemp.set(index, invoiceTemp);
+	// }
+	// invoiceCrud = invoiceTemp.clone();
+	// }
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer('Không thành công!', 'Lưu Không thành công!','warning',2000);");
+	// }
+	// } else {
+	// if (!allowUser(invoiceOld.getCreated_by())) {
+	// warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá.");
+	// } else {
+	// if (invoiceOld != null && allowUpdate(null, invoiceOld.getCreated_by()))
+	// {
+	// invoiceOld = invoiceService.findById(invoiceOld.getId());
+	// invoiceOld.setIe_categories(invoiceCrud.getIe_categories());
+	// invoiceOld.setNote(invoiceCrud.getNote());
+	// invoiceOld.setCar(invoiceCrud.getCar());
+	// invoiceOld.setCarrier(invoiceCrud.getCarrier());
+	// invoiceOld.setSophieuvc(invoiceCrud.getSophieuvc());
+	// invoiceOld.setDelivery_pricing(invoiceCrud.getDelivery_pricing());
+	// invoiceOld.setWarehouse(invoiceCrud.getWarehouse());
+	// invoiceOld.setPayment(invoiceCrud.isPayment());
+	// invoiceOld.setPayment_date(invoiceCrud.getPayment_date());
+	// if (invoiceService.updateSelect(invoiceOld, getAccount().getUserName()) >
+	// 0) {
+	// InvoiceReqInfo invoiceReqInfo = new InvoiceReqInfo();
+	// invoiceService.selectById(clone.getInvoice().getId(), invoiceReqInfo);
+	// Invoice invoiceTemp = invoiceReqInfo.getInvoice();
+	// if (invoiceTemp != null) {
+	// int index = listInvoiceTemp.indexOf(invoiceCrud);
+	// if (index != -1) {
+	// listInvoiceTemp.set(index, invoiceTemp);
+	// }
+	// invoiceCrud = invoiceTemp.clone();
+	// }
+	// warning("Tháng đã khóa, phiếu chỉ cập nhật được (Mã xuất nhập, Ghi chú xuất, Số xe, Người VC, Số phiếu VC, Nơi dến, Kho, Thanh toán).");
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer('Cảnh báo!', 'Xảy ra lỗi không cập nhật được.','error',2000);");
+	// }
+	//
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+	// }
+	// }
+	// }
+	// }
+	// }
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer('Cảnh báo!', 'Thông tin hóa đơn không đầy đủ, điền đầy đủ thông tin chứa(*)','warning',2000);");
+	// }
+	// }
+	// } catch (Exception e) {
+	// e.printStackTrace();
+	// logger.error("InvoiceBean.saveOrUpdateInvoice:" + e.getMessage(), e);
+	// }
+	// // chạy thử nghiệm
+	// current.executeScript("PF('tablect').clearFilters();");
+	// }
+
+	public void showDialogPickDeliveryPricing() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			listDeliveryPricing = new ArrayList<>();
+			if (invoiceCrud != null && invoiceCrud.getCustomer() != null) {
+				/* {place_code:'',customer_id:0} */
+				JsonObject json = new JsonObject();
+				json.addProperty("customer_id", invoiceCrud.getCustomer().getId());
+				json.addProperty("disable", 0);
+				deliveryPricingService.seletcBy(JsonParserUtil.getGson().toJson(json), listDeliveryPricing);
+				showDialog("dlgpickpd");
+			} else {
+				notify.warning("Chưa chọn khách hàng");
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.showDialogPickDeliveryPricing:" + e.getMessage(), e);
+		}
+	}
+
+	public void pickDeliveryPricing(SelectEvent event) {
+		try {
+			if (invoiceCrud != null && invoiceCrud.getCustomer() != null) {
+				invoiceCrud.setDelivery_pricing((DeliveryPricing) event.getObject());
+			}
+		} catch (Exception e) {
+			logger.error("OrderLixBean.pickDeliveryPricing:" + e.getMessage(), e);
+		}
+	}
+
+	public void exportPDF() {
+		try {
+
+		} catch (Exception e) {
+			logger.error("InvoiceBean.exportPDF:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogExport(WrapInvoiceDetailReqInfo item) {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			wrapInvoiceDetailPick = item.clone();
+			InvoiceDetail invoiceDetail = item.getInvoice_detail();
+			listWrapExportData = new ArrayList<>();
+			// lấy danh sách lô hàng đã xuất và chưa xuất(còn tồn) cho chi tiết
+			// này
+			// lưu ý chỉ hiển thị lô hàng trạng thái đã hoàn thành
+			List<ExportBatch> listExportBatch = new ArrayList<>();
+			List<Batch> listBatch = new ArrayList<>();
+			batchService.exportBatchByInvoiceDetail(invoiceDetail.getProduct().getId(), invoiceDetail.getId(),
+					listBatch);
+			for (Batch b : listBatch) {
+				ExportBatch e = new ExportBatch();
+				e.setBatch(b);
+				listExportBatch.add(e);
+			}
+			// prepare list wrap
+			for (ExportBatch ex : listExportBatch) {
+				WrapExportDataReqInfo w = new WrapExportDataReqInfo();
+				w.setExport_batch(ex);
+				w.setQuantity_export(0);
+				w.setSelect(ex.isSelect());
+				listWrapExportData.add(w);
+			}
+			current.executeScript("PF('dlgexport').show();");
+		} catch (Exception e) {
+			logger.error("InvoiceBean.showDialogExport:" + e.getMessage(), e);
+		}
+	}
+
+	public void selectExportBatch(WrapExportDataReqInfo t) {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			Batch batch = t.getExport_batch().getBatch();
+			InvoiceDetail invoiceDetailPick = wrapInvoiceDetailPick.getInvoice_detail();
+			if (t.isSelect()) {
+				// load lại Batch hiện tại
+				BatchReqInfo brq = new BatchReqInfo();
+				batchService.selectById(batch.getId(), brq);
+				batch = brq.getBatch();
+				t.getExport_batch().setBatch(batch);
+				// kiểm tra sản phẩm lô hàng có cài quy cách chưa.
+				if (batch.getProduct().getSpecification() == 0) {
+					current.executeScript("swaldesignclose('Cảnh báo', 'Quy cách sản phẩm bị sai:'"
+							+ invoiceDetailPick.getProduct().getProduct_code() + ",'warning');");
+					t.setSelect(false);
+					return;
+				}
+				// số lượng tồn của lô hàng
+				double soTon = batch.getRemain_quantity();
+				// số lượng yêu cầu và số lượng thực xuất chi tiết hóa đơn
+				double quantity = invoiceDetailPick.getQuantity();
+				double quantityReal = invoiceDetailPick.getReal_quantity();
+				// số lượng yêu cầu còn lại chưa xuất
+				double quantityEx = BigDecimal.valueOf(quantity).subtract(BigDecimal.valueOf(quantityReal))
+						.doubleValue();
+				if (quantityEx == 0) {
+					// đã đủ số lượng.
+					t.setSelect(false);
+					notify.warning("Đã xuất đủ số lượng!");
+					return;
+				}
+				double soluongCal = BigDecimal.valueOf(quantityEx).subtract(BigDecimal.valueOf(soTon)).doubleValue();
+				if (soluongCal >= 0) {
+					t.setQuantity_export(soTon);
+					// tăng số lượng thực xuất
+					quantityReal = BigDecimal.valueOf(quantityReal).add(BigDecimal.valueOf(soTon)).doubleValue();
+				} else {
+					t.setQuantity_export(quantityEx);
+					// tăng số lượng thực xuất
+					quantityReal = BigDecimal.valueOf(quantityReal).add(BigDecimal.valueOf(quantityEx)).doubleValue();
+				}
+				invoiceDetailPick.setReal_quantity(quantityReal);
+			} else {
+				double quantityEx = t.getQuantity_export();
+				double quantityReal = BigDecimal.valueOf(invoiceDetailPick.getReal_quantity())
+						.subtract(BigDecimal.valueOf(quantityEx)).doubleValue();
+				invoiceDetailPick.setReal_quantity(quantityReal);
+				t.setQuantity_export(0);
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.selectExportBatch:" + e.getMessage(), e);
+			notify.message("Lỗi dữ liệu không hợp lệ");
+			current.executeScript("PF('dlgexport').hide();");
+		}
+		PrimeFaces
+				.current()
+				.ajax()
+				.update("menuformid:tabview1:tablect:" + listWrapInvoiceDetail.indexOf(wrapInvoiceDetailPick)
+						+ ":tableInner");
+	}
+
+	public void changeQuantityExportBatch(WrapExportDataReqInfo item) {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			InvoiceDetail invoiceDetailPick = wrapInvoiceDetailPick.getInvoice_detail();
+			if (item.isSelect()) {
+				// load lại lô hàng
+				BatchReqInfo brq = new BatchReqInfo();
+				batchService.selectById(item.getExport_batch().getBatch().getId(), brq);
+				Batch batch = brq.getBatch();
+				item.getExport_batch().setBatch(batch);
+				// tính số lượng đơn vị tính
+				double quantityEdit = item.getQuantity_export();
+				// nếu sản phẩm chưa cài quy cách thì thông báo.
+				item.setQuantity_export(quantityEdit);
+				// số lượng tồn của lô hàng
+				double quantityTon = batch.getRemain_quantity();
+				double sum = 0;
+				for (WrapExportDataReqInfo ex : listWrapExportData) {
+					if (ex.isSelect()) {
+						sum = BigDecimal.valueOf(sum).add(BigDecimal.valueOf(ex.getQuantity_export())).doubleValue();
+					}
+				}
+				// tính tổng lượng đã xuất trước đó (thực tế).
+				List<ExportBatch> listExportBatchReal = wrapInvoiceDetailPick.getList_export_batch();
+				double sumReal = 0;
+				for (ExportBatch r : listExportBatchReal) {
+					sumReal = BigDecimal.valueOf(sumReal).add(BigDecimal.valueOf(r.getQuantity())).doubleValue();
+				}
+				double totalQuantity = BigDecimal.valueOf(sum).add(BigDecimal.valueOf(sumReal)).doubleValue();
+				if (quantityEdit > quantityTon) {
+					// trả lại trạng thái trước.
+					item.setQuantity_export(0);
+					invoiceDetailPick.setReal_quantity(sumReal);
+					notify.warning("Số lượng xuất lớn hơn số lượng tồn.");
+					return;
+				}
+				// nếu tổng xuất lớn hơn số lượng yêu cầu
+				if (totalQuantity > invoiceDetailPick.getQuantity()) {
+					item.setQuantity_export(0);
+					invoiceDetailPick.setReal_quantity(sumReal);
+					notify.warning("Số lượng xuất lớn hơn số lượng yêu cầu.");
+					return;
+				}
+				invoiceDetailPick.setReal_quantity(totalQuantity);
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceBean.changeQuantityExportBatch:" + e.getMessage(), e);
+			notify.message("Lỗi dữ liệu không hợp lệ");
+			current.executeScript("PF('dlgexport').hide();");
+		}
+	}
+
+	// public void capNhatMaTraCuuHDDTDS() {
+	// PrimeFaces current = PrimeFaces.current();
+	// List<Invoice> invoiceChoose = new ArrayList<Invoice>();
+	// for (int i = 0; i < listInvoiceTemp.size(); i++) {
+	// if (listInvoiceTemp.get(i).isChonphieu()) {
+	// invoiceChoose.add(listInvoiceTemp.get(i));
+	// }
+	// }
+	// if (invoiceChoose.size() != 0) {
+	// for (int i = 0; i < invoiceChoose.size(); i++) {
+	// this.invoiceCrud = invoiceChoose.get(i);
+	// capNhatMaTraCuuHDDT();
+	// }
+	// createdNew();
+	// } else {
+	// current.executeScript("swaldesigntimer2('Cảnh báo','Chưa chọn phiếu.','warning',2000)");
+	// }
+	// }
+
+	public void capNhatMaTraCuuHDDT() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (invoiceCrud != null && invoiceCrud.getId() != 0) {
+				InvoiceReqInfo invoiceReqInfo = new InvoiceReqInfo();
+				invoiceService.selectById(invoiceCrud.getId(), invoiceReqInfo);
+				Invoice invoiceLoad = invoiceReqInfo.getInvoice();
+				String idMisa = invoiceLoad.getRefId();
+				if (idMisa != null) {
+					String result = MisaInvoice.getInvoice(idMisa, eInvoiceService);
+					Gson gson = new Gson();
+					KetQua kqinsert = gson.fromJson(result, KetQua.class);
+					if (kqinsert.getCode() == 200) {
+						if ("true".equals(kqinsert.getThamso().getSuccess())) {
+							EInvoiceV3 hoadon = gson.fromJson(kqinsert.getThamso().getData(), EInvoiceV3.class);
+							if (hoadon != null) {
+								if (hoadon.getInvNo() == null || "<Chưa cấp số>".equalsIgnoreCase(hoadon.getInvNo())) {
+									FacesContext context = FacesContext.getCurrentInstance();
+									context.addMessage(null, new FacesMessage(FacesMessage.SEVERITY_ERROR, "",
+											"Hóa đơn chưa cấp số."));
+								} else {
+									invoiceLoad.setLookup_code(hoadon.getTransactionID());
+									invoiceLoad.setVoucher_code(hoadon.getInvNo());
+									invoiceLoad.setStatus(1);
+									invoiceService.updateGetInvoice(invoiceLoad.getId(), hoadon.getTransactionID(),
+											hoadon.getInvNo(), getAccount().getUserName());
+
+									invoiceCrud.setLookup_code(hoadon.getTransactionID());
+									invoiceCrud.setVoucher_code(invoiceLoad.getVoucher_code());
+									invoiceCrud.setStatus(1);
+									success();
+								}
+							} else {
+								noticeError(result);
+								current.executeScript("console.log('" + result + "')");
+							}
+						} else {
+							current.executeScript("swaldesigntimer2('Không thành công','Xảy ra lỗi, nhấn F12 để xem chi tiết','error',2000)");
+							current.executeScript("console.log('" + result + "')");
+						}
+					} else {
+						current.executeScript("swaldesigntimer2('Không thành công','Xảy ra lỗi, nhấn F12 để xem chi tiết','error',2000)");
+						current.executeScript("console.log('" + result + "')");
+					}
+				} else {
+					current.executeScript("swaldesigntimer2('Không thành công','Phiếu chưa được chuyển sang điện tử','warning',2000)");
+				}
+			} else {
+				current.executeScript("swaldesigntimer2('Không thành công','Chưa chọn phiếu.','warning',2000)");
+			}
+		} catch (Exception e) {
+			logger.error("ExportBean.capNhatMaTraCuuHDDT:" + e.getMessage(), e);
+		}
+	}
+
+	public boolean deleteHDDT(String guiId) {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (guiId != null) {
+				String result = MisaInvoice.deleteInvoice(guiId, eInvoiceService);
+				Gson gson = new Gson();
+				KetQua kqinsert = gson.fromJson(result, KetQua.class);
+				if (kqinsert.getCode() == 200) {
+					return true;
+				} else {
+					current.executeScript("console.log('" + result + "')");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("ExportBean.capNhatMaTraCuuHDDT:" + e.getMessage(), e);
+		}
+		return false;
+	}
+
+	@Inject
+	IIEInvoiceService ieInvoiceService;
+	@Getter
+	@Setter
+	boolean lamtron = true;
+
+	// public void chuyenHDDTDS(boolean phieuxuatkho) {
+	// PrimeFaces current = PrimeFaces.current();
+	// List<Invoice> invoiceChoose = new ArrayList<Invoice>();
+	// if (listInvoiceTemp != null)
+	// for (int i = 0; i < listInvoiceTemp.size(); i++) {
+	// if (listInvoiceTemp.get(i).isChonphieu()) {
+	// invoiceChoose.add(listInvoiceTemp.get(i));
+	// }
+	// }
+	// if (invoiceChoose.size() > 20) {
+	// current.executeScript("swaldesigntimer2('Cảnh báo','Không chuyển được quá 20 hóa đơn.','warning',2000)");
+	// } else {
+	// if (invoiceChoose.size() != 0) {
+	// for (int i = 0; i < invoiceChoose.size(); i++) {
+	// this.invoiceCrud = invoiceChoose.get(i);
+	// chuyenHDDT(phieuxuatkho);
+	// }
+	// invoiceSelect = null;
+	// createdNew();
+	// search();
+	// updateform("menuformid:tabview1");
+	// } else {
+	// current.executeScript("swaldesigntimer2('Cảnh báo','Chưa chọn phiếu.','warning',2000)");
+	// }
+	// }
+	// }
+
+	@Getter
+	@Setter
+	private String passhoadonjson;
+	@Getter
+	@Setter
+	private String datahoadonjson;
+	@Getter
+	@Setter
+	private String datahoadonjsonRefId;
+
+	// public void chuyenHDDTJson() {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// if ("LIXCO@2023HD".equals(passhoadonjson)) {
+	// boolean capnhatphieu = true;
+	// if (datahoadonjsonRefId != null && !"".equals(datahoadonjsonRefId)) {
+	// capnhatphieu = deleteHDDT(datahoadonjsonRefId);
+	// }
+	// if (capnhatphieu) {
+	// ThongBao thongbao = new ThongBao();
+	// thongbao.setLoi(false);
+	// thongbao.setDulieu(datahoadonjson);
+	//
+	// if (thongbao.isLoi() == false) {
+	// System.out.println("Chuyen hoa don tu json------- refID: " +
+	// datahoadonjsonRefId);
+	// String result = MisaInvoice.insertInvoice(thongbao.getDulieu(),
+	// eInvoiceService);
+	// try {
+	// Gson gson = new Gson();
+	// KetQua kqinsert = gson.fromJson(result, KetQua.class);
+	// if (kqinsert != null) {
+	// if (kqinsert.getCode() == 200) {
+	// if ("true".equals(kqinsert.getThamso().getSuccess())) {
+	// if (invoiceSelect != null)
+	// invoiceCrud = invoiceService.findById(invoiceSelect.getId());
+	// success("Đã nạp hóa đơn thành công");
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer2('Không thành công','Xảy ra lỗi, nhấn F12 để xem chi tiết','error',2000)");
+	// current.executeScript("console.log('" + result + "')");
+	// }
+	// } else {
+	// if (result.contains("Duplicate entry")) {
+	// current.executeScript(
+	// "swaldesigntimer2('Không thành công','Phiếu đã nạp lên hóa đơn điện tử','warning',2000)");
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer2('Không thành công','Xảy ra lỗi, nhấn F12 để xem chi tiết','error',2000)");
+	// current.executeScript("console.log('" + result + "')");
+	// }
+	// }
+	// } else {
+	// noticeError(
+	// "Đã chuyển nhưng không định dạng được kết quả trả về (xem console): " +
+	// result);
+	// current.executeScript("console.log('" + result + "')");
+	// }
+	// } catch (Exception e) {
+	// noticeError("Đã chuyển nhưng không định dạng được kết quả trả về (xem console): "
+	// + result
+	// + "-ERROR-" + e.getMessage());
+	// current.executeScript("console.log('" + result + "')");
+	// }
+	//
+	// } else {
+	// noticeError(thongbao.getThongtinloi());
+	// }
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer2('Cảnh báo','Không cập nhật được phiếu, nhấn F12 để xem chi tiết','warning',2000)");
+	// }
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer2('Cảnh báo','Không đúng mật khẩu chuyển hóa đơn.','warning',2000)");
+	// }
+	//
+	// } catch (Exception e) {
+	// logger.error("ExportBean.eInvoiceTransfer:" + e.getMessage(), e);
+	// }
+	// }
+
+	// public void chuyenHDDT(boolean phieuxuatkho) {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// if (invoiceCrud != null && invoiceCrud.getId() != 0) {
+	// checkOutServer = 0;
+	// InvoiceReqInfo invoiceReqInfo = new InvoiceReqInfo();
+	// invoiceService.selectById(invoiceCrud.getId(), invoiceReqInfo);
+	// Invoice invoiceLoad = invoiceReqInfo.getInvoice();
+	//
+	// boolean statusNVC = true;
+	// if (invoiceLoad.getCarrier() == null) {
+	// for (int i = 0; i < MAKT_NVC.length; i++) {
+	// if (invoiceLoad.getIe_categories().getCode().equals(MAKT_NVC[i])) {
+	// statusNVC = false;
+	// break;
+	// }
+	// }
+	// }
+	// if (statusNVC == false) {
+	// error("Không chuyển được hóa đơn (ID: " + invoiceLoad.getId() +
+	// ") do không có người vận chuyển.");
+	// } else {
+	// boolean capnhatphieu = true;
+	// if (invoiceLoad.getRefId() != null && !"".equals(invoiceLoad.getRefId()))
+	// {
+	// capnhatphieu = deleteHDDT(invoiceLoad.getRefId());
+	// }
+	// if (capnhatphieu) {
+	// ThongBao thongbao;
+	// if (!phieuxuatkho) {
+	// thongbao = InvoiceToJson.toJsonHoaDon(invoiceLoad, eInvoiceService,
+	// invoiceService,
+	// invoiceDetailService, ieInvoiceService, lamtron, getDatabase(),
+	// getAccount().getUserName(), productService);
+	// } else {
+	// thongbao = InvoiceToJson.toJsonXuatKho(invoiceLoad, eInvoiceService,
+	// invoiceService,
+	// invoiceDetailService, ieInvoiceService, lamtron,
+	// getAccount().getUserName());
+	// }
+	// System.out.println(thongbao.getDulieu());
+	// if (thongbao.isLoi() == false) {
+	// // Luu file json chuyen hddt
+	// try {
+	// System.out.println("Chuyen hoa don-------" + invoiceLoad.getId() +
+	// "\t refID: "
+	// + invoiceLoad.getRefId());
+	// String jsonhoadon = thongbao.getDulieu();
+	// invoiceLoad.setJsonhoadon(jsonhoadon);
+	// invoiceService.updateJsonHoaDon(invoiceLoad, getAccount().getUserName());
+	// System.out.println(
+	// "\tDone" + invoiceLoad.getId() + "\t refID: " + invoiceLoad.getRefId());
+	// } catch (Exception e) {
+	// e.printStackTrace();
+	// }
+	//
+	// String result = MisaInvoice.insertInvoice(thongbao.getDulieu(),
+	// eInvoiceService);
+	// try {
+	// Gson gson = new Gson();
+	// KetQua kqinsert = gson.fromJson(result, KetQua.class);
+	// if (kqinsert != null) {
+	// if (kqinsert.getCode() == 200) {
+	// if ("true".equals(kqinsert.getThamso().getSuccess())) {
+	// if (invoiceSelect != null)
+	// invoiceCrud = invoiceService.findById(invoiceSelect.getId());
+	// success("Đã nạp hóa đơn thành công");
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer2('Không thành công','Xảy ra lỗi, nhấn F12 để xem chi tiết','error',2000)");
+	// current.executeScript("console.log('" + result + "')");
+	// }
+	// } else {
+	// if (result.contains("Duplicate entry")) {
+	// current.executeScript(
+	// "swaldesigntimer2('Không thành công','Phiếu đã nạp lên hóa đơn điện tử','warning',2000)");
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer2('Không thành công','Xảy ra lỗi, nhấn F12 để xem chi tiết','error',2000)");
+	// current.executeScript("console.log('" + result + "')");
+	// }
+	// }
+	// } else {
+	// noticeError("Đã chuyển nhưng không định dạng được kết quả trả về (xem console): "
+	// + result);
+	// current.executeScript("console.log('" + result + "')");
+	// }
+	// } catch (Exception e) {
+	// noticeError("Đã chuyển nhưng không định dạng được kết quả trả về (xem console): "
+	// + result + "-ERROR-" + e.getMessage());
+	// current.executeScript("console.log('" + result + "')");
+	// }
+	//
+	// } else {
+	// noticeError(thongbao.getThongtinloi());
+	// }
+	// } else {
+	// current.executeScript(
+	// "swaldesigntimer2('Cảnh báo','Không cập nhật được phiếu, nhấn F12 để xem chi tiết','warning',2000)");
+	// }
+	// }
+	// } else {
+	// current.executeScript("swaldesigntimer2('Cảnh báo','Chưa chọn phiếu','warning',2000)");
+	// }
+	// } catch (Exception e) {
+	// logger.error("ExportBean.eInvoiceTransfer:" + e.getMessage(), e);
+	// }
+	// }
+
+	public void xoaHDDT() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (invoiceCrud != null && invoiceCrud.getId() != 0) {
+				checkOutServer = 0;
+				InvoiceReqInfo invoiceReqInfo = new InvoiceReqInfo();
+				invoiceService.selectById(invoiceCrud.getId(), invoiceReqInfo);
+				Invoice invoiceLoad = invoiceReqInfo.getInvoice();
+				boolean capnhatphieu = true;
+				if (invoiceLoad.getRefId() != null && !"".equals(invoiceLoad.getRefId())) {
+					capnhatphieu = deleteHDDT(invoiceLoad.getRefId());
+				}
+				if (capnhatphieu) {
+					success("Đã xóa hóa đơn điện tử.");
+				} else {
+					noticeError("Đã duyệt không xóa được");
+				}
+			} else {
+				current.executeScript("swaldesigntimer2('Cảnh báo','Chưa chọn phiếu','warning',2000)");
+			}
+		} catch (Exception e) {
+			logger.error("ExportBean.eInvoiceTransfer:" + e.getMessage(), e);
+		}
+	}
+
+	public void taiFileJson() {
+		try {
+			PrimeFaces current = PrimeFaces.current();
+			current.executeScript("target='_blank';monitorDownload( showStatus , hideStatus)");
+			HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+					.getExternalContext().getResponse();
+			httpServletResponse.reset();
+			httpServletResponse.setHeader("Content-Type", "application/vnd.ms-excel");
+			httpServletResponse.setCharacterEncoding("utf8");
+			httpServletResponse.addHeader("Content-disposition",
+					"attachment; filename=" + "datajson_" + invoiceCrud.getId() + ".txt");
+			ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+			if (invoiceCrud.getJsonhoadon() != null) {
+				byte[] bytes = invoiceCrud.getJsonhoadon().getBytes("UTF-8");
+				servletOutputStream.write(bytes);
+				FacesContext.getCurrentInstance().responseComplete();
+			} else {
+				warning("Không có dữ liệu json.");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	@Getter
+	List<String> dulieukhongnapduoc;
+	@Getter
+	@Setter
+	private Date ngaythanhtoan;
+
+	public void loadExcelThanhToan(FileUploadEvent event) {
+		dulieukhongnapduoc = new ArrayList<String>();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			UploadedFile part = event.getFile();
+			if (part != null) {
+				Workbook workBook = MyUtilExcel.getWorkbook(new ByteArrayInputStream(part.getContent()),
+						part.getFileName());
+				Sheet firstSheet = workBook.getSheetAt(0);
+				Iterator<Row> rows = firstSheet.iterator();
+				Map<String, PricingProgram> map = new LinkedHashMap<String, PricingProgram>();
+				while (rows.hasNext()) {
+					rows.next();
+					rows.remove();
+					break;
+				}
+
+				lv1: while (rows.hasNext()) {
+					Row row = rows.next();
+					Iterator<Cell> cells = row.cellIterator();
+					Customer customer = null;
+					Date ngay = null;
+					String sochungtu = null;
+					String makh = null;
+					double sotien = 0;
+					while (cells.hasNext()) {
+						Cell cell = cells.next();
+						int columnIndex = cell.getColumnIndex();
+
+						switch (columnIndex) {
+						case 0:
+							try {
+								makh = Objects.toString(MyUtilExcel.getCellValue(cell), null);
+								if (makh == null || !"".equals(makh)) {
+									customer = customerService.selectByCode(makh);
+								}
+							} catch (Exception e) {
+							}
+							break;
+						case 2:
+							try {
+								if (DateUtil.isCellDateFormatted(cell)) {
+									ngay = cell.getDateCellValue();
+								} else {
+									String ngayHL = Objects.toString(MyUtilExcel.getCellValue(cell));
+									if (ngayHL != null && !"".equals(ngayHL)) {
+										ngay = ToolTimeCustomer.convertStringToDate(ngayHL, "dd/MM/yyyy");
+									}
+								}
+							} catch (Exception e) {
+								String ngayHL = Objects.toString(MyUtilExcel.getCellValue(cell));
+								if (ngayHL != null && !"".equals(ngayHL)) {
+									ngay = ToolTimeCustomer.convertStringToDate(ngayHL, "dd/MM/yyyy");
+								}
+							}
+							break;
+						case 3:
+							try {
+								sochungtu = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+							} catch (Exception e) {
+							}
+							break;
+						case 4:
+							try {
+								sotien = Double.parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell), "0"));
+							} catch (Exception e) {
+							}
+							break;
+						}
+					}
+
+					if (customer != null && ngay != null && sochungtu != null) {
+						Invoice invoice = invoiceService.findBy(customer.getId(), ngay, sochungtu);
+						if (invoice != null) {
+							List<InvoiceDetail> listInvoiceTempDetail = new ArrayList<>();
+							invoiceDetailService.selectByInvoice(invoice.getId(), listInvoiceTempDetail);
+							double total = listInvoiceTempDetail.stream().mapToDouble(x -> x.getTotal()).sum();
+							total = MyMath.round(total + (total * invoice.getTax_value()));
+							if ((total - sotien) == 0) {
+								invoiceService.updatePayment(customer.getId(), ngay, sochungtu, ngaythanhtoan,
+										getAccount().getUserName());
+							} else {
+								System.out.println("So tong: " + total + "\tSo tien tt: " + sotien);
+								dulieukhongnapduoc.add("Khong khop tien -> makh: " + makh + "\t" + "ngay: "
+										+ MyUtil.chuyensangDay(ngay) + "\t" + "soct: " + sochungtu + " [So tong: "
+										+ total + "\tSo tien tt: " + sotien + "]");
+							}
+						} else {
+							dulieukhongnapduoc.add("Không tìm thấy HD -> makh: " + makh + "\t" + "ngay: "
+									+ MyUtil.chuyensangStr(ngay) + "\t" + "soct: " + sochungtu);
+						}
+					} else {
+						dulieukhongnapduoc.add("makh: " + makh + "\t" + "ngay: " + MyUtil.chuyensangStr(ngay) + "\t"
+								+ "soct: " + sochungtu + "trống,không đọc được");
+					}
+				}
+				if (dulieukhongnapduoc.size() == 0) {
+					notify.success();
+				} else {
+					showDialog("dldulieukhongnapduoc");
+				}
+				search();
+			}
+		} catch (Exception e) {
+			logger.error("invoiceBean.loadExcelThanhToan:" + e.getMessage(), e);
+		}
+	}
+
+	// cap nhat thanh toan
+	// public void xacNhanThanhToan(Invoice invoice) {
+	// try {
+	// int result = invoiceService.updatePayment(invoice.getId(),
+	// getAccount().getUserName(), invoice.isPayment());
+	// if (result == 1) {
+	// InvoiceReqInfo invoiceReqInfo = new InvoiceReqInfo();
+	// invoiceService.selectById(invoice.getId(), invoiceReqInfo);
+	// Invoice invoiceTemp = invoiceReqInfo.getInvoice();
+	// if (invoiceTemp != null) {
+	// int index = listInvoiceTemp.indexOf(invoiceCrud);
+	// if (index != -1) {
+	// listInvoiceTemp.set(index, invoiceTemp);
+	// }
+	// }
+	// success("Đã cập nhật trạng thái thanh toán.");
+	// updateform(":messages,tablesp");
+	// } else {
+	// error("Xảy ra lỗi khi cập nhật.");
+	// }
+	// } catch (Exception e) {
+	// e.printStackTrace();
+	// error(e.getLocalizedMessage());
+	// }
+	//
+	// }
+
+	// Nap hoa dopn excel (TMDT) (thành tiền= soluong * don gia)
+	// public void loadExcelNapHoaDon(FileUploadEvent event) {
+	// dulieukhongnapduoc = new ArrayList<String>();
+	// Notify notify = new Notify(FacesContext.getCurrentInstance());
+	// try {
+	// UploadedFile part = event.getFile();
+	// if (part != null) {
+	// Workbook workBook = MyUtilExcel.getWorkbook(new
+	// ByteArrayInputStream(part.getContent()),
+	// part.getFileName());
+	// Sheet firstSheet = workBook.getSheetAt(0);
+	// Iterator<Row> rows = firstSheet.iterator();
+	// Map<String, PricingProgram> map = new LinkedHashMap<String,
+	// PricingProgram>();
+	// while (rows.hasNext()) {
+	// rows.next();
+	// rows.remove();
+	// break;
+	// }
+	// List<DuLieuHoaDonOnline> hoaDonOnlines = new
+	// ArrayList<DuLieuHoaDonOnline>();
+	// Date now = new Date();
+	// while (rows.hasNext()) {
+	//
+	// Row row = rows.next();
+	// Iterator<Cell> cells = row.cellIterator();
+	// Date ngay = now;
+	// String madonhang = null;
+	// String masp = null;
+	// double dongia = 0;
+	// double soluong = 0;
+	// double thanhtien = 0;
+	// double chietkhau = 0;
+	// double thanhtientong = 0;
+	// String makh = null;
+	// while (cells.hasNext()) {
+	// Cell cell = cells.next();
+	// int columnIndex = cell.getColumnIndex();
+	//
+	// switch (columnIndex) {
+	// case 2:// madonhang
+	// try {
+	// madonhang = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 3:// masanpham
+	// try {
+	// masp = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 5:// dongia
+	// try {
+	// dongia =
+	// Double.parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell),
+	// "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	//
+	// case 6:// soluong
+	// try {
+	// soluong =
+	// Double.parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell),
+	// "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	//
+	// case 7:// thanhtien
+	// try {
+	// thanhtien =
+	// Double.parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell),
+	// "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	//
+	// case 8:// Chietkhau
+	// try {
+	// chietkhau =
+	// Double.parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell),
+	// "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	//
+	// case 9:// thanhtien
+	// try {
+	// thanhtientong = Double
+	// .parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell), "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	//
+	// case 10:// ma kh
+	// try {
+	// makh = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// }
+	// }
+	// if (makh == null || "".equals(makh)) {
+	// makh = "BL467";
+	// madonhang = "online" + MyUtil.chuyensangStrCode(now);
+	// }
+	// if (ngay != null && madonhang != null && masp != null) {
+	// DuLieuHoaDonOnline hd = new DuLieuHoaDonOnline(ngay, madonhang, masp,
+	// dongia, soluong,
+	// thanhtien, chietkhau, thanhtientong, makh);
+	// hoaDonOnlines.add(hd);
+	// }
+	// }
+	// if (hoaDonOnlines.size() != 0) {
+	// Map<String, Map<String, Map<String, Map<Double,
+	// List<DuLieuHoaDonOnline>>>>> hds = hoaDonOnlines
+	// .stream()
+	// .collect(Collectors.groupingBy(DuLieuHoaDonOnline::getMadonhang,
+	// Collectors.groupingBy(DuLieuHoaDonOnline::getMakh,
+	// Collectors.groupingBy(DuLieuHoaDonOnline::getMasp,
+	// Collectors.groupingBy(DuLieuHoaDonOnline::getDongia)))));
+	//
+	// PaymentMethod pm = paymentMethodService.findById(4);// CK/TM
+	// // (id:4)
+	// IECategories iecater = ieCategoriesService.selectByCode("$");// $:BÁN
+	// // HÀNG
+	// // ONLINE
+	// Warehouse wh = warehouseService.selectByCode("F");// F:KHO
+	// // SAN
+	// // PHAM
+	// double hesothue = 0.1;
+	// for (String madh : hds.keySet()) {
+	// Map<String, Map<String, Map<Double, List<DuLieuHoaDonOnline>>>> hds1 =
+	// hds.get(madh);
+	// for (String makh : hds1.keySet()) {
+	// Customer customer = customerService.selectByCode(makh);
+	// double chietkhau = 0;
+	// List<InvoiceDetail> invoiceDetails = new ArrayList<InvoiceDetail>();
+	// Map<String, Map<Double, List<DuLieuHoaDonOnline>>> hds2 = hds1.get(makh);
+	// for (String masp : hds2.keySet()) {
+	// Map<Double, List<DuLieuHoaDonOnline>> hds3 = hds2.get(masp);
+	// for (Double dongia : hds3.keySet()) {
+	// double soluong = 0;
+	// List<DuLieuHoaDonOnline> hds4 = hds3.get(dongia);
+	// for (int i = 0; i < hds4.size(); i++) {
+	// soluong += hds4.get(i).getSoluong();
+	// chietkhau += hds4.get(i).getChietkhau();
+	// }
+	// Product product = productService.selectByCode(masp);
+	// if (product != null) {
+	// InvoiceDetail detail = new InvoiceDetail();
+	// detail.setCreated_by_id(getAccount().getMember().getId());
+	// detail.setCreated_by(getAccount().getMember().getName());
+	// detail.setNaponline(true);
+	// detail.setProduct(product);
+	// detail.setQuantity(soluong);
+	// detail.setReal_quantity(detail.getQuantity());
+	// detail.setUnit_price(dongia);
+	// detail.setTotal(MyMath.round(detail.getQuantity() *
+	// detail.getUnit_price()));
+	// detail.setNapdulieu("NapTMDT");
+	// Object[] dutk = dutonkho(detail);
+	// if ((boolean) dutk[0]) {
+	// invoiceDetails.add(detail);
+	// } else {
+	// noticeError("Sản phẩm: " + detail.getProduct().getProduct_code()
+	// + " không đủ tồn kho (tồn kho: "
+	// + MyUtilEJB.dinhdangso((double) dutk[1]) + ")");
+	// }
+	// } else {
+	// dulieukhongnapduoc.add("Không tìm thấy mã sản phẩm: " + masp);
+	// }
+	// }
+	//
+	// }
+	// if (customer != null) {
+	// if (chietkhau != 0) {
+	// Product product = productService.selectByCode("CKDH");// CKDH:
+	// // Chiet
+	// // khau
+	// // don
+	// // hang
+	// if (product != null) {
+	// InvoiceDetail detail = new InvoiceDetail();
+	// detail.setCreated_by_id(getAccount().getMember().getId());
+	// detail.setCreated_by(getAccount().getMember().getName());
+	// detail.setNaponline(true);
+	// detail.setProduct(product);
+	// detail.setTotal(MyMath.round(chietkhau));
+	// invoiceDetails.add(detail);
+	// } else {
+	// dulieukhongnapduoc.add("Không tìm thấy mã chiết khấu 'CKDH' ");
+	// }
+	// }
+	//
+	// if (invoiceDetails.size() != 0) {
+	// InvoiceTemp invoice = new InvoiceTemp();
+	// invoice.setNaponline(true);
+	// invoice.setCreated_by_id(getAccount().getMember().getId());
+	// invoice.setCreated_by(getAccount().getMember().getName());
+	// invoice.setCreated_date(new Date());
+	// invoice.setCustomer(customer);
+	// invoice.setInvoice_temp_date(now);
+	// invoice.setDelivery_date(now);
+	// invoice.setPayment_method(pm);
+	// invoice.setIe_categories(iecater);
+	// invoice.setWarehouse(wh);
+	// invoice.setTax_value(hesothue);
+	// invoice.setVoucher_code(madh);
+	// invoice.setExported(true);
+	// double totalevent = invoiceDetails.stream().mapToDouble(f ->
+	// f.getTotal()).sum();
+	// invoice.setTongtien(MyMath.round(totalevent));
+	// invoice.setThue(MyMath.round(totalevent * invoice.getTax_value()));
+	// if (allowSave(invoice.getInvoice_temp_date())) {
+	// processLogicInvoiceService.createInvoiceByExcelOnline(invoice,
+	// invoiceDetails);
+	// } else {
+	// dulieukhongnapduoc.add(
+	// "Tài khoản này không có quyền thực hiện hoặc tháng đã khoá: " + madh);
+	// }
+	// }
+	// } else {
+	// dulieukhongnapduoc.add("Không tìm thấy mã khách hàng: " + makh);
+	// }
+	// }
+	// }
+	// notify.success();
+	// } else {
+	// noticeError("Không đọc được dữ liệu");
+	// }
+	// if (dulieukhongnapduoc.size() != 0) {
+	// showDialog("dldulieukhongnapduoc");
+	// }
+	// search();
+	// } else {
+	// noticeError("Không đọc được file upload");
+	// }
+	//
+	// } catch (Exception e) {
+	// logger.error("invoiceBean.loadExcelThanhToan:" + e.getMessage(), e);
+	// }
+	// }
+
+	// Nap hoa don VSIP
+	// public void loadExcelNapHoaDonVSIP(FileUploadEvent event) {
+	// dulieukhongnapduoc = new ArrayList<String>();
+	// Notify notify = new Notify(FacesContext.getCurrentInstance());
+	// try {
+	// UploadedFile part = event.getFile();
+	// if (part != null) {
+	// Workbook workBook = MyUtilExcel.getWorkbook(new
+	// ByteArrayInputStream(part.getContent()),
+	// part.getFileName());
+	// Sheet firstSheet = workBook.getSheetAt(0);
+	// Iterator<Row> rows = firstSheet.iterator();
+	// while (rows.hasNext()) {
+	// rows.next();
+	// rows.remove();
+	// break;
+	// }
+	// List<DuLieuHoaDonVSIP> hoaDonVSIPs = new ArrayList<DuLieuHoaDonVSIP>();
+	// Date now = new Date();
+	// while (rows.hasNext()) {
+	//
+	// Row row = rows.next();
+	// Iterator<Cell> cells = row.cellIterator();
+	// String makh = null;
+	// String masp = null;
+	// double soluong = 0;
+	// String malohang = "";
+	// String ghichuxuat = "";
+	// int nhomtheohd = 0;
+	// while (cells.hasNext()) {
+	// Cell cell = cells.next();
+	// int columnIndex = cell.getColumnIndex();
+	//
+	// switch (columnIndex) {
+	// case 0:
+	// try {
+	// makh = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 1:// masanpham
+	// try {
+	// masp = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 3:// soluong
+	// try {
+	// soluong =
+	// Double.parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell),
+	// "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	//
+	// case 4:// lo hang
+	// try {
+	// malohang = MyUtilExcel.getCellValueString(cell);
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 5:// ghi chu xuat
+	// try {
+	// ghichuxuat = MyUtilExcel.getCellValueString(cell);
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 6:// nhom hoa don
+	// try {
+	// nhomtheohd = (int) Double
+	// .parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell), "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	// }
+	// }
+	//
+	// if (masp != null && makh != null && !"".equals(makh)) {
+	// DuLieuHoaDonVSIP hd = new DuLieuHoaDonVSIP(makh, masp, soluong, malohang,
+	// ghichuxuat,
+	// nhomtheohd);
+	// hoaDonVSIPs.add(hd);
+	// }
+	// }
+	// if (hoaDonVSIPs.size() != 0) {
+	// Map<String, Map<Integer, List<DuLieuHoaDonVSIP>>> hds =
+	// hoaDonVSIPs.stream()
+	// .collect(Collectors.groupingBy(DuLieuHoaDonVSIP::getMakh,
+	// Collectors.groupingBy(DuLieuHoaDonVSIP::getNhomtheohd)));
+	//
+	// IECategories iecater = ieCategoriesService.selectByCode("D");// D:
+	// // XUẤT
+	// // TRẢ
+	// // HÀNG
+	// // GIA
+	// // CÔNG
+	// Warehouse wh = warehouseService.selectByCode("F");// F:KHO
+	// // SAN
+	// // PHAM
+	// double hesothue = 0;
+	// int index = 1;
+	// for (String makh : hds.keySet()) {
+	// Map<Integer, List<DuLieuHoaDonVSIP>> hds1 = hds.get(makh);
+	// for (Integer hoadon : hds1.keySet()) {
+	// List<DuLieuHoaDonVSIP> hds4 = hds1.get(hoadon);
+	// List<InvoiceDetail> invoiceDetails = new ArrayList<InvoiceDetail>();
+	// for (int i = 0; i < hds4.size(); i++) {
+	// Product product = productService.selectByCode(hds4.get(i).getMasp());
+	// if (product != null) {
+	// InvoiceDetail detail = new InvoiceDetail();
+	// detail.setCreated_by_id(getAccount().getMember().getId());
+	// detail.setCreated_by(getAccount().getMember().getName());
+	// detail.setNaponline(true);
+	// detail.setProduct(product);
+	// detail.setQuantity(hds4.get(i).getSoluong());
+	// detail.setReal_quantity(detail.getQuantity());
+	// detail.setNote_batch_code(hds4.get(i).getMalohang());
+	// detail.setNapdulieu("NapVsip");
+	// ;
+	// Object[] dutk = dutonkho(detail);
+	// if ((boolean) dutk[0]) {
+	// invoiceDetails.add(detail);
+	// } else {
+	// noticeError("Sản phẩm: " + detail.getProduct().getProduct_code()
+	// + " không đủ tồn kho (tồn kho: "
+	// + MyUtilEJB.dinhdangso((double) dutk[1]) + ")");
+	// }
+	// } else {
+	// dulieukhongnapduoc.add("Không tìm thấy mã sản phẩm: " +
+	// hds4.get(i).getMasp());
+	// }
+	// }
+	// Customer customer = customerService.selectByCode(hds4.get(0).getMakh());
+	// if (customer != null) {
+	// if (invoiceDetails.size() != 0) {
+	// Invoice invoice = new Invoice();
+	// invoice.setNaponline(true);
+	// invoice.setCreated_by_id(getAccount().getMember().getId());
+	// invoice.setCreated_by(getAccount().getMember().getName());
+	// invoice.setCreated_date(new Date());
+	// invoice.setCustomer(customer);
+	// invoice.setInvoice_date(now);
+	// invoice.setDelivery_date(now);
+	// invoice.setIe_categories(iecater);
+	// invoice.setWarehouse(wh);
+	// invoice.setTax_value(hesothue);
+	// invoice.setVoucher_code("VSIP_" + index);
+	// invoice.setExported(true);
+	// double totalevent = invoiceDetails.stream().mapToDouble(f ->
+	// f.getTotal()).sum();
+	// invoice.setTongtien(MyMath.round(totalevent));
+	// invoice.setThue(MyMath.round(totalevent * invoice.getTax_value()));
+	// invoice.setNote(hds4.get(0).getGhichuxuat());
+	// if (allowSave(invoice.getInvoice_temp_date())) {
+	// processLogicInvoiceService.createInvoiceByExcelOnline(invoice,
+	// invoiceDetails);
+	// } else {
+	// dulieukhongnapduoc.add(
+	// "Tài khoản này không có quyền thực hiện hoặc tháng đã khoá: " + makh);
+	// }
+	// }
+	// } else {
+	// dulieukhongnapduoc.add("Không tìm thấy mã khách hàng: " + makh);
+	// }
+	// }
+	// index++;
+	// }
+	// notify.success();
+	// } else {
+	// noticeError("Không đọc được dữ liệu");
+	// }
+	// if (dulieukhongnapduoc.size() != 0) {
+	// showDialog("dldulieukhongnapduoc");
+	// }
+	// search();
+	// } else {
+	// noticeError("Không đọc được file upload");
+	// }
+	//
+	// } catch (Exception e) {
+	// e.printStackTrace();
+	// }
+	// }
+
+	// Nap hoa don chiet khau
+	// public void loadExcelNapHoaDonChietKhau(FileUploadEvent event) {
+	// dulieukhongnapduoc = new ArrayList<String>();
+	// Notify notify = new Notify(FacesContext.getCurrentInstance());
+	// try {
+	// UploadedFile part = event.getFile();
+	// if (part != null) {
+	// Workbook workBook = MyUtilExcel.getWorkbook(new
+	// ByteArrayInputStream(part.getContent()),
+	// part.getFileName());
+	// Sheet firstSheet = workBook.getSheetAt(0);
+	// Iterator<Row> rows = firstSheet.iterator();
+	// while (rows.hasNext()) {
+	// rows.next();
+	// rows.remove();
+	// break;
+	// }
+	// List<DuLieuHoaDonChietKhau> hoaDonChietKhaus = new
+	// ArrayList<DuLieuHoaDonChietKhau>();
+	// Date now = new Date();
+	// while (rows.hasNext()) {
+	//
+	// Row row = rows.next();
+	// Iterator<Cell> cells = row.cellIterator();
+	// String masp = null;
+	// double soluong = 0;
+	// double dongia = 0;
+	// double thanhtien = 0;
+	// String makh = null;
+	// String maxuatnhap = null;
+	// String htthanhtoan = null;
+	// while (cells.hasNext()) {
+	// Cell cell = cells.next();
+	// int columnIndex = cell.getColumnIndex();
+	//
+	// switch (columnIndex) {
+	// case 0:// masanpham
+	// try {
+	// masp = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 1:// soluong
+	// try {
+	// soluong =
+	// Double.parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell),
+	// "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 2:// dongia
+	// try {
+	// dongia =
+	// Double.parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell),
+	// "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 3:// thanhtien
+	// try {
+	// thanhtien =
+	// Double.parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell),
+	// "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 4:// ma kh
+	// try {
+	// makh = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 5:// ma xuat nhap
+	// try {
+	// maxuatnhap = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 6:// hinh thuc thanh toan
+	// try {
+	// htthanhtoan = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// }
+	// }
+	//
+	// if (masp != null && makh != null && !"".equals(makh) && maxuatnhap !=
+	// null) {
+	// DuLieuHoaDonChietKhau hd = new DuLieuHoaDonChietKhau(masp, soluong,
+	// dongia, thanhtien, makh,
+	// maxuatnhap, htthanhtoan);
+	// hoaDonChietKhaus.add(hd);
+	// }
+	// }
+	// if (hoaDonChietKhaus.size() != 0) {
+	// Warehouse wh = warehouseService.selectByCode("F");// F:KHO
+	// // SAN
+	// // PHAM
+	// double hesothue = 0.1;
+	// for (int i = 0; i < hoaDonChietKhaus.size(); i++) {
+	// PaymentMethod pm =
+	// paymentMethodService.selectByCode(hoaDonChietKhaus.get(i).getHtthanhtoan());
+	// IECategories iecater = ieCategoriesService
+	// .selectByCode(hoaDonChietKhaus.get(i).getMaxuatnhap());
+	// Product product =
+	// productService.selectByCode(hoaDonChietKhaus.get(i).getMasp());
+	// if (product != null) {
+	// InvoiceDetail detail = new InvoiceDetail();
+	// detail.setCreated_by_id(getAccount().getMember().getId());
+	// detail.setCreated_by(getAccount().getMember().getName());
+	// detail.setNaponline(true);
+	// detail.setProduct(product);
+	// detail.setQuantity(hoaDonChietKhaus.get(i).getSoluong());
+	// detail.setReal_quantity(detail.getQuantity());
+	// detail.setUnit_price(hoaDonChietKhaus.get(i).getDongia());
+	// detail.setTotal(hoaDonChietKhaus.get(i).getThanhtien());
+	// detail.setNapdulieu("NapHDChietKhau");
+	// List<InvoiceDetail> invoiceDetails = new ArrayList<InvoiceDetail>();
+	// Object[] dutk = dutonkho(detail);
+	// if ((boolean) dutk[0]) {
+	// invoiceDetails.add(detail);
+	// } else {
+	// noticeError("Sản phẩm: " + detail.getProduct().getProduct_code()
+	// + " không đủ tồn kho (tồn kho: " + MyUtilEJB.dinhdangso((double) dutk[1])
+	// + ")");
+	// }
+	//
+	// Customer customer =
+	// customerService.selectByCode(hoaDonChietKhaus.get(i).getMakh());
+	// if (customer != null) {
+	// Invoice invoice = new Invoice();
+	// invoice.setNaponline(true);
+	// invoice.setCreated_by_id(getAccount().getMember().getId());
+	// invoice.setCreated_by(getAccount().getMember().getName());
+	// invoice.setCreated_date(now);
+	// invoice.setCustomer(customer);
+	// invoice.setInvoice_date(now);
+	// invoice.setDelivery_date(now);
+	// invoice.setPayment_method(pm);
+	// invoice.setIe_categories(iecater);
+	// invoice.setWarehouse(wh);
+	// invoice.setTax_value(hesothue);
+	// invoice.setVoucher_code("HDCK_" + (i + 1));
+	// invoice.setExported(true);
+	// double totalevent = invoiceDetails.stream().mapToDouble(f ->
+	// f.getTotal()).sum();
+	// invoice.setTongtien(MyMath.round(totalevent));
+	// invoice.setThue(MyMath.round(totalevent * invoice.getTax_value()));
+	// if (allowSave(invoice.getInvoice_temp_date())) {
+	// processLogicInvoiceService.createInvoiceByExcelOnline(invoice,
+	// invoiceDetails);
+	// } else {
+	// dulieukhongnapduoc
+	// .add("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá.");
+	// }
+	// } else {
+	// dulieukhongnapduoc.add("Không tìm thấy mã KH: " +
+	// hoaDonChietKhaus.get(i).getMakh());
+	// }
+	// } else {
+	// dulieukhongnapduoc.add("Không tìm thấy mã sản phẩm: " +
+	// hoaDonChietKhaus.get(i).getMasp());
+	// }
+	// }
+	// notify.success();
+	// } else {
+	// noticeError("Không đọc được dữ liệu");
+	// }
+	// if (dulieukhongnapduoc.size() != 0) {
+	// showDialog("dldulieukhongnapduoc");
+	// }
+	// search();
+	// } else {
+	// noticeError("Không đọc được file upload");
+	// }
+	//
+	// } catch (Exception e) {
+	// e.printStackTrace();
+	// }
+	// }
+
+	// Nap hoa dopn chi tiết hđ excel
+	// public void loadExcelNapCTHoaDon(FileUploadEvent event) {
+	// try {
+	// if (allowSave(invoiceCrud.getInvoice_temp_date())) {
+	// dulieukhongnapduoc = new ArrayList<String>();
+	// UploadedFile part = event.getFile();
+	// if (part != null) {
+	// Workbook workBook = MyUtilExcel.getWorkbook(new
+	// ByteArrayInputStream(part.getContent()),
+	// part.getFileName());
+	// Sheet firstSheet = workBook.getSheetAt(0);
+	// Iterator<Row> rows = firstSheet.iterator();
+	// while (rows.hasNext()) {
+	// rows.next();
+	// rows.remove();
+	// break;
+	// }
+	// Date now = new Date();
+	// if (invoiceCrud != null) {
+	// while (rows.hasNext()) {
+	//
+	// Row row = rows.next();
+	// Iterator<Cell> cells = row.cellIterator();
+	// String masp = null;
+	// double dongia = 0;
+	// double soluong = 0;
+	// double thanhtien = 0;
+	// String malohang = null;
+	// while (cells.hasNext()) {
+	// Cell cell = cells.next();
+	// int columnIndex = cell.getColumnIndex();
+	//
+	// switch (columnIndex) {
+	// case 0:// masanpham
+	// try {
+	// masp = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// case 2:// dongia
+	// try {
+	// dongia = Double
+	// .parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell), "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	//
+	// case 3:// soluong
+	// try {
+	// soluong = Double
+	// .parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell), "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	//
+	// case 4:// thanhtien
+	// try {
+	// thanhtien = Double
+	// .parseDouble(Objects.toString(MyUtilExcel.getCellValue(cell), "0"));
+	// } catch (Exception e) {
+	// }
+	// break;
+	//
+	// case 5:// lohang
+	// try {
+	// malohang = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+	// } catch (Exception e) {
+	// }
+	// break;
+	// }
+	// }
+	// Product product = productService.selectByCode(masp);
+	// if (product != null) {
+	// InvoiceDetail detail = new InvoiceDetail();
+	// detail.setInvoice(invoiceCrud);
+	// detail.setCreated_date(now);
+	// detail.setCreated_by_id(getAccount().getMember().getId());
+	// detail.setCreated_by(getAccount().getMember().getName());
+	// detail.setProduct(product);
+	// detail.setQuantity(soluong);
+	// detail.setReal_quantity(soluong);
+	// detail.setUnit_price(dongia);
+	// detail.setTotal(MyMath.round(thanhtien));
+	// detail.setNote_batch_code(malohang);
+	// detail.setNapdulieu("Napchitiet");
+	// Object[] dutk = dutonkho(detail);
+	// if ((boolean) dutk[0]) {
+	// invoiceDetailService.insert(detail);
+	// } else {
+	// noticeError("Sản phẩm: " + detail.getProduct().getProduct_code()
+	// + " không đủ tồn kho (tồn kho: " + MyUtilEJB.dinhdangso((double) dutk[1])
+	// + ")");
+	// }
+	// } else {
+	// noticeError("Không có SP này " + masp);
+	// }
+	// }
+	// // reload lai danh sach
+	// listWrapInvoiceDetail = new ArrayList<>();
+	// List<InvoiceDetail> listInvoiceTempDetail = new ArrayList<>();
+	// invoiceDetailService.selectByInvoice(invoiceCrud.getId(),
+	// listInvoiceTempDetail);
+	// for (InvoiceDetail dt : listInvoiceTempDetail) {
+	// WrapInvoiceDetailReqInfo w = new WrapInvoiceDetailReqInfo(dt);
+	// listWrapInvoiceDetail.add(w);
+	// }
+	// sumInvoice();// tinh lai tong cong
+	// executeScript("PF('tablect').clearFilters();PF('dlnapchitiethoadon').hide();");
+	// updateform(":menuformid:tabview1:tablect,menuformid:tabview1:tongtien");
+	// } else {
+	// notice("Chưa lưu hóa đơn.");
+	// }
+	// } else {
+	// noticeError("Không đọc được file upload");
+	// }
+	// } else {
+	// warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá");
+	// }
+	// } catch (Exception e) {
+	// logger.error("invoiceBean.loadExcelThanhToan:" + e.getMessage(), e);
+	// }
+	// }
+
+	@Inject
+	HeThongService heThongService;
+
+	// Nap hoa don excel (donhang)
+	public void loadExcelNapHoaDonTuDonHang(FileUploadEvent event) {
+		dulieukhongnapduoc = new ArrayList<String>();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			UploadedFile part = event.getFile();
+			if (part != null) {
+				Workbook workBook = MyUtilExcel.getWorkbook(new ByteArrayInputStream(part.getContent()),
+						part.getFileName());
+				Sheet firstSheet = workBook.getSheetAt(0);
+				Iterator<Row> rows = firstSheet.iterator();
+				Map<String, PricingProgram> map = new LinkedHashMap<String, PricingProgram>();
+				List<DuLieuHoaDonDonHang> hoaDonDonHangs = new ArrayList<DuLieuHoaDonDonHang>();
+				int i = 0;
+				Date ngayhoadon = null;
+				while (rows.hasNext()) {
+					Row row = rows.next();
+					Iterator<Cell> cells = row.cellIterator();
+					double soluongthung = 0;
+					String masp = null;
+					long iddonhangchitiet = 0;
+					long iddonhang = 0;
+					String soxe = null;
+					String hoadon = null;// so chuyen
+					String lohang = null;
+
+					if (i == 0) {
+						while (cells.hasNext()) {
+							Cell cell = cells.next();
+							int columnIndex = cell.getColumnIndex();
+
+							switch (columnIndex) {
+							case 3:
+								try {
+									if (MyUtilExcel.getCellValue(workBook, cell).getClass().equals(Double.class)) {
+										ngayhoadon = DateUtil.getJavaDate((double) MyUtilExcel.getCellValue(workBook,
+												cell));
+									} else {
+										ngayhoadon = (Date) MyUtilExcel.getCellValue(workBook, cell);
+									}
+									break;
+								} catch (Exception e) {
+									e.printStackTrace();
+
+									String ngaydathang = Objects.toString(MyUtilExcel.getCellValue(workBook, cell),
+											null);
+									if (ngaydathang != null && !"".equals(ngaydathang)) {
+										ngayhoadon = ToolTimeCustomer.convertStringToDate(ngaydathang, "dd/MM/yyyy");
+									}
+									break;
+								}
+
+							}
+						}
+					} else {
+						while (cells.hasNext()) {
+							Cell cell = cells.next();
+							int columnIndex = cell.getColumnIndex();
+
+							switch (columnIndex) {
+							case 4:
+								try {
+									soluongthung = Double.parseDouble(Objects.toString(
+											MyUtilExcel.getCellValue(workBook, cell), "0"));
+								} catch (Exception e) {
+								}
+								break;
+							case 6:
+								try {
+									masp = Objects.toString(MyUtilExcel.getCellValue(workBook, cell), "");
+								} catch (Exception e) {
+								}
+								break;
+
+							case 7:
+								try {
+									iddonhangchitiet = (long) Double.parseDouble(Objects.toString(
+											MyUtilExcel.getCellValue(workBook, cell), "0"));
+								} catch (Exception e) {
+								}
+								break;
+							case 8:
+								try {
+									iddonhang = (long) Double.parseDouble(Objects.toString(
+											MyUtilExcel.getCellValue(workBook, cell), "0"));
+
+								} catch (Exception e) {
+								}
+								break;
+							case 9:
+								try {
+									soxe = Objects.toString(MyUtilExcel.getCellValue(workBook, cell), "");
+								} catch (Exception e) {
+								}
+								break;
+							case 10:
+								try {
+									hoadon = Objects.toString(MyUtilExcel.getCellValue(workBook, cell), "0");
+								} catch (Exception e) {
+								}
+								break;
+							case 11:
+								try {
+									lohang = Objects.toString(MyUtilExcel.getCellValue(workBook, cell), "");
+								} catch (Exception e) {
+								}
+								break;
+							}
+						}
+						boolean status = true;
+						if (ngayhoadon == null) {
+							dulieukhongnapduoc.add("Không đọc được ngày (ô D1)");
+							status = false;
+						}
+						if (masp == null) {
+							dulieukhongnapduoc.add("Không đọc được mã SP (dòng " + (i + 1) + ")");
+							status = false;
+						}
+						if (hoadon == null) {
+							dulieukhongnapduoc.add("Không đọc được số chuyến (dòng " + (i + 1) + ")");
+							status = false;
+						}
+						if (status && soluongthung != 0) {
+							DuLieuHoaDonDonHang hd = new DuLieuHoaDonDonHang(ngayhoadon, soluongthung, masp,
+									iddonhangchitiet, iddonhang, soxe, hoadon, lohang, "");
+							hoaDonDonHangs.add(hd);
+						}
+					}
+					i++;
+				}
+				if (hoaDonDonHangs.size() != 0) {
+					Map<String, List<DuLieuHoaDonDonHang>> hds = hoaDonDonHangs.stream().collect(
+							Collectors.groupingBy(DuLieuHoaDonDonHang::getSohoadon));
+					for (String sohd : hds.keySet()) {
+						List<DuLieuHoaDonDonHang> hdssub = hds.get(sohd);
+						OrderLix orderLixCrud = orderLixService.selectById(hdssub.get(0).getIddonhang());
+						if (orderLixCrud == null) {
+							dulieukhongnapduoc.add("Không có đơn hàng (ID: " + hdssub.get(0).getIddonhang() + ")");
+						} else {
+							List<WrapOrderDetailLixReqInfo> listWrapOrderDetailLixReqInfo = new ArrayList<WrapOrderDetailLixReqInfo>();
+							List<PromotionOrderDetail> listPromotionOrderDetailInvoice = new ArrayList<PromotionOrderDetail>();
+							for (int m = 0; m < hdssub.size(); m++) {
+								OrderDetail dt = orderDetailService.selectById(hdssub.get(m).getIddonhangchitiet());
+								if (dt == null) {
+									dulieukhongnapduoc.add("Không có chi tiết đơn hàng (ID: "
+											+ hdssub.get(m).getIddonhangchitiet() + ")");
+								} else {
+									dt.setBatch_code(hdssub.get(m).getLohang());
+									WrapOrderDetailLixReqInfo t = new WrapOrderDetailLixReqInfo(dt);
+									t.setExport_quantity(hdssub.get(m).getSoluongthung());
+									t.setExport_unit_quantity(t.getExport_quantity()
+											* dt.getProduct().getSpecification());
+									listWrapOrderDetailLixReqInfo.add(t);
+
+								}
+							}
+							List<PromotionOrderDetail> promotionOrderDetails = tinhkhuyenmaixuattiep(
+									listWrapOrderDetailLixReqInfo, orderLixCrud);
+							listPromotionOrderDetailInvoice.addAll(promotionOrderDetails);
+
+							if (listWrapOrderDetailLixReqInfo.size() > 0) {
+								WrapExtensionOrderReqInfo data = new WrapExtensionOrderReqInfo(orderLixCrud.getId(),
+										account.getMember().getId(), account.getMember().getName(),
+										listWrapOrderDetailLixReqInfo, listPromotionOrderDetailInvoice);
+								StringBuilder messages = new StringBuilder();
+								List<Long> listIdResult = new ArrayList<>();
+								HeThong ht = heThongService.findById(1);
+								int code = processLogicInvoiceService.createInvoiceByExtensionOrder(data, listIdResult,
+										messages, hdssub.get(0).getSoxe(), ht.isKiemton(), null);
+								if (code == 0) {
+									success();
+								} else {
+									noticeError(messages.toString());
+								}
+							}
+						}
+						tinhlaikhuyenmaisoluong(orderLixCrud);
+					}
+					notify.success();
+				} else {
+
+					noticeError("Không đọc được dữ liệu");
+				}
+				if (dulieukhongnapduoc.size() != 0) {
+					showDialog("dldulieukhongnapduoc");
+				}
+				search();
+			} else {
+				noticeError("Không đọc được file upload");
+			}
+
+		} catch (Exception e) {
+			logger.error("invoiceBean.loadExcelThanhToan:" + e.getMessage(), e);
+		}
+	}
+
+	@Inject
+	IPromotionProgramDetailService promotionProgramDetailService;
+	@Inject
+	IPromotionOrderDetailService promotionOrderDetailService;
+
+	private List<PromotionOrderDetail> tinhkhuyenmaixuattiep(
+			List<WrapOrderDetailLixReqInfo> listWrapOrderDetailLixReqInfo, OrderLix orderLixCrud) {
+		try {
+			List<PromotionOrderDetail> listPromotionOrderDetailInvoice = new ArrayList<>();
+			if (listWrapOrderDetailLixReqInfo != null) {
+				for (WrapOrderDetailLixReqInfo t : listWrapOrderDetailLixReqInfo) {
+
+					if (orderLixCrud.getPromotion_program() != null) {
+
+						List<PromotionOrderDetail> listproDetails = new ArrayList<>();
+						promotionOrderDetailService.selectByOrderDetail(t.getOrder_detail().getId(), listproDetails);
+
+						// tính khuyến mãi
+						JsonObject js = new JsonObject();
+						js.addProperty("product_id", t.getOrder_detail().getProduct().getId());
+						js.addProperty("promotion_program_id",
+								orderLixCrud.getPromotion_program() != null ? orderLixCrud.getPromotion_program()
+										.getId() : 0);
+						js.addProperty("promotion_form", t.getOrder_detail().getPromotion_forms());
+						List<PromotionProgramDetail> list = new ArrayList<>();
+						promotionProgramDetailService.selectBy(JsonParserUtil.getGson().toJson(js), list);
+						lv1: for (PromotionProgramDetail ppd : list) {
+							PromotionOrderDetail pod = new PromotionOrderDetail();
+
+							if (listproDetails.size() != 0) {
+								pod.setId(listproDetails.get(0).getId());
+							}
+							pod.setOrder_detail(t.getOrder_detail());
+							Product pr = ppd.getPromotion_product();
+							pod.setProduct(pr);
+							// tim nạp đơn giá sản phẩm khuyến mãi
+							PromotionalPricingReqInfo ppr = new PromotionalPricingReqInfo();
+							JsonObject json = new JsonObject();
+							json.addProperty(
+									"date",
+									ToolTimeCustomer.convertDateToString(t.getOrder_detail().getOrder_lix()
+											.getOrder_date(), "dd/MM/yyyy"));
+							json.addProperty("product_id", ppd.getPromotion_product().getId());
+							promotionalPricingService.findSettingPromotionalPricing(
+									JsonParserUtil.getGson().toJson(json), ppr);
+							if (ppr.getPromotional_pricing() != null) {
+								pod.setUnit_price(ppr.getPromotional_pricing().getUnit_price());
+							}
+							// double quantity =
+							// t.getExport_quantity()*ppd.getPromotion_quantity()/ppd.getBox_quatity();
+							// pod.setQuantity((int) quantity);
+
+							double quantity = (int) t.getExport_quantity() / ppd.getBox_quatity()
+									* ppd.getSpecification();
+							pod.setQuantity((int) quantity);
+
+							// for (PromotionOrderDetail p :
+							// listPromotionOrderDetailInvoice) {
+							// if (p.getProduct().equals(pod.getProduct())) {
+							// p.setQuantity(Double.sum(p.getQuantity(),
+							// pod.getQuantity()));
+							// continue lv1;
+							// }
+							// }
+							listPromotionOrderDetailInvoice.add(pod);
+						}
+					}
+				}
+			}
+			return listPromotionOrderDetailInvoice;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return new ArrayList<PromotionOrderDetail>();
+	}
+
+	@Getter
+	@Setter
+	private List<PromotionOrderDetail> listPromotionOrderDetailInvoice;
+
+	public void createInvoiceByTemp() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (invoiceCrud != null && invoiceCrud.getId() != 0) {
+				if (allowUpdate(null)) {
+					tinhkhuyenmaixuattiep();
+					List<WrapInvoiceDetailTempReqInfo> listData = new ArrayList<>();
+					if (listWrapInvoiceDetail != null && listWrapInvoiceDetail.size() > 0) {
+						for (WrapInvoiceDetailTempReqInfo w : listWrapInvoiceDetail) {
+							if (w.getInvoice_detail().getReal_quantity() > 0
+									&& w.getInvoice_detail().getProductdh_code() == null) {
+								listData.add(w);
+							}
+						}
+					}
+					if (listData.size() > 0) {
+						// prepare data
+						// promotionOrderDetailService.selectByOrderTemp(invoiceCrud.getOrder_lix().getId(),
+						// listPromotionOrderDetailTemp);
+//						promotionOrderDetailService.selectByOrderTemp(invoiceCrud.getOrder_lix().getId(), listPromotionOrderDetailTemp);
+						WrapInvoiceDetailTempReqInfo data = new WrapInvoiceDetailTempReqInfo(invoiceCrud.getId(), account.getMember().getId(), account.getMember().getName(), listData, listPromotionOrderDetailInvoice);
+						StringBuilder messages = new StringBuilder();
+						// list id invoice chỉ dùng cho việc binding result vs
+						// foxpro
+						List<Long> listIdResult = new ArrayList<>();
+						HeThong ht = heThongService.findById(1);
+						int code = processLogicInvoiceService.createInvoiceByTemp(data, listIdResult, messages, null,
+								ht.isKiemton());
+						if (code == 0) {
+							success("Đã chuyển qua phiếu xuất.");
+						} else {
+							current.executeScript(
+									"swaldesignclose('Xảy ra lỗi!', '" + messages.toString() + "!','warning',2000);");
+						}
+						// Cap nhat trang thai don hang
+						try {
+							orderLixService.updateTinhTrangDH(invoiceCrud.getId());
+						} catch (Exception e) {
+							error(e.getLocalizedMessage());
+						}
+
+						// // tinhlaikhuyenmaisoluong();
+						// sumOrderLix();
+						// if (!tabOrder) {
+						// tabInvoiceOnClick();
+						// }
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo', 'Chưa nhập số lượng xuất','warning',2000);");
+					}
+				} else {
+					current.executeScript(
+							"swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo', 'Đơn hàng chưa được lưu!','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("OrderLixBean.createInvoiceByExtensionOrder:" + e.getMessage(), e);
+		}
+	}
+
+	public void tinhkhuyenmaixuattiep() {
+		try {
+			listPromotionOrderDetailInvoice = new ArrayList<>();
+			if (listWrapInvoiceDetail != null) {
+				for (WrapInvoiceDetailTempReqInfo t : listWrapInvoiceDetail) {
+					if (t.getInvoice_detail().getProductdh_code() == null) {
+						if (t.getInvoice_detail().getReal_quantity() > 0) {
+							if (invoiceCrud.getOrder_lix().getPromotion_program() != null) {
+								// tính khuyến mãi
+								JsonObject js = new JsonObject();
+								js.addProperty("product_id", t.getInvoice_detail().getProduct().getId());
+								js.addProperty("promotion_program_id", invoiceCrud.getOrder_lix()
+										.getPromotion_program() != null ? invoiceCrud.getOrder_lix()
+										.getPromotion_program().getId() : 0);
+								js.addProperty("promotion_program_id",
+										invoiceCrud.getOrder_lix().getPromotion_program() != null
+												? invoiceCrud.getOrder_lix().getPromotion_program().getId()
+												: 0);
+								js.addProperty("promotion_form", t.getInvoice_detail().getPromotion_forms());
+								List<PromotionProgramDetail> list = new ArrayList<>();
+								promotionProgramDetailService.selectBy(JsonParserUtil.getGson().toJson(js), list);
+								lv1: for (PromotionProgramDetail ppd : list) {
+									PromotionOrderDetail pod = new PromotionOrderDetail();
+									pod.setInvoice_detail_temp(t.getInvoice_detail());
+									Product pr = ppd.getPromotion_product();
+									pod.setProduct(pr);
+									// tim nạp đơn giá sản phẩm khuyến mãi
+									PromotionalPricingReqInfo ppr = new PromotionalPricingReqInfo();
+									JsonObject json = new JsonObject();
+									json.addProperty("date",
+											ToolTimeCustomer.convertDateToString(
+													t.getInvoice_detail().getInvoicetemp().getInvoice_temp_date(),
+													"dd/MM/yyyy"));
+									json.addProperty("product_id", ppd.getPromotion_product().getId());
+									promotionalPricingService
+											.findSettingPromotionalPricing(JsonParserUtil.getGson().toJson(json), ppr);
+									if (ppr.getPromotional_pricing() != null) {
+										pod.setUnit_price(ppr.getPromotional_pricing().getUnit_price());
+									}
+									// double quantity =
+									// t.getExport_quantity()*ppd.getPromotion_quantity()/ppd.getBox_quatity();
+									// pod.setQuantity((int) quantity);
+
+									double quantity = (int) t.getInvoice_detail().getReal_quantity_box()
+											/ ppd.getBox_quatity() * ppd.getSpecification();
+									pod.setQuantity((int) quantity);
+
+									for (PromotionOrderDetail p : listPromotionOrderDetailInvoice) {
+										if (p.getProduct().equals(pod.getProduct())) {
+											p.setQuantity(Double.sum(p.getQuantity(), pod.getQuantity()));
+											continue lv1;
+										}
+									}
+									listPromotionOrderDetailInvoice.add(pod);
+								}
+							}
+						}
+					}
+				}
+			}
+			tinhkhoiluong();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Getter
+	double khoiluongxuat;
+
+	public void tinhkhoiluong() {
+		khoiluongxuat = 0;
+		if (listWrapInvoiceDetail != null)
+			for (int i = 0; i < listWrapInvoiceDetail.size(); i++) {
+				khoiluongxuat += listWrapInvoiceDetail.get(i).getInvoice_detail().getReal_quantity()
+						* listWrapInvoiceDetail.get(i).getInvoice_detail().getProduct().getFactor();
+			}
+		if (listPromotionOrderDetailInvoice != null)
+			for (int i = 0; i < listPromotionOrderDetailInvoice.size(); i++) {
+				if (listPromotionOrderDetailInvoice.get(i).isNo() == false)
+					khoiluongxuat += listPromotionOrderDetailInvoice.get(i).getQuantity()
+							* listPromotionOrderDetailInvoice.get(i).getProduct().getFactor();
+			}
+		khoiluongxuat = Math.round(khoiluongxuat);
+		updateform("menuformid:tabview1:khoiluongxuat");
+	}
+
+	private void tinhlaikhuyenmaisoluong(OrderLix orderLixCrud) {
+		try {
+
+			// kiểm tra hóa đơn có tồn tại không
+			if (orderLixCrud != null && orderLixCrud.getId() != 0) {
+				List<OrderDetail> listOrderDetail = new ArrayList<>();
+				orderDetailService.selectByOrder(orderLixCrud.getId(), listOrderDetail);
+
+				// show thông tin sản phẩm khuyến mãi của đơn hàng
+				List<PromotionOrderDetail> listPromotionOrderDetail = new ArrayList<>();
+				promotionOrderDetailService.selectByOrder(orderLixCrud.getId(), listPromotionOrderDetail);
+
+				List<Object[]> slhoadons = new ArrayList<>();
+				orderLixService.getListExportExtensionOrder(orderLixCrud.getId(), slhoadons);
+				boolean status = true;
+				for (int i = 0; i < listOrderDetail.size(); i++) {
+					double slhdthung = 0;
+					double slhddvt = 0;
+					for (Object[] v : slhoadons) {
+						long productId = Long.parseLong(Objects.toString(v[0]));
+						if (listOrderDetail.get(i).getProduct().getId() == productId) {
+							slhdthung = Double.parseDouble(Objects.toString(v[1], "0"));
+							slhddvt = Double.parseDouble(Objects.toString(v[3], "0"));
+						}
+					}
+					listOrderDetail.get(i).setBox_quantity_actual(slhdthung);
+					listOrderDetail.get(i).setQuantity(slhddvt);
+
+					// bo ra 22/06/2023
+					// listOrderDetail.get(i)
+					// .setTotal(
+					// MyMath.round(listOrderDetail.get(i).getQuantity()
+					// * listOrderDetail.get(i).getUnit_price()));
+					orderDetailService.updateBoxQuantityActual(listOrderDetail.get(i));
+					if (listOrderDetail.get(i).getBox_quantity() != listOrderDetail.get(i).getBox_quantity_actual()) {
+						status = false;
+					}
+				}
+				// kiem tra, cap nhat trang thai da giao hang
+				if (status) {
+					orderLixCrud.setDelivered(true);
+					OrderLixReqInfo orderLixReqInfo = new OrderLixReqInfo(orderLixCrud);
+					orderLixService.update(orderLixReqInfo);
+					orderLixCrud = orderLixReqInfo.getOrder_lix();
+				}
+
+				List<Object[]> slhoadonKMs = new ArrayList<>();
+				orderLixService.getListExportExtensionOrderKM(orderLixCrud.getId(), slhoadonKMs);
+				for (int i = 0; i < listPromotionOrderDetail.size(); i++) {
+					double soluongAct = 0;
+					for (Object[] v : slhoadonKMs) {
+						long productId = Long.parseLong(Objects.toString(v[0]));
+						if (listPromotionOrderDetail.get(i).getOrder_detail().getProduct().getProduct_code()
+								.equals(Objects.toString(v[2]).toString())
+								&& listPromotionOrderDetail.get(i).getProduct().getId() == productId) {
+							soluongAct += Double.parseDouble(Objects.toString(v[1], "0"));
+
+						}
+					}
+					listPromotionOrderDetail.get(i).setQuantityAct(soluongAct);
+					promotionOrderDetailService.updateQuantityAc(listPromotionOrderDetail.get(i));
+
+				}
+			}
+		} catch (Exception e) {
+			logger.error("OrderLixBean.tabInvoiceOnClick:" + e.getMessage(), e);
+		}
+	}
+
+	private List<HoaDonC2> hoaDonC2List;
+
+	public List<HoaDonC2> getHoaDonC2List() {
+		return hoaDonC2List;
+	}
+
+	@Getter
+	@Setter
+	private List<HoaDonC2> hoaDonC2sDC;
+	@Getter
+	@Setter
+	private List<InvoiceDetailTemp> invoiceDetailsDC;
+	@Getter
+	@Setter
+	private List<HoaDonChiTietC2> hoaDonChiTietC2s;
+	@Inject
+	private InvoiceTempService invoiceTempService;
+
+	public void openSplitDialog() {
+		listDetailDTO3 = new ArrayList<>();
+
+		if (listWrapInvoiceDetail == null || listWrapInvoiceDetail.isEmpty()) {
+			FacesContext.getCurrentInstance().addMessage(null,
+					new FacesMessage(FacesMessage.SEVERITY_WARN, "Cảnh báo", "Không có dữ liệu hóa đơn trong bảng!"));
+			return;
+		}
+
+		Long invoiceId = listWrapInvoiceDetail.get(0).getInvoice_detail().getInvoicetemp().getId();
+
+		InvoiceTemp invoiceTempForCode = invoiceTempService.findByIdWithDetails(invoiceId);
+
+		this.voucherCode2Input = generateVoucherCode2(invoiceTempForCode);
+
+		this.hoaDonC2List = invoiceTempService.findByInvoiceId(invoiceId);
+		created_Date = new Date();
+		vehicle_Number = new String();
+		Map<Long, Double> splittedQtyMap = new HashMap<>();
+		for (HoaDonC2 c2 : hoaDonC2List) {
+			if (c2.getChiTietC2List() == null)
+				continue;
+			for (HoaDonChiTietC2 ct : c2.getChiTietC2List()) {
+				Long key = ct.getInvoiceDetailTemp().getId();
+				splittedQtyMap.merge(key, ct.getQuantity(), Double::sum);
+			}
+		}
+
+		List<InvoiceDetailTemp> invoiceDetailTemps = invoiceTempService.findDetailsWithProduct(invoiceId);
+
+		for (InvoiceDetailTemp detail : invoiceDetailTemps) {
+			InvoiceDetailDTO3 dto = new InvoiceDetailDTO3(detail);
+			dto.setQuantityEdit(0d);
+			dto.setSplittedQuantity(splittedQtyMap.getOrDefault(detail.getId(), 0d));
+			listDetailDTO3.add(dto);
+		}
+
+		hoaDonC2sDC = invoiceTempService.findByInvoiceId(invoiceId);
+		invoiceDetailsDC = new ArrayList<InvoiceDetailTemp>();
+		invoiceDetailTempService.selectByInvoice(invoiceId, invoiceDetailsDC);
+		hoaDonChiTietC2s = invoiceTempService.findChiTietByInvoiceId(invoiceId);
+		mapSLTach = new HashMap<>();
+		for (HoaDonChiTietC2 ct : hoaDonChiTietC2s) {
+			String key = ct.getHoaDonC2().getVoucher_code2() + "|"
+					+ ct.getInvoiceDetailTemp().getProduct().getProduct_code();
+			mapSLTach.merge(key, ct.getQuantity(), Double::sum);
+			System.out.println("Put mapSLTach: " + key + " => " + ct.getQuantity());
+		}
+
+		PrimeFaces.current().executeScript("PF('dlgSplitWV').show()");
+	}
+
+	public void showEditInvoiceDetailTemp() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (hoaDonC2ChiTietSelect != null) {
+				hoaDonC2ChiTietCrud = hoaDonC2ChiTietSelect;
+				current.executeScript("PF('dlgEdit').show();");
+			} else {
+				FacesContext.getCurrentInstance().addMessage(null,
+						new FacesMessage(FacesMessage.SEVERITY_WARN, "Cảnh báo", "Chưa chọn dòng nào để chỉnh sửa!"));
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceTempBean.showEditInvoiceDetailTemp:" + e.getMessage(), e);
+		}
+	}
+
+	@Inject
+	private InvoiceDetailTempService invoiceDetailTempService;
+
+	// Lưu hóa đơn tách
+	public void saveSplit() {
+		try {
+			if (listWrapInvoiceDetail == null || listWrapInvoiceDetail.isEmpty()) {
+				FacesContext.getCurrentInstance().addMessage(null,
+						new FacesMessage(FacesMessage.SEVERITY_WARN, "Cảnh báo", "Không có dữ liệu hóa đơn gốc"));
+				return;
+			}
+
+			if (voucherCode2Input == null || voucherCode2Input.trim().isEmpty()) {
+				FacesContext.getCurrentInstance().addMessage(null,
+						new FacesMessage(FacesMessage.SEVERITY_WARN, "Cảnh báo", "Vui lòng nhập Số CT cấp 2"));
+				return;
+			}
+
+			// Ràng buộc phải nhập số xe
+			if (vehicle_Number == null || vehicle_Number.trim().isEmpty()) {
+				FacesContext.getCurrentInstance().addMessage(null,
+						new FacesMessage(FacesMessage.SEVERITY_WARN, "Cảnh báo", "Vui lòng nhập Số xe"));
+				return;
+			}
+
+			// Lấy invoice từ phần tử đầu tiên trong list
+			InvoiceTemp invoiceTemp = listWrapInvoiceDetail.get(0).getInvoice_detail().getInvoicetemp();
+
+			// kiểm tra tổng trước khi lưu
+			for (InvoiceDetailDTO3 dto : listDetailDTO3) {
+				double totalAfter = dto.getSplittedQuantity() + Math.max(0, dto.getQuantityEdit());
+				if (totalAfter > dto.getQuantity()) {
+					FacesContext.getCurrentInstance().addMessage(
+							null,
+							new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Tổng tách của mã "
+									+ dto.getProductCode() + " vượt SL gốc"));
+					return;
+				}
+			}
+
+			// Tạo chứng từ C2
+			HoaDonC2 c2 = new HoaDonC2();
+			c2.setInvoiceTemp(invoiceTemp);
+			c2.setVoucher_code2(voucherCode2Input);
+			c2.setCreatedUser(memberName);
+			c2.setModifiedDate(new Date());
+			c2.setVehicleNumber(vehicle_Number);
+
+			List<HoaDonChiTietC2> ctList = new ArrayList<>();
+
+			for (InvoiceDetailDTO3 dto : listDetailDTO3) {
+				if (dto.getQuantityEdit() > 0) {
+					HoaDonChiTietC2 ct = new HoaDonChiTietC2();
+					InvoiceDetailTemp invDetail = invoiceDetailTempService.selectById(dto.getInvoiceDetailId());
+					ct.setInvoiceDetailTemp(invDetail);
+					ct.setQuantity(dto.getQuantityEdit());
+					ct.setReal_quantity(dto.getSplittedQuantity());
+					ct.setProduct_name(invDetail.getProduct().getProduct_name());
+					ct.setProductdh_code(invDetail.getProduct().getProduct_code());
+					ct.setCreatedUser(memberName);
+					ct.setBatchCode(dto.getBatchCode());
+
+					c2.setModifiedDate(new Date());
+					ct.setHoaDonC2(c2);
+					ctList.add(ct);
+				}
+			}
+
+			if (ctList.isEmpty()) {
+				FacesContext.getCurrentInstance().addMessage(null,
+						new FacesMessage(FacesMessage.SEVERITY_WARN, "Cảnh báo", "Bạn chưa nhập số lượng tách nào"));
+				return;
+			}
+
+			c2.setChiTietC2List(ctList);
+			hoaDonC2Service.create(c2);
+
+			FacesContext.getCurrentInstance().addMessage(
+					null,
+					new FacesMessage(FacesMessage.SEVERITY_INFO, "Thành công", "Đã lưu chứng từ C2: "
+							+ voucherCode2Input));
+
+			// Refresh lại dữ liệu sau khi lưu
+			openSplitDialog();
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			FacesContext.getCurrentInstance().addMessage(null,
+					new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Không thể lưu: " + e.getMessage()));
+		}
+	}
+
+	private Map<String, Double> mapSLTach = new HashMap<>();
+
+	public Double getSLTach(String voucherCode2, String productCode) {
+		if (mapSLTach == null)
+			return 0d;
+		return mapSLTach.getOrDefault(voucherCode2 + "|" + productCode, 0d);
+	}
+
+	public void validateSplit(InvoiceDetailDTO3 dto) {
+		double totalAfterSplit = dto.getSplittedQuantity() + dto.getQuantityEdit();
+		if (dto.getQuantityEdit() < 0) {
+			FacesContext.getCurrentInstance().addMessage(null,
+					new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Số lượng tách không được nhỏ hơn 0"));
+			dto.setQuantityEdit(0);
+		} else if (totalAfterSplit > dto.getQuantity()) {
+			FacesContext.getCurrentInstance().addMessage(
+					null,
+					new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Tổng SL đã tách vượt quá SL gốc ("
+							+ dto.getQuantity() + ")"));
+			dto.setQuantityEdit(0);
+		}
+	}
+
+	public void exportAll(InvoiceDetailDTO3 dto) {
+		if (dto == null)
+			return;
+		double remain = dto.getQuantity() - dto.getSplittedQuantity();
+		if (remain < 0)
+			remain = 0;
+		dto.setQuantityEdit(remain);
+	}
+
+	// Sinh số CT cấp 2 dựa trên hóa đơn gốc và số thứ tự
+	private String generateVoucherCode2(InvoiceTemp invoiceTemp) {
+		String base = invoiceTemp.getVoucher_code();
+		if (base == null || base.isEmpty())
+			base = "CT";
+		long seq = hoaDonC2Service.countByInvoiceId(invoiceTemp.getId()) + 1;
+		return base + "-" + seq;
+	}
+
+	// Tính tổng các lần tách của 1 sản phẩm (theo mã sản phẩm)
+	public double getTongPhieuTao(String productCode) {
+		double total = 0.0;
+		if (hoaDonC2sDC != null) {
+			for (HoaDonC2 c2 : hoaDonC2sDC) {
+				total += getSLTach(c2.getVoucher_code2(), productCode);
+			}
+		}
+		return total;
+	}
+
+	public double getChenhLech(InvoiceDetailTemp item) {
+		double tongPhieu = getTongPhieuTao(item.getProduct().getProduct_code());
+		return item.getQuantity() - tongPhieu;
+	}
+
+	public String getRowStyle(InvoiceDetailTemp item) {
+		double tongPhieu = getTongPhieuTao(item.getProduct().getProduct_code());
+		double chenhlech = item.getQuantity() - tongPhieu;
+
+		if (tongPhieu == 0) {
+			return "row-white"; // Chưa tách
+		} else if (chenhlech == 0) {
+			return "row-green"; // Tách đủ
+		} else {
+			return "row-yellow"; // Tách thiếu
+		}
+	}
+
+	public void saveChiTietC2List() {
+		try {
+			if (hoaDonC2List == null || hoaDonC2List.isEmpty()) {
+				FacesContext.getCurrentInstance().addMessage(null,
+						new FacesMessage(FacesMessage.SEVERITY_WARN, "Cảnh báo", "Không có dữ liệu để lưu"));
+				return;
+			}
+
+			for (HoaDonC2 c2 : hoaDonC2List) {
+				if (c2.getChiTietC2List() == null)
+					continue;
+				for (HoaDonChiTietC2 ct : c2.getChiTietC2List()) {
+					hoaDonC2DetailService.update(ct);
+				}
+			}
+
+			// Reload lại dữ liệu tab 1 (SL đã xuất)
+			// Long invoiceId = hoaDonC2List.get(0).getInvoiceTemp().getId();
+			openSplitDialog();
+
+			FacesContext.getCurrentInstance().addMessage(
+					null,
+					new FacesMessage(FacesMessage.SEVERITY_INFO, "Thành công",
+							"Đã lưu thay đổi cho tất cả phiếu đã xuất"));
+		} catch (Exception e) {
+			logger.error("saveChiTietC2List error: " + e.getMessage(), e);
+			FacesContext.getCurrentInstance().addMessage(null,
+					new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Không thể lưu thay đổi"));
+		}
+	}
+
+	private String voucherCode2Input;
+	@Getter
+	@Setter
+	private Date created_Date;
+	@Getter
+	@Setter
+	private String vehicle_Number;
+
+	public String getVoucherCode2Input() {
+		return voucherCode2Input;
+	}
+
+	public void setVoucherCode2Input(String voucherCode2Input) {
+		this.voucherCode2Input = voucherCode2Input;
+	}
+
+	private List<InvoiceDetailDTO3> listDetailDTO3;
+
+	public List<InvoiceDetailDTO3> getListDetailDTO3() {
+		return listDetailDTO3;
+	}
+
+	public void setListDetailDTO3(List<InvoiceDetailDTO3> listDetailDTO3) {
+		this.listDetailDTO3 = listDetailDTO3;
+	}
+
+	@Inject
+	private HoaDonC2Service hoaDonC2Service;
+
+	@Inject
+	private HoaDonC2DetailService hoaDonC2DetailService;
+
+	private HoaDonC2 selectedHoaDon;
+	private List<HoaDonC2> splitInvoices;
+
+	public HoaDonC2 getSelectedHoaDon() {
+		return selectedHoaDon;
+	}
+
+	public void setSelectedHoaDon(HoaDonC2 selectedHoaDon) {
+		this.selectedHoaDon = selectedHoaDon;
+	}
+
+	public List<HoaDonC2> getSplitInvoices() {
+		return splitInvoices;
+	}
+
+	public void setSplitInvoices(List<HoaDonC2> splitInvoices) {
+		this.splitInvoices = splitInvoices;
+	}
+
+	public void receiveInvoice() {
+		String allowedChooseStocker = getAccount().getMember().getName();
+		String allowedCodeStocker = getAccount().getMember().getCode();
+
+		if (invoiceCrud != null) {
+			invoiceCrud.getStocker().setCodeNV(allowedCodeStocker);
+			if (allowedChooseStocker.equals(invoiceCrud.getStocker().getStocker_name())
+					&& allowedCodeStocker.equals(invoiceCrud.getStocker().getCodeNV())) {
+				if (invoiceService.updateTempSelect(invoiceCrud, allowedChooseStocker) > 0) {
+					success("Đã nhận đơn thành công!");
+				} else {
+					warning("Thủ kho không được chọn để nhận đơn!");
+				}
+
+			}
+
+		}
+	}
+
+	public void prepareAndReceiveInvoice(InvoiceTemp item) {
+		this.invoiceCrud = item;
+		receiveInvoice();
+	}
+
+	public void selectedStockerFromRow(InvoiceTemp item) {
+		this.invoiceCrud.setStocker(item.getStocker());
+		String allowedChooseStocker = getAccount().getUserName();
+		if (allowedChooseStocker.equals("lyxuannhon") || allowedChooseStocker.equals("admin")) {
+			if (invoiceCrud != null) {
+				if (invoiceService.updateTempSelect(invoiceCrud, allowedChooseStocker) > 0) {
+					success("Đã chọn thủ kho" + " " + invoiceCrud.getStocker().getStocker_name() + " "
+							+ "nhận đơn có IDĐH là" + "" + invoiceCrud.getIdorderlix());
+				}
+			}
+		} else {
+			warning("Tài khoản không có quyền phân công thủ kho!");
+		}
+	}
+
+	@Inject
+	IProductService productService;
+
+	@Override
+	protected Logger getLogger() {
+		return logger;
+	}
+
+	public InvoiceTemp getInvoiceCrud() {
+		return invoiceCrud;
+	}
+
+	public void setInvoiceCrud(InvoiceTemp invoiceCrud) {
+		this.invoiceCrud = invoiceCrud;
+	}
+
+	public InvoiceTemp getInvoiceSelect() {
+		return invoiceSelect;
+	}
+
+	public void setInvoiceSelect(InvoiceTemp invoiceSelect) {
+		this.invoiceSelect = invoiceSelect;
+	}
+
+	public List<InvoiceTemp> getlistInvoiceTemp() {
+		return listInvoiceTemp;
+	}
+
+	public void setlistInvoiceTemp(List<InvoiceTemp> listInvoiceTemp) {
+		this.listInvoiceTemp = listInvoiceTemp;
+	}
+
+	public WrapInvoiceDetailTempReqInfo getWrapInvoiceDetailCrud() {
+		return wrapInvoiceDetailCrud;
+	}
+
+	public void setWrapInvoiceDetailCrud(WrapInvoiceDetailTempReqInfo wrapInvoiceDetailCrud) {
+		this.wrapInvoiceDetailCrud = wrapInvoiceDetailCrud;
+	}
+
+	public WrapInvoiceDetailTempReqInfo getWrapInvoiceDetailSelect() {
+		return wrapInvoiceDetailSelect;
+	}
+
+	public void setWrapInvoiceDetailSelect(WrapInvoiceDetailTempReqInfo wrapInvoiceDetailSelect) {
+		this.wrapInvoiceDetailSelect = wrapInvoiceDetailSelect;
+	}
+
+	public List<WrapInvoiceDetailTempReqInfo> getListWrapInvoiceDetail() {
+		return listWrapInvoiceDetail;
+	}
+
+	public void setListWrapInvoiceDetail(List<WrapInvoiceDetailTempReqInfo> listWrapInvoiceDetail) {
+		this.listWrapInvoiceDetail = listWrapInvoiceDetail;
+	}
+
+	public List<PaymentMethod> getListPaymentMethod() {
+		return listPaymentMethod;
+	}
+
+	public void setListPaymentMethod(List<PaymentMethod> listPaymentMethod) {
+		this.listPaymentMethod = listPaymentMethod;
+	}
+
+	public FormatHandler getFormatHandler() {
+		return formatHandler;
+	}
+
+	public void setFormatHandler(FormatHandler formatHandler) {
+		this.formatHandler = formatHandler;
+	}
+
+	public Date getFromDateFCFilter() {
+		return fromDateFCFilter;
+	}
+
+	public void setFromDateFCFilter(Date fromDateFCFilter) {
+		this.fromDateFCFilter = fromDateFCFilter;
+	}
+
+	public Date getToDateFCFilter() {
+		return toDateFCFilter;
+	}
+
+	public void setToDateFCFilter(Date toDateFCFilter) {
+		this.toDateFCFilter = toDateFCFilter;
+	}
+
+	public CustomerTypes getCustomerTypesFCFilter() {
+		return customerTypesFCFilter;
+	}
+
+	public void setCustomerTypesFCFilter(CustomerTypes customerTypesFCFilter) {
+		this.customerTypesFCFilter = customerTypesFCFilter;
+	}
+
+	public Customer getCustomerFcFilter() {
+		return customerFcFilter;
+	}
+
+	public void setCustomerFcFilter(Customer customerFcFilter) {
+		this.customerFcFilter = customerFcFilter;
+	}
+
+	public String getContractNoFCFilter() {
+		return contractNoFCFilter;
+	}
+
+	public void setContractNoFCFilter(String contractNoFCFilter) {
+		this.contractNoFCFilter = contractNoFCFilter;
+	}
+
+	public List<FreightContract> getListFreightContractSelect() {
+		return listFreightContractSelect;
+	}
+
+	public void setListFreightContractSelect(List<FreightContract> listFreightContractSelect) {
+		this.listFreightContractSelect = listFreightContractSelect;
+	}
+
+	public int getPageSizeHDVC() {
+		return pageSizeHDVC;
+	}
+
+	public void setPageSizeHDVC(int pageSizeHDVC) {
+		this.pageSizeHDVC = pageSizeHDVC;
+	}
+
+	public NavigationInfo getNavigationInfoHDVC() {
+		return navigationInfoHDVC;
+	}
+
+	public void setNavigationInfoHDVC(NavigationInfo navigationInfoHDVC) {
+		this.navigationInfoHDVC = navigationInfoHDVC;
+	}
+
+	public List<Integer> getListRowPerPageHDVC() {
+		return listRowPerPageHDVC;
+	}
+
+	public void setListRowPerPageHDVC(List<Integer> listRowPerPageHDVC) {
+		this.listRowPerPageHDVC = listRowPerPageHDVC;
+	}
+
+	public String getKeySearchCustomer() {
+		return keySearchCustomer;
+	}
+
+	public void setKeySearchCustomer(String keySearchCustomer) {
+		this.keySearchCustomer = keySearchCustomer;
+	}
+
+	public List<Customer> getListCustomerSelect() {
+		return listCustomerSelect;
+	}
+
+	public void setListCustomerSelect(List<Customer> listCustomerSelect) {
+		this.listCustomerSelect = listCustomerSelect;
+	}
+
+	public List<Stevedore> getListStevedores() {
+		return listStevedores;
+	}
+
+	public void setListStevedores(List<Stevedore> listStevedores) {
+		this.listStevedores = listStevedores;
+	}
+
+	public List<FormUpGoods> getListFormUpGoods() {
+		return listFormUpGoods;
+	}
+
+	public void setListFormUpGoods(List<FormUpGoods> listFormUpGoods) {
+		this.listFormUpGoods = listFormUpGoods;
+	}
+
+	public List<WrapInvoiceDetailTempReqInfo> getListWrapInvoiceDetailFilter() {
+		return listWrapInvoiceDetailFilter;
+	}
+
+	public void setListWrapInvoiceDetailFilter(List<WrapInvoiceDetailTempReqInfo> listWrapInvoiceDetailFilter) {
+		this.listWrapInvoiceDetailFilter = listWrapInvoiceDetailFilter;
+	}
+
+	public WrapInvoiceDetailReqInfo getWrapInvoiceDetailPick() {
+		return wrapInvoiceDetailPick;
+	}
+
+	public void setWrapInvoiceDetailPick(WrapInvoiceDetailReqInfo wrapInvoiceDetailPick) {
+		this.wrapInvoiceDetailPick = wrapInvoiceDetailPick;
+	}
+
+	public List<WrapExportDataReqInfo> getListWrapExportData() {
+		return listWrapExportData;
+	}
+
+	public void setListWrapExportData(List<WrapExportDataReqInfo> listWrapExportData) {
+		this.listWrapExportData = listWrapExportData;
+	}
+
+	public List<ReportTypeIEInVoice> getListSelectReport() {
+		return listSelectReport;
+	}
+
+	public void setListSelectReport(List<ReportTypeIEInVoice> listSelectReport) {
+		this.listSelectReport = listSelectReport;
+	}
+
+	public ReportTypeIEInVoice getReportTypeIEInVoiceSelect() {
+		return reportTypeIEInVoiceSelect;
+	}
+
+	public void setReportTypeIEInVoiceSelect(ReportTypeIEInVoice reportTypeIEInVoiceSelect) {
+		this.reportTypeIEInVoiceSelect = reportTypeIEInVoiceSelect;
+	}
+
+	public Car getCarCrud() {
+		return carCrud;
+	}
+
+	public void setCarCrud(Car carCrud) {
+		this.carCrud = carCrud;
+	}
+
+	public Car getCarSelect() {
+		return carSelect;
+	}
+
+	public void setCarSelect(Car carSelect) {
+		this.carSelect = carSelect;
+	}
+
+	public List<Car> getListCar() {
+		return listCar;
+	}
+
+	public void setListCar(List<Car> listCar) {
+		this.listCar = listCar;
+	}
+
+	public List<CarType> getListCarType() {
+		return listCarType;
+	}
+
+	public void setListCarType(List<CarType> listCarType) {
+		this.listCarType = listCarType;
+	}
+
+	public List<CarOwner> getListCarOwner() {
+		return listCarOwner;
+	}
+
+	public void setListCarOwner(List<CarOwner> listCarOwner) {
+		this.listCarOwner = listCarOwner;
+	}
+
+	public CarType getCarTypeSearch() {
+		return carTypeSearch;
+	}
+
+	public void setCarTypeSearch(CarType carTypeSearch) {
+		this.carTypeSearch = carTypeSearch;
+	}
+
+	public CarOwner getCarOwnerSearch() {
+		return carOwnerSearch;
+	}
+
+	public void setCarOwnerSearch(CarOwner carOwnerSearch) {
+		this.carOwnerSearch = carOwnerSearch;
+	}
+
+	public String getLicensePlateSearch() {
+		return licensePlateSearch;
+	}
+
+	public void setLicensePlateSearch(String licensePlateSearch) {
+		this.licensePlateSearch = licensePlateSearch;
+	}
+
+	public List<DeliveryPricing> getListDeliveryPricing() {
+		return listDeliveryPricing;
+	}
+
+	public void setListDeliveryPricing(List<DeliveryPricing> listDeliveryPricing) {
+		this.listDeliveryPricing = listDeliveryPricing;
+	}
+
+}

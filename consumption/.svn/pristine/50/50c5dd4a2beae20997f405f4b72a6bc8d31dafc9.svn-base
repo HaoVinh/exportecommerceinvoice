@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Danh
+			mục lái xe (tài xế)</h3>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<div class="col-md-4">
+					<p:panel header="Thông tin" styleClass="panelw100">
+						<h:panelGrid id="info">
+							<label>Tên lái xe<span style="color: red;">*</span></label>
+							<p:inputText value="#{driverBean.driverCrud.name}" />
+							<label>Điện thoại</label>
+							<p:inputText value="#{driverBean.driverCrud.phone}" />
+							<label>CCCD</label>
+							<p:inputText value="#{driverBean.driverCrud.cccd}" />
+							<label>Ghi chú</label>
+							<p:inputText value="#{driverBean.driverCrud.note}" />
+						</h:panelGrid>
+						<p:separator />
+						<p:commandLink process="@this,info"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							action="#{driverBean.saveOrUpdate()}" styleClass="btn_primmary"
+							update="menuformid:tableid,:messages">
+							<i class="fa fa-floppy-o" aria-hidden="true"></i>
+							<span>Lưu/Cập nhật</span>
+						</p:commandLink>
+						<p:commandLink process="@this,info"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							action="#{driverBean.createNew()}" styleClass="btn_new"
+							update="menuformid:info">
+							<i class="fa fa-file-o" aria-hidden="true"></i>
+							<span>Tạo mới</span>
+						</p:commandLink>
+						<p:commandLink process="@this" id="xoact"
+							action="#{driverBean.delete()}"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							styleClass="btn_destroy" update=":messages,:menuformid"
+							icon="fa fa-trash">
+							<p:confirm icon="ui-icon-alert" />
+							<i class="fa fa-trash" aria-hidden="true"></i>
+							<span>Xóa</span>
+						</p:commandLink>
+					</p:panel>
+				</div>
+				<div class="col-md-8">
+					<p:panel header="Danh sách" id="preview" style=" height:500px">
+						<h:panelGrid id="mainGrid" columns="6"
+							style="float:left; margin-bottom:5px">
+							<p:commandLink styleClass="btn_printtt" immediate="true"
+								style="padding:4px !important;" update="editdetail"
+								process="@this" ajax="false" target="blank_"
+								action="#{driverBean.exportExcel()}">
+								<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+								<span>Xuất excel</span>
+							</p:commandLink>
+						</h:panelGrid>
+						<div style="clear: both" />
+						<p:dataTable value="#{driverBean.listDriver}"
+							paginatorPosition="bottom" styleClass="tablenhapsp tableright1"
+							style="width:100%" paginator="true" rowKey="#{item.id}" rows="50"
+							selection="#{driverBean.driverSelect}" scrollable="true"
+							selectionMode="single" scrollWidth="" id="tableid"
+							scrollHeight="350" widgetVar="datatb" resizableColumns="true"
+							var="item">
+							<p:ajax event="rowSelect" listener="#{driverBean.showEdit()}"
+								update="menuformid:info" />
+							<p:column headerText="ID" width="50">
+								<h:outputText value="#{item.id}" />
+							</p:column>
+							<p:column headerText="Tên lái xe" width="200">
+								<h:outputText value="#{item.name}" />
+							</p:column>
+							<p:column headerText="Số điện thoại" width="150">
+								<h:outputText style="white-space: initial;"
+									value="#{item.phone}" />
+							</p:column>
+							<p:column headerText="CCCD" width="150">
+								<h:outputText value="#{item.cccd}" />
+							</p:column>
+							<p:column headerText="Ghi chú" width="100">
+								<h:outputText value="#{item.note}" />
+							</p:column>
+						</p:dataTable>
+					</p:panel>
+				</div>
+			</h:form>
+		</div>
+
+	</ui:define>
+</ui:composition>

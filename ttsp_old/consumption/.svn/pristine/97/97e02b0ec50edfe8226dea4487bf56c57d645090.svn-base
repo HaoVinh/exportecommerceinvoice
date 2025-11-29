@@ -1,0 +1,1532 @@
+package lixco.com.service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Objects;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionAttribute;
+import javax.ejb.TransactionAttributeType;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Expression;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.ParameterExpression;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import javax.persistence.criteria.Subquery;
+
+import lixco.com.commom_ejb.HolderParser;
+import lixco.com.commom_ejb.JsonParserUtil;
+import lixco.com.commom_ejb.ToolTimeCustomer;
+import lixco.com.entity.Car;
+import lixco.com.entity.Carrier;
+import lixco.com.entity.Contract;
+import lixco.com.entity.Customer;
+import lixco.com.entity.CustomerChannel;
+import lixco.com.entity.CustomerTypes;
+import lixco.com.entity.DeliveryPricing;
+import lixco.com.entity.ExportBatch;
+import lixco.com.entity.FormUpGoods;
+import lixco.com.entity.HarborCategory;
+import lixco.com.entity.IECategories;
+import lixco.com.entity.IEInvoice;
+import lixco.com.entity.Invoice;
+import lixco.com.entity.InvoiceDetail;
+import lixco.com.entity.OrderLix;
+import lixco.com.entity.PaymentMethod;
+import lixco.com.entity.PricingProgram;
+import lixco.com.entity.Product;
+import lixco.com.entity.ProductType;
+import lixco.com.entity.PromotionProgram;
+import lixco.com.entity.Stevedore;
+import lixco.com.entity.Stocker;
+import lixco.com.entity.Warehouse;
+import lixco.com.interfaces.IInvoiceService;
+import lixco.com.reportInfo.LenhDieuDong;
+import lixco.com.reportInfo.PhieuNhapKho;
+import lixco.com.reportInfo.PhieuXuatKho;
+import lixco.com.reportInfo.PhieuXuatKhoKiemVCNB;
+import lixco.com.reqInfo.InvoiceReqInfo;
+import lixco.com.reqInfo.PhieuXuatKhoLever;
+
+import org.jboss.logging.Logger;
+
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.CONTAINER)
+public class InvoiceService implements IInvoiceService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource
+	private SessionContext ct;
+
+	@Override
+	public List<Invoice> findAll() {
+		CriteriaBuilder cb = em.getCriteriaBuilder();
+		CriteriaQuery<Invoice> cq = cb.createQuery(Invoice.class);
+		Root<Invoice> root = cq.from(Invoice.class);
+		cq.select(root);
+		TypedQuery<Invoice> query = em.createQuery(cq);
+		return query.getResultList();
+	}
+
+	@Override
+	public int prepareDataDelInvoice(long invoiceId, List<String> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Object[]> cq = cb.createQuery(Object[].class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			Join<Invoice, Invoice> invoiceOwn = root.join("invoice_own", JoinType.LEFT);
+			cq.multiselect(root.get("idfox"), invoiceOwn.get("id"), invoiceOwn.get("idfox")).where(
+					cb.equal(root.get("id"), invoiceId));
+			TypedQuery<Object[]> query = em.createQuery(cq);
+			Object[] data = query.getSingleResult();
+			String idfox = Objects.toString(data[0], null);
+			long idMain = Long.parseLong(Objects.toString(data[1], "0"));
+			String idfoxMain = Objects.toString(data[2], null);
+			if (idMain == 0) {
+				// đây là hóa đơn chính
+				list.add(idfox);
+				// lấy danh sách id fox khuyến mãi
+				CriteriaQuery<String> cq2 = cb.createQuery(String.class);
+				Root<Invoice> root2 = cq.from(Invoice.class);
+				cq2.select(root2.get("idfox")).where(cb.equal(root2.get("invoice_own").get("id"), invoiceId));
+				TypedQuery<String> query2 = em.createQuery(cq2);
+				list.addAll(query2.getResultList());
+			} else {
+				list.add(idfox);
+				list.add(idfoxMain);
+			}
+			res = 0;
+		} catch (Exception e) {
+			// logger.error("InvoiceService.prepareDataDelInvoice:"+e.getMessage(),e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public int prepareDataDelInvoiceDetail(long invoiceDetailId, List<String> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Object[]> cq = cb.createQuery(Object[].class);
+			Root<InvoiceDetail> root_ = cq.from(InvoiceDetail.class);
+			Join<InvoiceDetail, Invoice> invoice_ = root_.join("invoice", JoinType.INNER);
+			Join<InvoiceDetail, InvoiceDetail> detail_ = root_.join("invoice_detail_own", JoinType.LEFT);
+			cq.multiselect(root_.get("idfox"), root_.get("ex_order"), invoice_.get("ipromotion"), detail_.get("id"))
+					.where(cb.equal(root_.get("id"), invoiceDetailId));
+			TypedQuery<Object[]> query = em.createQuery(cq);
+			Object[] data = query.getSingleResult();
+			String idfox = Objects.toString(data[0], null);
+			boolean exOrder = Boolean.parseBoolean(Objects.toString(data[1], "FALSE"));
+			boolean ipromotion = Boolean.parseBoolean(Objects.toString(data[2], "FALSE"));
+			long idInvoiceDetailMain = Long.parseLong(Objects.toString(data[3], "0"));
+			if (exOrder) {
+				if (ipromotion) {
+					// truy tìm String foxpro hóa đơn chính và chi tiết khuyến
+					// mãi liên quan
+					CriteriaQuery<String> cq2 = cb.createQuery(String.class);
+					Root<InvoiceDetail> root2 = cq2.from(InvoiceDetail.class);
+					cq2.select(root2.get("idfox")).where(
+							cb.or(cb.equal(root2.get("invoice_detail_own").get("id"), idInvoiceDetailMain),
+									cb.equal(root2.get("id"), idInvoiceDetailMain)));
+					TypedQuery<String> query2 = em.createQuery(cq2);
+					List<String> listData1 = query2.getResultList();
+					// add idfox khuyến mãi
+					list.addAll(listData1);
+				} else {
+					// add id fox chính
+					list.add(idfox);
+					CriteriaQuery<String> cq3 = cb.createQuery(String.class);
+					Root<InvoiceDetail> root3 = cq3.from(InvoiceDetail.class);
+					cq3.select(root3.get("idfox")).where(
+							cb.equal(root3.get("invoice_detail_own").get("id"), invoiceDetailId));
+					TypedQuery<String> query3 = em.createQuery(cq3);
+					// add id fox khuyến mãi
+					list.addAll(query3.getResultList());
+				}
+			} else {
+				list.add(idfox);
+			}
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.prepareDataDelInvoiceDetail:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public int getListDataInvoiceFox(List<Long> listIdInvoice, List<lixco.com.reqfox.Invoice> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<lixco.com.reqfox.Invoice> cq = cb.createQuery(lixco.com.reqfox.Invoice.class);
+			Root<Invoice> root_ = cq.from(Invoice.class);
+			Join<Invoice, Customer> customer_ = root_.join("customer", JoinType.INNER);// khách
+																						// hàng
+			Join<Invoice, PromotionProgram> promotionPro_ = root_.join("promotion_program", JoinType.LEFT);// chương
+																											// trình
+																											// KM
+			Join<Invoice, PricingProgram> pricing_ = root_.join("pricing_program", JoinType.LEFT);// chương
+																									// trình
+																									// đơn
+																									// giá
+			Join<Invoice, PaymentMethod> pm_ = root_.join("payment_method", JoinType.LEFT);// phương
+																							// thức
+																							// thanh
+																							// toán
+			Join<Invoice, Car> car_ = root_.join("car", JoinType.LEFT);// xe
+			Join<Invoice, Contract> contract_ = root_.join("contract", JoinType.LEFT);// hợp
+																						// đồng
+			Join<Invoice, Warehouse> warehouse_ = root_.join("warehouse", JoinType.LEFT);// kho
+			Join<Invoice, IECategories> ieCate_ = root_.join("ie_categories", JoinType.LEFT);// danh
+																								// mục
+																								// nhập
+																								// xuất
+			Join<Invoice, DeliveryPricing> dp_ = root_.join("delivery_pricing", JoinType.LEFT);// đơn
+																								// giá
+																								// vận
+																								// chuyển
+																								// (nơi
+																								// đến)
+			Join<Invoice, HarborCategory> hb_ = root_.join("harbor_category", JoinType.LEFT);// cảng
+																								// vận
+																								// chuyển
+			Join<Invoice, Stocker> stocker_ = root_.join("stocker", JoinType.LEFT);// thủ
+																					// kho
+			Join<Invoice, Stevedore> stevedore_ = root_.join("stevedore", JoinType.LEFT);// bốc
+																							// xếp
+			Join<Invoice, FormUpGoods> formUpGoods_ = root_.join("form_up_goods", JoinType.LEFT);// hình
+																									// thức
+																									// lên
+																									// hàng
+			Join<Invoice, Carrier> carrier_ = root_.join("carrier", JoinType.LEFT);// người
+																					// vận
+																					// chuyển
+			Join<Invoice, OrderLix> order_ = root_.join("order_lix", JoinType.INNER);
+			// (long id, String maxn, String soct, String makh, Date ngay,
+			// String makho, String soxe,
+			// double hesothue, String htthanhtoa, boolean dathtoan, String
+			// sohd, String soserie, String sodhang,
+			// String manoivc, String port_id,String matk, String mabx, String
+			// htbocxep, boolean ngoaigio, String masoctkm, String manvvc,
+			// String noidungvc, String masoctdg, String iddonhang, String
+			// soldd,
+			// Date ngaygh, String quydoi, String ghichu, String po, int
+			// tglenhang,String guid, int capnhat, String matracuu, String
+			// idfox)
+			cq.select(
+					cb.construct(lixco.com.reqfox.Invoice.class, root_.get("id"), ieCate_.get("code"),
+							root_.get("voucher_code"), customer_.get("customer_code"), root_.get("invoice_date"),
+							warehouse_.get("code"), car_.get("license_plate"), root_.get("tax_value"),
+							pm_.get("method_code"), root_.get("exported"), contract_.get("voucher_code"),
+							root_.get("invoice_serie"), root_.get("order_voucher"), dp_.get("place_code"),
+							hb_.get("harbor_code"), stocker_.get("stocker_code"), stevedore_.get("old_code"),
+							formUpGoods_.get("old_code"), root_.get("timeout"), promotionPro_.get("program_code"),
+							carrier_.get("carrier_code"), root_.get("transport_content"), pricing_.get("program_code"),
+							order_.get("idfox"), root_.get("movement_commands_no"), root_.get("delivery_date"),
+							root_.get("content_qd"), root_.get("note"), root_.get("po_no"), root_.get("time_up_goods"),
+							root_.get("refId"), root_.get("editVersion"), root_.get("lookup_code"), root_.get("idfox")))
+					.where(root_.get("id").in(listIdInvoice));
+			TypedQuery<lixco.com.reqfox.Invoice> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			for (lixco.com.reqfox.Invoice p : list) {
+				// lấy danh sách chi tiết
+				// (long id, String masp, double soluong, double dongia, double
+				// sotien, String maso,double thucxuatn, String malohang,
+				// String maspdh, double dongiant, double sotiennt, String guid,
+				// String idfox, String id_parent_fox)
+				CriteriaQuery<lixco.com.reqfox.InvoiceDetail> cqDetail = cb
+						.createQuery(lixco.com.reqfox.InvoiceDetail.class);
+				Root<InvoiceDetail> root2 = cqDetail.from(InvoiceDetail.class);
+				Join<InvoiceDetail, Product> product_ = root2.join("product", JoinType.INNER);
+				Join<InvoiceDetail, Invoice> invoice_ = root2.join("invoice", JoinType.INNER);
+				cqDetail.select(
+						cb.construct(lixco.com.reqfox.InvoiceDetail.class, root2.get("id"),
+								product_.get("product_code"), root2.get("quantity"),
+								cb.quot(root2.get("quantity"), product_.get("specification")), root2.get("unit_price"),
+								cb.prod(root2.get("quantity"), root2.get("unit_price")), root2.get("note"),
+								root2.get("quantity"), root2.get("note_batch_code"), root2.get("productdh_code"),
+								root2.get("foreign_unit_price"), root2.get("total_foreign_amount"),
+								root2.get("refDetailID"), root2.get("idfox"), invoice_.get("idfox"))).where(
+						cb.equal(invoice_.get("id"), p.getId()));
+				TypedQuery<lixco.com.reqfox.InvoiceDetail> query2 = em.createQuery(cqDetail);
+				p.setListInvoiceDetail(query2.getResultList());
+			}
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.getListDataInvoiceFox(EX):" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public int getListDataInvoiceFoxByIEInvoice(long iEInvoiceId, List<lixco.com.reqfox.Invoice> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<lixco.com.reqfox.Invoice> cq = cb.createQuery(lixco.com.reqfox.Invoice.class);
+			Root<IEInvoice> iEInvoice_ = cq.from(IEInvoice.class);
+			Join<IEInvoice, Invoice> root_ = iEInvoice_.join("invoice", JoinType.INNER);
+			Join<Invoice, Customer> customer_ = root_.join("customer", JoinType.INNER);// khách
+																						// hàng
+			Join<Invoice, PromotionProgram> promotionPro_ = root_.join("promotion_program", JoinType.LEFT);// chương
+																											// trình
+																											// KM
+			Join<Invoice, PricingProgram> pricing_ = root_.join("pricing_program", JoinType.LEFT);// chương
+																									// trình
+																									// đơn
+																									// giá
+			Join<Invoice, PaymentMethod> pm_ = root_.join("payment_method", JoinType.LEFT);// phương
+																							// thức
+																							// thanh
+																							// toán
+			Join<Invoice, Car> car_ = root_.join("car", JoinType.LEFT);// xe
+			Join<Invoice, Contract> contract_ = root_.join("contract", JoinType.LEFT);// hợp
+																						// đồng
+			Join<Invoice, Warehouse> warehouse_ = root_.join("warehouse", JoinType.LEFT);// kho
+			Join<Invoice, IECategories> ieCate_ = root_.join("ie_categories", JoinType.LEFT);// danh
+																								// mục
+																								// nhập
+																								// xuất
+			Join<Invoice, DeliveryPricing> dp_ = root_.join("delivery_pricing", JoinType.LEFT);// đơn
+																								// giá
+																								// vận
+																								// chuyển
+																								// (nơi
+																								// đến)
+			Join<Invoice, HarborCategory> hb_ = root_.join("harbor_category", JoinType.LEFT);// cảng
+																								// vận
+																								// chuyển
+			Join<Invoice, Stocker> stocker_ = root_.join("stocker", JoinType.LEFT);// thủ
+																					// kho
+			Join<Invoice, Stevedore> stevedore_ = root_.join("stevedore", JoinType.LEFT);// bốc
+																							// xếp
+			Join<Invoice, FormUpGoods> formUpGoods_ = root_.join("form_up_goods", JoinType.LEFT);// hình
+																									// thức
+																									// lên
+																									// hàng
+			Join<Invoice, Carrier> carrier_ = root_.join("carrier", JoinType.LEFT);// người
+																					// vận
+																					// chuyển
+			// (long id, String maxn, String soct, String makh, Date ngay,
+			// String makho, String soxe,
+			// double hesothue, String htthanhtoa, boolean dathtoan, String
+			// sohd, String soserie, String sodhang,
+			// String manoivc, String port_id,String matk, String mabx, String
+			// htbocxep, boolean ngoaigio, String masoctkm, String manvvc,
+			// String noidungvc, String masoctdg, String iddonhang, String
+			// soldd,
+			// Date ngaygh, String quydoi, String ghichu, String po, int
+			// tglenhang,String guid, int capnhat, String matracuu, String
+			// idfox)
+			cq.select(
+					cb.construct(lixco.com.reqfox.Invoice.class, root_.get("id"), ieCate_.get("code"),
+							root_.get("voucher_code"), customer_.get("customer_code"), root_.get("invoice_date"),
+							warehouse_.get("code"), car_.get("license_plate"), root_.get("tax_value"),
+							pm_.get("method_code"), root_.get("exported"), contract_.get("voucher_code"),
+							root_.get("invoice_serie"), root_.get("order_voucher"), dp_.get("place_code"),
+							hb_.get("harbor_code"), stocker_.get("stocker_code"), stevedore_.get("old_code"),
+							formUpGoods_.get("old_code"), root_.get("timeout"), promotionPro_.get("program_code"),
+							carrier_.get("carrier_code"), root_.get("transport_content"), pricing_.get("program_code"),
+							iEInvoice_.get("idfox"), root_.get("movement_commands_no"), root_.get("delivery_date"),
+							root_.get("content_qd"), root_.get("note"), root_.get("po_no"), root_.get("time_up_goods"),
+							root_.get("refId"), root_.get("editVersion"), root_.get("lookup_code"), root_.get("idfox")))
+					.where(cb.equal(iEInvoice_.get("id"), iEInvoiceId));
+			TypedQuery<lixco.com.reqfox.Invoice> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			for (lixco.com.reqfox.Invoice p : list) {
+				// lấy danh sách chi tiết
+				// (long id, String masp, double soluong, double dongia, double
+				// sotien, String maso,double thucxuatn, String malohang,
+				// String maspdh, double dongiant, double sotiennt, String guid,
+				// String idfox, String id_parent_fox)
+				CriteriaQuery<lixco.com.reqfox.InvoiceDetail> cqDetail = cb
+						.createQuery(lixco.com.reqfox.InvoiceDetail.class);
+				Root<InvoiceDetail> root2 = cqDetail.from(InvoiceDetail.class);
+				Join<InvoiceDetail, Product> product_ = root2.join("product", JoinType.INNER);
+				Join<InvoiceDetail, Invoice> invoice_ = root2.join("invoice", JoinType.INNER);
+				cqDetail.select(
+						cb.construct(lixco.com.reqfox.InvoiceDetail.class, root2.get("id"),
+								product_.get("product_code"), root2.get("quantity"), root2.get("unit_price"),
+								cb.prod(root2.get("quantity"), root2.get("unit_price")), root2.get("note"),
+								root2.get("quantity"), root2.get("note_batch_code"), root2.get("productdh_code"),
+								root2.get("foreign_unit_price"), root2.get("total_foreign_amount"),
+								root2.get("refDetailID"), root2.get("idfox"), invoice_.get("idfox"))).where(
+						cb.equal(invoice_.get("id"), p.getId()));
+				TypedQuery<lixco.com.reqfox.InvoiceDetail> query2 = em.createQuery(cqDetail);
+				p.setListInvoiceDetail(query2.getResultList());
+			}
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.getListDataInvoiceFoxByIEInvoice:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public int getListDataInvoiceFox(long orderId, List<lixco.com.reqfox.Invoice> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<lixco.com.reqfox.Invoice> cq = cb.createQuery(lixco.com.reqfox.Invoice.class);
+			Root<Invoice> root_ = cq.from(Invoice.class);
+			Join<Invoice, Customer> customer_ = root_.join("customer", JoinType.INNER);// khách
+																						// hàng
+			Join<Invoice, PromotionProgram> promotionPro_ = root_.join("promotion_program", JoinType.LEFT);// chương
+																											// trình
+																											// KM
+			Join<Invoice, PricingProgram> pricing_ = root_.join("pricing_program", JoinType.LEFT);// chương
+																									// trình
+																									// đơn
+																									// giá
+			Join<Invoice, PaymentMethod> pm_ = root_.join("payment_method", JoinType.LEFT);// phương
+																							// thức
+																							// thanh
+																							// toán
+			Join<Invoice, Car> car_ = root_.join("car", JoinType.LEFT);// xe
+			Join<Invoice, Contract> contract_ = root_.join("contract", JoinType.LEFT);// hợp
+																						// đồng
+			Join<Invoice, Warehouse> warehouse_ = root_.join("warehouse", JoinType.LEFT);// kho
+			Join<Invoice, IECategories> ieCate_ = root_.join("ie_categories", JoinType.LEFT);// danh
+																								// mục
+																								// nhập
+																								// xuất
+			Join<Invoice, DeliveryPricing> dp_ = root_.join("delivery_pricing", JoinType.LEFT);// đơn
+																								// giá
+																								// vận
+																								// chuyển
+																								// (nơi
+																								// đến)
+			Join<Invoice, HarborCategory> hb_ = root_.join("harbor_category", JoinType.LEFT);// cảng
+																								// vận
+																								// chuyển
+			Join<Invoice, Stocker> stocker_ = root_.join("stocker", JoinType.LEFT);// thủ
+																					// kho
+			Join<Invoice, Stevedore> stevedore_ = root_.join("stevedore", JoinType.LEFT);// bốc
+																							// xếp
+			Join<Invoice, FormUpGoods> formUpGoods_ = root_.join("form_up_goods", JoinType.LEFT);// hình
+																									// thức
+																									// lên
+																									// hàng
+			Join<Invoice, Carrier> carrier_ = root_.join("carrier", JoinType.LEFT);// người
+																					// vận
+																					// chuyển
+			Join<Invoice, OrderLix> order_ = root_.join("order_lix", JoinType.INNER);
+			// (long id, String maxn, String soct, String makh, Date ngay,
+			// String makho, String soxe,
+			// double hesothue, String htthanhtoa, boolean dathtoan, String
+			// sohd, String soserie, String sodhang,
+			// String manoivc, String port_id,String matk, String mabx, String
+			// htbocxep, boolean ngoaigio, String masoctkm, String manvvc,
+			// String noidungvc, String masoctdg, String iddonhang, String
+			// soldd,
+			// Date ngaygh, String quydoi, String ghichu, String po, int
+			// tglenhang,String guid, int capnhat, String matracuu, String
+			// idfox)
+			cq.select(
+					cb.construct(lixco.com.reqfox.Invoice.class, root_.get("id"), ieCate_.get("code"),
+							root_.get("voucher_code"), customer_.get("customer_code"), root_.get("invoice_date"),
+							warehouse_.get("code"), car_.get("license_plate"), root_.get("tax_value"),
+							pm_.get("method_code"), root_.get("exported"), contract_.get("voucher_code"),
+							root_.get("invoice_serie"), root_.get("order_voucher"), dp_.get("place_code"),
+							hb_.get("harbor_code"), stocker_.get("stocker_code"), stevedore_.get("old_code"),
+							formUpGoods_.get("old_code"), root_.get("timeout"), promotionPro_.get("program_code"),
+							carrier_.get("carrier_code"), root_.get("transport_content"), pricing_.get("program_code"),
+							order_.get("idfox"), root_.get("movement_commands_no"), root_.get("delivery_date"),
+							root_.get("content_qd"), root_.get("note"), root_.get("po_no"), root_.get("time_up_goods"),
+							root_.get("refId"), root_.get("editVersion"), root_.get("lookup_code"), root_.get("idfox")))
+					.where(cb.equal(order_.get("id"), orderId));
+			TypedQuery<lixco.com.reqfox.Invoice> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			for (lixco.com.reqfox.Invoice p : list) {
+				// lấy danh sách chi tiết
+				// (long id, String masp, double soluong, double dongia, double
+				// sotien, String maso,double thucxuatn, String malohang,
+				// String maspdh, double dongiant, double sotiennt, String guid,
+				// String idfox, String id_parent_fox)
+				CriteriaQuery<lixco.com.reqfox.InvoiceDetail> cqDetail = cb
+						.createQuery(lixco.com.reqfox.InvoiceDetail.class);
+				Root<InvoiceDetail> root2 = cqDetail.from(InvoiceDetail.class);
+				Join<InvoiceDetail, Product> product_ = root2.join("product", JoinType.INNER);
+				Join<InvoiceDetail, Invoice> invoice_ = root2.join("invoice", JoinType.INNER);
+				cqDetail.select(
+						cb.construct(lixco.com.reqfox.InvoiceDetail.class, root2.get("id"),
+								product_.get("product_code"), root2.get("quantity"), root2.get("unit_price"),
+								cb.prod(root2.get("quantity"), root2.get("unit_price")), root2.get("note"),
+								root2.get("quantity"), root2.get("note_batch_code"), root2.get("productdh_code"),
+								root2.get("foreign_unit_price"), root2.get("total_foreign_amount"),
+								root2.get("refDetailID"), root2.get("idfox"), invoice_.get("idfox"))).where(
+						cb.equal(invoice_.get("id"), p.getId()));
+				TypedQuery<lixco.com.reqfox.InvoiceDetail> query2 = em.createQuery(cqDetail);
+				p.setListInvoiceDetail(query2.getResultList());
+			}
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.getListDataInvoiceFox:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public int search(String json, List<Invoice> list, List<CustomerChannel> customerChannels,
+			List<CustomerTypes> customerTypes, boolean chuachuyenmisa, int giohanHDtruyvan,List<IECategories> ieCategoriesSearchs, List<Customer> customerSearchs) {
+		int res = -1;
+		try {
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+
+			HolderParser hstextStr = JsonParserUtil.getValueString(j.get("invoice_info"), "stextStr", null);
+			HolderParser hFromDate = JsonParserUtil.getValueString(j.get("invoice_info"), "from_date", null);
+			HolderParser hToDate = JsonParserUtil.getValueString(j.get("invoice_info"), "to_date", null);
+			HolderParser hInvoiceId = JsonParserUtil.getValueNumber(j.get("invoice_info"), "id", null);
+			HolderParser hVoucherCode = JsonParserUtil.getValueString(j.get("invoice_info"), "voucher_code", null);
+			HolderParser hPoNo = JsonParserUtil.getValueString(j.get("invoice_info"), "po_no", null);
+			HolderParser hOrderCode = JsonParserUtil.getValueString(j.get("invoice_info"), "order_code", null);
+			HolderParser hOrderVoucher = JsonParserUtil.getValueString(j.get("invoice_info"), "order_voucher", null);
+			HolderParser hPayment = JsonParserUtil.getValueNumber(j.get("invoice_info"), "payment", null);
+			HolderParser hStatus = JsonParserUtil.getValueList(j.get("invoice_info"), "status", null,
+					new TypeToken<List<Long>>() {
+					}.getType());
+			HolderParser hxeptheohd = JsonParserUtil.getValueString(j.get("invoice_info"), "xeptheosohoadon", null);
+
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Invoice> cq = cb.createQuery(Invoice.class);
+			Root<Invoice> root_ = cq.from(Invoice.class);
+			root_.fetch("customer", JoinType.INNER);// khách hàng
+			root_.fetch("promotion_program", JoinType.LEFT);// chương trình KM
+			root_.fetch("pricing_program", JoinType.LEFT);// chương trình đơn
+															// giá
+			root_.fetch("payment_method", JoinType.LEFT);// phương thức thanh
+															// toán
+			root_.fetch("car", JoinType.LEFT);// xe
+			root_.fetch("freight_contract", JoinType.LEFT);// hợp đồng vận
+															// chuyển.
+			root_.fetch("contract", JoinType.LEFT);// hợp đồng
+			root_.fetch("warehouse", JoinType.LEFT);// kho
+			root_.fetch("ie_categories", JoinType.LEFT);// danh mục nhập xuất
+			root_.fetch("delivery_pricing", JoinType.LEFT);// đơn giá vận chuyển
+															// (nơi đến)
+			root_.fetch("harbor_category", JoinType.LEFT);// cảng vận chuyển
+			root_.fetch("stocker", JoinType.LEFT);// thủ kho
+			root_.fetch("stevedore", JoinType.LEFT);// bốc xếp
+			root_.fetch("form_up_goods", JoinType.LEFT);// hình thức lên hàng
+			root_.fetch("carrier", JoinType.LEFT);// người vận chuyển
+			List<Predicate> predicates = new ArrayList<Predicate>();
+			ParameterExpression<Date> pFromDate = cb.parameter(Date.class);
+			ParameterExpression<Date> pToDate = cb.parameter(Date.class);
+			ParameterExpression<Long> pInvoiceId = cb.parameter(Long.class);
+			ParameterExpression<String> pVoucherCode = cb.parameter(String.class);
+			ParameterExpression<Long> pIECategoriesId = cb.parameter(Long.class);
+			ParameterExpression<String> pPoNo = cb.parameter(String.class);
+			ParameterExpression<String> pOrderCode = cb.parameter(String.class);
+			ParameterExpression<String> pOrderVoucher = cb.parameter(String.class);
+			ParameterExpression<Integer> pPayment = cb.parameter(Integer.class);
+
+			Predicate dis = cb.disjunction();
+			dis.getExpressions().add(cb.isNull(pFromDate));
+			dis.getExpressions().add(cb.equal(pFromDate, ""));
+			dis.getExpressions().add(cb.greaterThanOrEqualTo(root_.get("invoice_date"), pFromDate));
+			predicates.add(dis);
+			Predicate dis1 = cb.disjunction();
+			dis1.getExpressions().add(cb.isNull(pToDate));
+			dis1.getExpressions().add(cb.equal(pToDate, ""));
+			dis1.getExpressions().add(cb.lessThanOrEqualTo(root_.get("invoice_date"), pToDate));
+			predicates.add(dis1);
+
+			if (customerSearchs != null && customerSearchs.size() != 0) {
+				predicates.add(cb.in(root_.get("customer")).value(
+						customerSearchs));
+			}
+			
+			if (customerChannels != null && customerChannels.size() != 0) {
+				predicates.add(cb.in(root_.get("customer").get("customer_types").get("customer_channel")).value(
+						customerChannels));
+			}
+			if (customerTypes != null && customerTypes.size() != 0) {
+				predicates.add(cb.in(root_.get("customer").get("customer_types")).value(customerTypes));
+			}
+
+			Predicate dis3 = cb.disjunction();
+			dis3.getExpressions().add(cb.equal(pInvoiceId, 0));
+			dis3.getExpressions().add(cb.equal(root_.get("id"), pInvoiceId));
+			predicates.add(dis3);
+			Predicate dis4 = cb.disjunction();
+			dis4.getExpressions().add(cb.equal(pVoucherCode, ""));
+			dis4.getExpressions().add(cb.equal(root_.get("voucher_code"), pVoucherCode));
+			predicates.add(dis4);
+			
+			
+			Predicate dis6 = cb.disjunction();
+			dis6.getExpressions().add(cb.equal(pPoNo, ""));
+			dis6.getExpressions().add(cb.equal(root_.get("po_no"), pPoNo));
+			predicates.add(dis6);
+			Predicate dis7 = cb.disjunction();
+			dis7.getExpressions().add(cb.equal(pOrderCode, ""));
+			dis7.getExpressions().add(cb.equal(root_.get("order_code"), pOrderCode));
+			predicates.add(dis7);
+			Predicate dis8 = cb.disjunction();
+			dis8.getExpressions().add(cb.equal(pOrderVoucher, ""));
+			dis8.getExpressions().add(cb.equal(root_.get("order_voucher"), pOrderVoucher));
+			predicates.add(dis8);
+			Predicate dis9 = cb.disjunction();
+			dis9.getExpressions().add(cb.equal(pPayment, -1));
+			dis9.getExpressions().add(cb.equal(root_.get("payment"), pPayment));
+			predicates.add(dis9);
+			List<Integer> listInt = (List<Integer>) hStatus.getValue();
+			if (listInt != null && listInt.size() > 0) {
+				predicates.add(root_.get("status").in(listInt));
+			}
+			// cai dat trang thai loc neu chua chuyen misa
+			if (chuachuyenmisa) {
+				predicates.add(root_.get("refId").isNull());
+			}
+			if (ieCategoriesSearchs!=null&&ieCategoriesSearchs.size()!=0) {
+				predicates.add(root_.get("ie_categories").in(ieCategoriesSearchs));
+			}
+
+			List<Predicate> predicatesStr = new ArrayList<Predicate>();
+			String stextStr = Objects.toString(hstextStr.getValue());
+			if (hstextStr.getValue() != null && !"".equals(stextStr.trim())) {
+				if (stextStr.contains(";")) {
+					String sohoadon[] = stextStr.split(";");
+					List<String> hds = new ArrayList<String>();
+					for (int i = 0; i < sohoadon.length; i++) {
+						hds.add(sohoadon[i].trim());
+					}
+					Predicate predicateinvoice_sohoadon = cb.in(root_.get("voucher_code")).value(hds);// id
+					predicatesStr.add(predicateinvoice_sohoadon);
+				} else {
+					Predicate predicateinvoice_code = cb.like(root_.get("voucher_code"), "%" + stextStr + "%");// id
+					predicatesStr.add(predicateinvoice_code);
+				} // fox
+
+				Predicate predicateorder_voucher = cb.like(root_.get("order_voucher"), "%" + stextStr + "%");// so
+				predicatesStr.add(predicateorder_voucher); // chung
+				// tu
+				Predicate predicatepo_no = cb.like(root_.get("po_no"), "%" + stextStr + "%");// so
+				predicatesStr.add(predicatepo_no); // chung
+				// tu
+				Join<Invoice, Customer> cus_ = root_.join("customer", JoinType.LEFT);
+				Predicate predicateCuscode = cb.like(cus_.get("customer_code"), "%" + stextStr + "%");// ma
+																										// khach
+																										// hang
+				predicatesStr.add(predicateCuscode);
+				Predicate predicateCus = cb.like(cus_.get("customer_name"), "%" + stextStr + "%");// ten
+																									// khach
+																									// hang
+				predicatesStr.add(predicateCus);
+				Predicate predicatecreated_by = cb.like(root_.get("created_by"), "%" + stextStr + "%");// nguoi
+																										// tao
+				predicatesStr.add(predicatecreated_by);
+				Join<Invoice, Car> car_ = root_.join("car", JoinType.LEFT);
+				Predicate predicatecar = cb.like(car_.get("license_plate"), "%" + stextStr + "%");// so
+																									// xe
+				predicatesStr.add(predicatecar);
+
+				List<Predicate> subpredicates = new LinkedList<Predicate>();
+				Subquery<InvoiceDetail> sqOne = cq.subquery(InvoiceDetail.class);
+				Root subroot = sqOne.from(InvoiceDetail.class);
+				Predicate predicatePdCode = cb.like(subroot.get("product").get("product_code"), "%" + stextStr + "%");
+				subpredicates.add(predicatePdCode);
+				Predicate predicatePdName = cb.like(subroot.get("product").get("product_name"), "%" + stextStr + "%");
+				subpredicates.add(predicatePdName);
+				sqOne.select(subroot.get("invoice")).where(cb.or(subpredicates.toArray(new Predicate[0])));
+				Predicate predicateSub = cb.equal(root_, cb.any(sqOne));
+				predicatesStr.add(predicateSub);// truy cap chi tiet
+			}
+			if (predicatesStr.size() != 0) {
+				cq.select(root_).where(cb.and(predicates.toArray(new Predicate[0])),
+						cb.or(predicatesStr.toArray(new Predicate[0])));
+				if (hxeptheohd.getValue() != null && "true".equals(hxeptheohd.getValue())) {
+					cq.orderBy(cb.desc(root_.get("voucher_code")));
+				} else {
+					cq.orderBy(cb.desc(root_.get("id")));
+				}
+			} else {
+				cq.select(root_).where(cb.and(predicates.toArray(new Predicate[0])));
+				if (hxeptheohd.getValue() != null && "true".equals(hxeptheohd.getValue())) {
+					cq.orderBy(cb.desc(root_.get("voucher_code")));
+				} else {
+					cq.orderBy(cb.desc(root_.get("id")));
+				}
+			}
+
+			TypedQuery<Invoice> query = em.createQuery(cq);
+			if (giohanHDtruyvan != 0) {
+				query.setMaxResults(giohanHDtruyvan);
+			}
+			query.setParameter(pFromDate,
+					ToolTimeCustomer.convertStringToDate(Objects.toString(hFromDate.getValue(), null), "dd/MM/yyyy"));
+			query.setParameter(pToDate,
+					ToolTimeCustomer.convertStringToDate(Objects.toString(hToDate.getValue(), null), "dd/MM/yyyy"));
+			query.setParameter(pInvoiceId, Long.parseLong(Objects.toString(hInvoiceId.getValue(), "0")));
+			query.setParameter(pVoucherCode, Objects.toString(hVoucherCode.getValue(), ""));
+			query.setParameter(pPoNo, Objects.toString(hPoNo.getValue(), ""));
+			query.setParameter(pOrderCode, Objects.toString(hOrderCode.getValue(), ""));
+			query.setParameter(pOrderVoucher, Objects.toString(hOrderVoucher.getValue(), ""));
+			query.setParameter(pPayment, Integer.parseInt(Objects.toString(hPayment.getValue(), "-1")));
+			list.addAll(query.getResultList());
+			res = 0;
+
+		} catch (Exception e) {
+			logger.error("InvoiceService.search:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public int processingContract(String json, List<Object[]> list) {
+		int res = -1;
+		try {/* {list_product_id:[],contract_id:0} */
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+			HolderParser hListPrroductId = JsonParserUtil.getValueList(j, "list_product_id", null,
+					new TypeToken<List<Long>>() {
+					}.getType());
+			HolderParser hContractId = JsonParserUtil.getValueNumber(j, "contract_id", null);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			List<Long> listProductId = (List<Long>) hListPrroductId.getValue();
+			ParameterExpression<Long> pContractId = cb.parameter(Long.class);
+			List<Predicate> predicates = new ArrayList<>();
+			CriteriaQuery<Object[]> cq = cb.createQuery(Object[].class);
+			Root<InvoiceDetail> root = cq.from(InvoiceDetail.class);
+			Join<InvoiceDetail, Invoice> invoice_ = root.join("invoice", JoinType.INNER);
+			Join<InvoiceDetail, Product> product_ = root.join("product", JoinType.INNER);
+			if (listProductId != null && listProductId.size() > 0) {
+				predicates.add(root.get("product").get("id").in(listProductId));
+			}
+			predicates.add(cb.equal(invoice_.get("contract").get("id"), pContractId));
+			cq.multiselect(root.get("product").get("id"), cb.sum(cb.prod(root.get("quantity"), product_.get("factor"))))
+					.where(cb.and(predicates.toArray(new Predicate[0])),
+							cb.not(invoice_.get("ie_categories").get("code").in("5", "A")))
+					.groupBy(root.get("product").get("id"), root.get("foreign_unit_price"));
+			TypedQuery<Object[]> query = em.createQuery(cq);
+			query.setParameter(pContractId, Long.parseLong(Objects.toString(hContractId.getValue())));
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.processingContract:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public Object[] processingContractDetail(long idContract, long idProduct, double dongiant) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+
+			CriteriaQuery<Object[]> cq = cb.createQuery(Object[].class);
+			Root<InvoiceDetail> root = cq.from(InvoiceDetail.class);
+			Join<InvoiceDetail, Invoice> invoice_ = root.join("invoice", JoinType.INNER);
+			Join<InvoiceDetail, Product> product_ = root.join("product", JoinType.INNER);
+
+			List<Predicate> predicates = new ArrayList<>();
+			predicates.add(cb.equal(invoice_.get("contract").get("id"), idContract));
+			predicates.add(cb.equal(root.get("product").get("id"), idProduct));
+			predicates.add(cb.equal(root.get("foreign_unit_price"), dongiant));
+
+			cq.multiselect(cb.sum(cb.prod(root.get("quantity"), product_.get("factor"))),
+					cb.sum(root.get("total_foreign_amount")))
+					.where(cb.and(predicates.toArray(new Predicate[0])),
+							cb.not(invoice_.get("ie_categories").get("code").in("5", "A")))
+					.groupBy(root.get("product").get("id"));
+			TypedQuery<Object[]> query = em.createQuery(cq);
+			List<Object[]> objects = query.getResultList();
+			if (objects.size() != 0)
+				return objects.get(0);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public int selectById(long id, InvoiceReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Invoice> cq = cb.createQuery(Invoice.class);
+			Root<Invoice> root_ = cq.from(Invoice.class);
+			root_.fetch("customer", JoinType.INNER);// khách hàng
+			root_.fetch("promotion_program", JoinType.LEFT);// chương trình KM
+			root_.fetch("pricing_program", JoinType.LEFT);// chương trình đơn
+															// giá
+			root_.fetch("payment_method", JoinType.LEFT);// phương thức thanh
+															// toán
+			root_.fetch("car", JoinType.LEFT);// xe
+			root_.fetch("freight_contract", JoinType.LEFT);// hợp đồng vận
+															// chuyển.
+			root_.fetch("contract", JoinType.LEFT);// hợp đồng
+			root_.fetch("warehouse", JoinType.LEFT);// kho
+			root_.fetch("ie_categories", JoinType.LEFT);// danh mục nhập xuất
+			root_.fetch("delivery_pricing", JoinType.LEFT);// đơn giá vận chuyển
+															// (nơi đến)
+			root_.fetch("harbor_category", JoinType.LEFT);// cảng vận chuyển
+			root_.fetch("stocker", JoinType.LEFT);// thủ kho
+			root_.fetch("stevedore", JoinType.LEFT);// bốc xếp
+			root_.fetch("form_up_goods", JoinType.LEFT);// hình thức lên hàng
+			root_.fetch("carrier", JoinType.LEFT);// người vận chuyển
+			root_.fetch("invoice_own", JoinType.LEFT);
+			root_.fetch("order_lix", JoinType.LEFT);
+			cq.select(root_).where(cb.equal(root_.get("id"), id));
+			TypedQuery<Invoice> query = em.createQuery(cq);
+			t.setInvoice(query.getSingleResult());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.selectById:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public int selectByInvoiceOwn(long idOwn, InvoiceReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Invoice> cq = cb.createQuery(Invoice.class);
+			Root<Invoice> root_ = cq.from(Invoice.class);
+			root_.fetch("customer", JoinType.INNER);// khách hàng
+			root_.fetch("promotion_program", JoinType.LEFT);// chương trình KM
+			root_.fetch("pricing_program", JoinType.LEFT);// chương trình đơn
+															// giá
+			root_.fetch("payment_method", JoinType.LEFT);// phương thức thanh
+															// toán
+			root_.fetch("car", JoinType.LEFT);// xe
+			root_.fetch("freight_contract", JoinType.LEFT);// hợp đồng vận
+															// chuyển.
+			root_.fetch("contract", JoinType.LEFT);// hợp đồng
+			root_.fetch("warehouse", JoinType.LEFT);// kho
+			root_.fetch("ie_categories", JoinType.LEFT);// danh mục nhập xuất
+			root_.fetch("delivery_pricing", JoinType.LEFT);// đơn giá vận chuyển
+															// (nơi đến)
+			root_.fetch("harbor_category", JoinType.LEFT);// cảng vận chuyển
+			root_.fetch("stocker", JoinType.LEFT);// thủ kho
+			root_.fetch("stevedore", JoinType.LEFT);// bốc xếp
+			root_.fetch("form_up_goods", JoinType.LEFT);// hình thức lên hàng
+			root_.fetch("carrier", JoinType.LEFT);// người vận chuyển
+			root_.fetch("invoice_own", JoinType.LEFT);
+			root_.fetch("order_lix", JoinType.LEFT);
+			cq.select(root_).where(cb.equal(root_.get("invoice_own").get("id"), idOwn));
+			TypedQuery<Invoice> query = em.createQuery(cq);
+			t.setInvoice(query.getSingleResult());
+		} catch (Exception e) {
+			// logger.error("InvoiceService.selectByInvoiceOwn:"+e.getMessage(),e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public int getListExportBatch(long invoiceDetailId, List<ExportBatch> list) {
+		int res = 0;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<ExportBatch> cq = cb.createQuery(ExportBatch.class);
+			Root<ExportBatch> root_ = cq.from(ExportBatch.class);
+			root_.fetch("batch", JoinType.INNER);
+			cq.select(root_).where(cb.equal(root_.get("invoice_detail").get("id"), invoiceDetailId));
+			TypedQuery<ExportBatch> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.getListExportBatch:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int processingContract(long contractId, List<Long> listProductId, List<Object[]> list) {
+		int res = -1;
+		try {
+			if (listProductId != null && listProductId.size() > 0) {
+				CriteriaBuilder cb = em.getCriteriaBuilder();
+				CriteriaQuery<Object[]> cq = cb.createQuery(Object[].class);
+				Root<InvoiceDetail> root_ = cq.from(InvoiceDetail.class);
+				Join<InvoiceDetail, Invoice> invoice_ = root_.join("invoice", JoinType.INNER);
+				Join<InvoiceDetail, Product> product_ = root_.join("product", JoinType.INNER);
+				Predicate con = cb.conjunction();
+				con.getExpressions().add(cb.equal(invoice_.get("contract").get("id"), contractId));
+				con.getExpressions().add(product_.get("id").in(listProductId));
+				cq.multiselect(product_.get("id"), cb.sum(cb.prod(root_.get("quantity"), product_.get("factor"))))
+						.where(con).groupBy(product_.get("id"));
+				TypedQuery<Object[]> query = em.createQuery(cq);
+				list.addAll(query.getResultList());
+				res = 0;
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceService.processingContract:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.NOT_SUPPORTED)
+	public int reportPhieuXuatKho(long invoiceId, List<PhieuXuatKho> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<PhieuXuatKho> cq = cb.createQuery(PhieuXuatKho.class);
+			Root<InvoiceDetail> root_ = cq.from(InvoiceDetail.class);
+			Join<InvoiceDetail, Product> product_ = root_.join("product", JoinType.INNER);
+			// PhieuXuatKho(long product_id, String product_code, String
+			// product_name, String batch_code, String unit,
+			// Double quantity, Double real_quantity, Double unit_price, Double
+			// total_amount)
+			cq.select(
+					cb.construct(PhieuXuatKho.class, product_.get("id"), product_.get("product_code"),
+							product_.get("product_name"), root_.get("note_batch_code"), product_.get("unit"),
+							root_.get("quantity"), root_.get("unit_price"), root_.get("total"))).where(
+					cb.equal(root_.get("invoice").get("id"), invoiceId));
+			TypedQuery<PhieuXuatKho> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.reportPhieuXuatKho:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int reportLenhDieuDong(long invoiceId, List<LenhDieuDong> list) {
+		int res = -1;
+		try {
+
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<LenhDieuDong> cq = cb.createQuery(LenhDieuDong.class);
+			Root<InvoiceDetail> root_ = cq.from(InvoiceDetail.class);
+			Join<InvoiceDetail, Product> product_ = root_.join("product", JoinType.INNER);
+			// LenhDieuDong(long product_id, String product_code, String
+			// product_name, String unit, Double quantity)
+			cq.select(
+					cb.construct(LenhDieuDong.class, product_.get("id"), product_.get("product_code"),
+							product_.get("product_name"), product_.get("unit"), root_.get("quantity")))
+					.where(cb.equal(root_.get("invoice").get("id"), invoiceId))
+					.orderBy(cb.desc(product_.get("product_name")));
+			TypedQuery<LenhDieuDong> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.reportLenhDieuDong:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int reportPhieuNhapKho(long invoiceId, List<PhieuNhapKho> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<PhieuNhapKho> cq = cb.createQuery(PhieuNhapKho.class);
+			Root<InvoiceDetail> root_ = cq.from(InvoiceDetail.class);
+			Join<InvoiceDetail, Product> product_ = root_.join("product", JoinType.INNER);
+			// PhieuNhapKho(long product_id, String product_code, String
+			// product_name, String unit, Double kg_quantity,
+			// Double unit_quantity, Double unit_price, Double total_amount)
+			cq.select(
+					cb.construct(PhieuNhapKho.class, product_.get("id"), product_.get("product_code"),
+							product_.get("product_name"), product_.get("unit"),
+							cb.prod(root_.get("quantity"), product_.get("factor")), root_.get("quantity"),
+							root_.get("unit_price"), cb.prod(root_.get("unit_price"), root_.get("quantity")))).where(
+					cb.equal(root_.get("invoice").get("id"), invoiceId));
+			TypedQuery<PhieuNhapKho> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.reportPhieuNhapKho:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int reportPhieuXuatKhoKiemVCNB(String json, List<PhieuXuatKhoKiemVCNB> list) {
+		int res = -1;
+		try {
+			/* {invoice_date:'',customer_id:0,movement_commands_no:'' } */
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+			HolderParser hInvoiceDate = JsonParserUtil.getValueString(j, "invoice_date", null);
+			HolderParser hCustomerId = JsonParserUtil.getValueNumber(j, "customer_id", null);
+			HolderParser hMovementCommandsNo = JsonParserUtil.getValueString(j, "movement_commands_no", null);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<PhieuXuatKhoKiemVCNB> cq = cb.createQuery(PhieuXuatKhoKiemVCNB.class);
+			Root<InvoiceDetail> root_ = cq.from(InvoiceDetail.class);
+			Join<InvoiceDetail, Invoice> invoice_ = root_.join("invoice", JoinType.INNER);
+			Join<InvoiceDetail, Product> product_ = root_.join("product", JoinType.INNER);
+			Join<Invoice, Car> car_ = invoice_.join("car", JoinType.LEFT);
+			Predicate con = cb.conjunction();
+			con.getExpressions().add(
+					cb.equal(invoice_.get("invoice_date"), ToolTimeCustomer.convertStringToDate(
+							Objects.toString(hInvoiceDate.getValue(), null), "dd/MM/yyyy")));
+			con.getExpressions().add(
+					cb.equal(invoice_.get("customer").get("id"),
+							Long.parseLong(Objects.toString(hCustomerId.getValue()))));
+			// con.getExpressions().add(cb.equal(invoice_.get("movement_commands_no"),
+			// Objects.toString(hMovementCommandsNo.getValue(),null)));
+			// (String invoice_code, String product_name, String unit, String
+			// quantity,String license_plate)
+			cq.select(
+					cb.construct(PhieuXuatKhoKiemVCNB.class, invoice_.get("invoice_code"),
+							product_.get("product_name"), product_.get("unit"), root_.get("quantity"),
+							car_.get("license_plate"))).where(con);
+			TypedQuery<PhieuXuatKhoKiemVCNB> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.reportPhieuXuatKhoKiemVCNB:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int checkInvoiceCode(String invoiceCode, long invoiceId) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Long> cq = cb.createQuery(Long.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			ParameterExpression<String> pInvoiceCode = cb.parameter(String.class);
+			ParameterExpression<Long> pInvoiceId = cb.parameter(Long.class);
+			Predicate dis = cb.disjunction();
+			Predicate con1 = cb.conjunction();
+			Predicate con2 = cb.conjunction();
+			con1.getExpressions().add(cb.equal(pInvoiceId, 0));
+			con1.getExpressions().add(cb.equal(root.get("invoice_code"), pInvoiceCode));
+			dis.getExpressions().add(con1);
+			con2.getExpressions().add(cb.notEqual(pInvoiceId, 0));
+			con2.getExpressions().add(cb.notEqual(root.get("id"), pInvoiceId));
+			con2.getExpressions().add(cb.equal(root.get("invoice_code"), pInvoiceCode));
+			dis.getExpressions().add(con2);
+			cq.select(cb.count(root.get("id"))).where(dis);
+			TypedQuery<Long> query = em.createQuery(cq);
+			query.setParameter(pInvoiceId, invoiceId);
+			query.setParameter(pInvoiceCode, invoiceCode);
+			res = query.getSingleResult().intValue();
+		} catch (Exception e) {
+			logger.error("InvoiceService.checkInvoiceCode:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public boolean checkIsCopy(List<Long> invoiceIds) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Long> cq = cb.createQuery(Long.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			cq.select(root.get("id")).where(cb.in(root.get("id")).value(invoiceIds),
+					cb.equal(root.get("phieudacopy"), true));
+			TypedQuery<Long> query = em.createQuery(cq);
+			List<Long> results = query.getResultList();
+			if (results.size() != 0)
+				return true;
+		} catch (Exception e) {
+			// e.printStackTrace();
+		}
+		return false;
+	}
+
+	@Override
+	public int insert(InvoiceReqInfo t) {
+		int res = -1;
+		try {
+			Invoice p = t.getInvoice();
+			if (p != null) {
+				em.persist(p);
+				if (p.getId() > 0) {
+					res = 0;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceService.insert:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	private String initInvoiceCode() {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Integer> cq = cb.createQuery(Integer.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			// cq.multiselect(cb.coalesce(cb.max(root.get("id")),0));
+			cq.multiselect(cb.coalesce(cb.max(cb.quot((Expression) root.get("invoice_code"), 1)), 0));
+			TypedQuery<Integer> query = em.createQuery(cq);
+			int max = query.getSingleResult();
+			double p = (double) max / 10000000;
+			if (p < 1) {
+				return String.format("%08d", max + 1);
+			}
+			return (max + 1) + "";
+		} catch (Exception e) {
+			logger.error("InvoiceService.initReceiptNoteCode:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	private int initCodeVoucher(Invoice t) {
+		int res = -1;
+		try {
+			Date date = t.getInvoice_date();
+			int year = ToolTimeCustomer.getYearM(date);
+			int month = ToolTimeCustomer.getMonthM(date);
+			int day = ToolTimeCustomer.getDayM(date);
+
+			String voucher = day + "" + month + "" + year + "/";
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<String> cq = cb.createQuery(String.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			cq.select(root.get("invoice_code"))
+					.where(cb.equal(root.get("invoice_date"), ToolTimeCustomer.getFirstDateOfDay(date)))
+					.orderBy(cb.desc(root.get("invoice_date")));
+			TypedQuery<String> query = em.createQuery(cq);
+			List<String> list = query.getResultList();
+
+			if (list.size() > 0) {
+				String temp = list.get(0);
+				if (temp != null) {
+					int last = temp.lastIndexOf("/");
+					String sub = temp.substring(last + 1);
+					voucher = voucher + String.format("%02d", Integer.parseInt(sub) + 1);
+					t.setVoucher_code(voucher);
+				}
+			} else {
+				voucher = voucher + String.format("%02d", 1);
+				t.setVoucher_code(voucher);
+			}
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.initCode:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int selectByInvoiceCodeOnlyId(String invoiceCode, InvoiceReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Invoice> cq = cb.createQuery(Invoice.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			ParameterExpression<String> pInvoiceCode = cb.parameter(String.class);
+			cq.select(cb.construct(Invoice.class, root.get("id"))).where(
+					cb.equal(root.get("invoice_code"), pInvoiceCode));
+			TypedQuery<Invoice> query = em.createQuery(cq);
+			query.setParameter(pInvoiceCode, invoiceCode);
+			t.setInvoice(query.getSingleResult());
+			res = 0;
+		} catch (Exception e) {
+			// e.printStackTrace();
+		}
+		return res;
+	}
+
+	@Override
+	public int selectByInvoiceCodeOnlyIdYear(String invoiceCode, int year, InvoiceReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Invoice> cq = cb.createQuery(Invoice.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			cq.select(cb.construct(Invoice.class, root.get("id"))).where(
+					cb.equal(root.get("voucher_code"), invoiceCode),
+					cb.equal(cb.function("year", Integer.class, root.get("invoice_date")), year));
+			TypedQuery<Invoice> query = em.createQuery(cq);
+			List<Invoice> invoices = query.getResultList();
+			if (invoices.size() != 0)
+				t.setInvoice(invoices.get(0));
+			res = 0;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	@Override
+	public int getListInventory(List<Long> listProductId, Date deliveryDate, List<Object[]> listInventory) {
+		int res = -1;
+		try {
+			if (deliveryDate != null && listProductId != null && listProductId.size() > 0) {
+				Date currentDate = new Date();
+				int month = ToolTimeCustomer.getMonthM(currentDate);
+				int year = ToolTimeCustomer.getYearM(currentDate);
+				if (month == 1) {
+					month = 12;
+					year = year - 1;
+				} else {
+					month = month - 1;
+				}
+				Date fromDate = ToolTimeCustomer.getDateMinCustomer(ToolTimeCustomer.getMonthM(deliveryDate),
+						ToolTimeCustomer.getYearM(deliveryDate));
+				StringBuilder sql = new StringBuilder();
+				sql.append("select t1.product_id,sum(unit_opening_balance+unit_import_quantity-unit_export_quantity) as inve,sum(unit_opening_balance+unit_import_quantity-unit_export_quantity-cal_quantity) as inv_cal from( ");
+				sql.append("select iv.product_id,iv.closing_balance as unit_opening_balance, 0 as unit_import_quantity, 0 as unit_export_quantity,0 cal_quantity  from inventory as iv where iv.inventory_month=:m and iv.inventory_year=:y and iv.product_id in (:ls) ");
+				sql.append("union all ");
+				sql.append("select dtn.product_id,0,dtn.quantity, 0,0 from goodsreceiptnotedetail as dtn ");
+				sql.append("inner join goodsreceiptnote as dn on dtn.goods_receipt_note_id=dn.id ");
+				sql.append("where  dn.import_date >= :fd and dtn.product_id in (:ls) ");
+				sql.append("union all ");
+				sql.append("select dtx.product_id,0,0,dtx.quantity,0 from invoicedetail as dtx ");
+				sql.append("inner join invoice as dx on dtx.invoice_id=dx.id ");
+				sql.append("where dx.delivery_date >= :fd and dtx.product_id in (:ls) and dx.exported=1 ");
+				sql.append("union all ");
+				sql.append("select dtx_.product_id,0,0,0,dtx_.quantity from invoicedetail as dtx_ ");
+				sql.append("inner join invoice as dx_ on dtx_.invoice_id=dx_.id ");
+				sql.append("where dx_.delivery_date >= :fd and dtx_.product_id in (:ls) and dx_.exported=0 and  dx_.delivery_date>=:d ");
+				sql.append(" ) as t1 ");
+				sql.append("group by t1.product_id ");
+				Query query = em.createNativeQuery(sql.toString());
+				query.setParameter("m", month);
+				query.setParameter("y", year);
+				query.setParameter("ls", listProductId);
+				query.setParameter("fd", ToolTimeCustomer.convertDateToString(fromDate, "yyyy-MM-dd"));
+				query.setParameter("d", ToolTimeCustomer.convertDateToString(deliveryDate, "yyyy-MM-dd"));
+				listInventory.addAll(query.getResultList());
+				res = 0;
+			}
+		} catch (Exception e) {
+			logger.error("InvoiceService.getListInventory:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateSelect(Invoice invoice, String userAction) {
+		int res = -1;
+		try {
+			// load lại invocie
+			Invoice invoiceOld = findByIdSafe(invoice.getId());
+			if (invoiceOld != null) {
+				invoice.setRefId(invoiceOld.getRefId());
+				invoice.setJsonhoadon(invoiceOld.getJsonhoadon());
+				invoice.setDatehoadon(invoiceOld.getDatehoadon());
+				invoice.setEditVersion(invoiceOld.getEditVersion());
+			}
+			invoice.setUseraction(userAction);
+			invoice.setAct("All_truHD");
+			em.merge(invoice);
+			res = 1;
+		} catch (Exception e) {
+			logger.error("InvoiceService.updateSelect:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateAll(Invoice invoice, String userAction) {
+		int res = -1;
+		try {
+			invoice.setUseraction(userAction);
+			invoice.setAct("All");
+			em.merge(invoice);
+			res = 1;
+		} catch (Exception e) {
+			logger.error("InvoiceService.updateSelect:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int reportPhieuXuatKhoLever(long invoiceId, List<PhieuXuatKhoLever> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<PhieuXuatKhoLever> cq = cb.createQuery(PhieuXuatKhoLever.class);
+			Root<InvoiceDetail> root_ = cq.from(InvoiceDetail.class);
+			Join<InvoiceDetail, Product> product_ = root_.join("product", JoinType.INNER);
+			cq.select(
+					cb.construct(PhieuXuatKhoLever.class, product_.get("id"), product_.get("lever_code"),
+							product_.get("product_name"),
+							cb.quot(root_.get("quantity"), product_.get("specification")), root_.get("note_batch_code")))
+					.where(cb.equal(root_.get("invoice").get("id"), invoiceId));
+			TypedQuery<PhieuXuatKhoLever> query = em.createQuery(cq);
+			query.setMaxResults(14);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvoiceService.reportPhieuXuatKhoLever:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	// @Override
+	// public int updateInvoiceFox(long invoiceId, String idfox) {
+	// int res = -1;
+	// try {
+	// Query query = em.createQuery("update Invoice set idfox=:f where id=:id");
+	// query.setParameter("f", idfox);
+	// query.setParameter("id", invoiceId);
+	// return query.executeUpdate();
+	// } catch (Exception e) {
+	// logger.error("InvoiceService.updateInvoiceFox:" + e.getMessage(), e);
+	// }
+	// return res;
+	// }
+	//
+	// @Override
+	// public int updateInvoiceDetailFox(long invoiceDetailId, String idfox) {
+	// int res = -1;
+	// try {
+	// Query query =
+	// em.createQuery("update InvoiceDetail set idfox=:f where id=:id");
+	// query.setParameter("f", idfox);
+	// query.setParameter("id", invoiceDetailId);
+	// return query.executeUpdate();
+	// } catch (Exception e) {
+	// logger.error("InvoiceService.updateInvoiceDetailFox:" + e.getMessage(),
+	// e);
+	// }
+	// return res;
+	// }
+
+	@Override
+	public int updateTotalTax(Invoice invoice, String userAction) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update Invoice set tongtien=:tt,thue=:th, act='TT-Thue', useraction=:useraction where id=:id");
+			query.setParameter("tt", invoice.getTongtien());
+			query.setParameter("th", invoice.getThue());
+			query.setParameter("id", invoice.getId());
+			query.setParameter("useraction", userAction);
+			return query.executeUpdate();
+		} catch (Exception e) {
+			logger.error("InvoiceService.updateTotalTax:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updatePayment(Long cusid, Date date, String voucher_code, Date ngaythanhtoan, String userAction) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update Invoice set payment=true, payment_date=:ntt,act='Thanhtoan', useraction=:useraction where customer_id=:cusid and invoice_date=:date and voucher_code=:vc");
+			query.setParameter("cusid", cusid);
+			query.setParameter("date", date);
+			query.setParameter("vc", voucher_code);
+			query.setParameter("ntt", ngaythanhtoan);
+			query.setParameter("useraction", userAction);
+			return query.executeUpdate();
+		} catch (Exception e) {
+			logger.error("InvoiceService.updatePayment:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updatePayment(long idinvoice, String userAction, boolean payment) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update Invoice set payment=:payment,act='Thanhtoan', useraction=:useraction where id=:idinvoice");
+			query.setParameter("idinvoice", idinvoice);
+			query.setParameter("payment", payment);
+			query.setParameter("useraction", userAction);
+			return query.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+			logger.error("InvoiceService.updatePayment2:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public Invoice findBy(Long cusid, Date date, String voucher_code) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Invoice> cq = cb.createQuery(Invoice.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			cq.select(root).where(cb.equal(root.get("invoice_date"), ToolTimeCustomer.getFirstDateOfDay(date)),
+					cb.equal(root.get("voucher_code"), voucher_code), cb.equal(root.get("customer").get("id"), cusid));
+			TypedQuery<Invoice> query = em.createQuery(cq);
+			Invoice result = query.getSingleResult();
+			return result;
+		} catch (Exception e) {
+		}
+		return null;
+
+	}
+
+	@Override
+	public int updateJsonHoaDon(Invoice invoice, String userAction) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update Invoice set jsonhoadon=:jsonhd,datehoadon=:datehd,act='jsonhoadon', useraction=:useraction where id=:id");
+			query.setParameter("jsonhd", invoice.getJsonhoadon());
+			query.setParameter("datehd", new Date());
+			query.setParameter("id", invoice.getId());
+			query.setParameter("useraction", userAction);
+			return query.executeUpdate();
+		} catch (Exception e) {
+			System.out.println("Luu refid xay ra loi: " + e.getMessage());
+			logger.error("InvoiceService.updateJsonHoaDon:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateDonHang(Invoice invoice) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update Invoice set order_voucher=:order_voucher,idorderlix=:idorderlix where id=:id");
+			query.setParameter("order_voucher", invoice.getOrder_voucher());
+			query.setParameter("idorderlix", invoice.getIdorderlix());
+			query.setParameter("id", invoice.getId());
+			return query.executeUpdate();
+		} catch (Exception e) {
+			System.out.println("Cap nhat so don hang xay ra loi: " + e.getMessage());
+			logger.error("InvoiceService.updateJsonHoaDon:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateRefId(long id, String refId, String userAction) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update Invoice set refId=:refId,act='refId', useraction=:useraction where id=:id");
+			query.setParameter("refId", refId);
+			query.setParameter("id", id);
+			query.setParameter("useraction", userAction);
+			return query.executeUpdate();
+		} catch (Exception e) {
+			logger.error("InvoiceService.updateRefId:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateEditVersion(long id, int editVersion, String userAction) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update Invoice set editVersion=:editVersion,act='editversion', useraction=:useraction where id=:id");
+			query.setParameter("editVersion", editVersion);
+			query.setParameter("id", id);
+			query.setParameter("useraction", userAction);
+			return query.executeUpdate();
+		} catch (Exception e) {
+			logger.error("InvoiceService.updateEditVersion:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateTongTienKM(long id, double total, String userAction) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update Invoice set tongtien=:total,act='TongtienKM', useraction=:useraction where id=:id");
+			query.setParameter("total", total);
+			query.setParameter("id", id);
+			query.setParameter("useraction", userAction);
+			return query.executeUpdate();
+		} catch (Exception e) {
+			logger.error("InvoiceService.updateTongTienKM:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateHDCopy(List<Long> ids) {
+		int res = -1;
+		try {
+			Query query = em.createQuery("update Invoice set phieudacopy=true where id in :ids");
+			query.setParameter("ids", ids);
+			return query.executeUpdate();
+		} catch (Exception e) {
+			logger.error("InvoiceService.updateTongTienKM:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateGetInvoice(long id, String lookup_code, String voucher_code, String userAction) {
+		int res = -1;
+		try {
+			// invoiceLoad.setLookup_code(hoadon.getTransactionID());
+			// invoiceLoad.setVoucher_code(hoadon.getInvNo());
+			// invoiceLoad.setStatus(1);
+			Query query = em
+					.createQuery("update Invoice set lookup_code=:lookup_code, voucher_code=:voucher_code, status=1,act='SoHDMaTC', useraction=:useraction where id=:id");
+			query.setParameter("lookup_code", lookup_code);
+			query.setParameter("voucher_code", voucher_code);
+			query.setParameter("id", id);
+			query.setParameter("useraction", userAction);
+			return query.executeUpdate();
+		} catch (Exception e) {
+			logger.error("InvoiceService.updateGetInvoice:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public Invoice findById(long id) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Invoice> cq = cb.createQuery(Invoice.class);
+			Root<Invoice> root_ = cq.from(Invoice.class);
+			root_.fetch("customer", JoinType.INNER);// khách hàng
+			root_.fetch("promotion_program", JoinType.LEFT);// chương trình KM
+			root_.fetch("pricing_program", JoinType.LEFT);// chương trình đơn
+															// giá
+			root_.fetch("payment_method", JoinType.LEFT);// phương thức thanh
+															// toán
+			root_.fetch("car", JoinType.LEFT);// xe
+			root_.fetch("freight_contract", JoinType.LEFT);// hợp đồng vận
+															// chuyển.
+			root_.fetch("contract", JoinType.LEFT);// hợp đồng
+			root_.fetch("warehouse", JoinType.LEFT);// kho
+			root_.fetch("ie_categories", JoinType.LEFT);// danh mục nhập xuất
+			root_.fetch("delivery_pricing", JoinType.LEFT);// đơn giá vận chuyển
+															// (nơi đến)
+			root_.fetch("harbor_category", JoinType.LEFT);// cảng vận chuyển
+			root_.fetch("stocker", JoinType.LEFT);// thủ kho
+			root_.fetch("stevedore", JoinType.LEFT);// bốc xếp
+			root_.fetch("form_up_goods", JoinType.LEFT);// hình thức lên hàng
+			root_.fetch("carrier", JoinType.LEFT);// người vận chuyển
+			root_.fetch("invoice_own", JoinType.LEFT);
+			root_.fetch("order_lix", JoinType.LEFT);
+			cq.select(root_).where(cb.equal(root_.get("id"), id));
+			TypedQuery<Invoice> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			logger.error("InvoiceService.selectById:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Override
+	public Invoice findByIdSafe(long id) {
+		Invoice iv = em.find(Invoice.class, id);
+		iv.getCustomer().getCustomer_code();
+		return iv;
+	}
+
+}

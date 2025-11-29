@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Copy element &apos;EcomOrderDetailService.java&apos; to &apos;consumption_ejb/src/lixco.com.service&apos;&#x0D;&#x0A;- Original project: &apos;consumption_ejb&apos;&#x0D;&#x0A;- Destination element: &apos;consumption_ejb/src/lixco.com.service&apos;&#x0D;&#x0A;- Original element: &apos;lixco.com.service.EcomOrderDetailService.java&apos;" description="Copy compilation unit" destination="/src=/optional=/true=/=/maven.pomderived=/true=/&lt;lixco.com.service" element1="/src=/optional=/true=/=/maven.pomderived=/true=/&lt;lixco.com.service{EcomOrderDetailService.java" files="0" flags="589830" folders="0" id="org.eclipse.jdt.ui.copy" policy="org.eclipse.jdt.ui.copyResources" stamp="1754096108517" units="1" version="1.0"/>
+</session>

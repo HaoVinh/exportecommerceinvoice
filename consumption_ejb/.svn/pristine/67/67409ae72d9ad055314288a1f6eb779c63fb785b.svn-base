@@ -1,0 +1,3673 @@
+package lixco.com.service;
+
+import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Expression;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import javax.sql.DataSource;
+import javax.transaction.SystemException;
+import javax.transaction.UserTransaction;
+
+import org.jboss.logging.Logger;
+
+import trong.lixco.com.entity.TonKhoThucTe;
+import lixco.com.commom_ejb.MyMath;
+import lixco.com.commom_ejb.MyUtilEJB;
+import lixco.com.commom_ejb.ToolTimeCustomer;
+import lixco.com.entity.Batch;
+import lixco.com.entity.BindIECategories;
+import lixco.com.entity.DeliveryPricing;
+import lixco.com.entity.EcomOrder;
+import lixco.com.entity.EcomOrderDetail;
+import lixco.com.entity.ExportBatch;
+import lixco.com.entity.ExportBatchOD;
+import lixco.com.entity.ExportBatchPOD;
+import lixco.com.entity.IECategories;
+import lixco.com.entity.IEInvoice;
+import lixco.com.entity.IEInvoiceDetail;
+import lixco.com.entity.Invoice;
+import lixco.com.entity.InvoiceDetail;
+import lixco.com.entity.InvoiceDetailTemp;
+import lixco.com.entity.InvoiceTemp;
+import lixco.com.entity.OrderDetail;
+import lixco.com.entity.OrderLix;
+import lixco.com.entity.PaymentMethod;
+import lixco.com.entity.PricingProgram;
+import lixco.com.entity.PricingProgramDetail;
+
+import lixco.com.entity.Product;
+
+import lixco.com.entity.ProductKM;
+
+import lixco.com.entity.PromotionOrderDetail;
+import lixco.com.entity.Stocker;
+import lixco.com.interfaces.ICarService;
+import lixco.com.interfaces.IIECategoriesService;
+import lixco.com.interfaces.IInvoiceService;
+import lixco.com.interfaces.IOrderDetailService;
+import lixco.com.interfaces.IOrderLixService;
+import lixco.com.interfaces.IProcessLogicInvoiceService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.interfaces.IStockerService;
+import lixco.com.reqInfo.Message;
+import lixco.com.reqInfo.WrapDataInvoiceDetail;
+import lixco.com.reqInfo.WrapDelExportBatchReqInfo;
+import lixco.com.reqInfo.WrapDelInvoiceDetailReqInfo;
+import lixco.com.reqInfo.WrapExportDataReqInfo;
+import lixco.com.reqInfo.WrapExtensionOrderReqInfo;
+import lixco.com.reqInfo.WrapIEInvocieReqInfo;
+import lixco.com.reqInfo.WrapInvoiceDelInfo;
+import lixco.com.reqInfo.WrapInvoiceDetailTempReqInfo;
+import lixco.com.reqInfo.WrapInvoiceReqInfo;
+import lixco.com.reqInfo.WrapOrderDetailLixReqInfo;
+import lixco.com.reqInfo.WrapOrderLixReqInfo;
+import lixco.com.reqInfo.WrapPMInvoiceDetailReqInfo;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.BEAN)
+public class ProcessLogicInvoiceService implements IProcessLogicInvoiceService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource(lookup = "java:/consumption")
+	DataSource datasource;
+	@Resource
+	private UserTransaction ut;
+
+	@Override
+	public int deleteInvoiceMaster(WrapInvoiceDelInfo t, Message message, String userAction)
+			throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		// Biến theo dõi trạng thái giao dịch
+		boolean transactionActive = false;
+
+		try {
+			// 1. BẮT ĐẦU GIAO DỊCH VÀ ĐẶT TRẠNG THÁI
+			ut.begin();
+			transactionActive = true;
+
+			con = datasource.getConnection();
+			// Thiết lập mức cô lập giao dịch (Tốt, nhưng nên đặt ở cấp database
+			// nếu có thể)
+			con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+
+			Query queryDelInvoiceDetail = em.createQuery("DELETE FROM InvoiceDetail as ivd WHERE ivd.invoice.id = :id");
+			queryDelInvoiceDetail.setParameter("id", t.getInvoice_id());
+			queryDelInvoiceDetail.executeUpdate();
+
+			// Xóa cứng hóa đơn (Hard Delete)
+			Query queryDelInvoice = em.createQuery("delete from Invoice where id = :id ");
+			queryDelInvoice.setParameter("id", t.getInvoice_id());
+			if (queryDelInvoice.executeUpdate() <= 0) {
+				res = -1;
+				throw new Exception("Xóa hóa đơn thất bại! (Không tìm thấy ID để xóa)");
+			}
+
+			// Cập nhật tham chiếu tới đơn hàng xuất khẩu
+			Query queryDelRefInvoiceInIEInvoice = em
+					.createQuery("update IEInvoice set invoice.id=null where invoice.id=:id");
+			queryDelRefInvoiceInIEInvoice.setParameter("id", t.getInvoice_id());
+			// Lỗi này không cần thiết phải rollback nếu nó chỉ là cập nhật khóa
+			// ngoại và có thể không tìm thấy (executeUpdate() >= 0 là đủ)
+			queryDelRefInvoiceInIEInvoice.executeUpdate();
+
+			res = 0;
+			ut.commit(); // 2. KẾT THÚC THÀNH CÔNG
+
+		} catch (Exception e) {
+			// Đảm bảo ROLLBACK khi có lỗi
+			if (transactionActive) {
+				try {
+					ut.rollback(); // 3. KẾT THÚC THẤT BẠI
+				} catch (Exception rollbackEx) {
+					logger.error("Lỗi khi cố gắng rollback giao dịch: " + rollbackEx.getMessage(), rollbackEx);
+				}
+			}
+
+			res = -1;
+			// Đặt thông báo lỗi
+			message.setUser_message("Xóa hóa đơn thất bại!");
+			// Nếu là lỗi nghiệp vụ do throw trong try, thông báo sẽ chi tiết
+			// hơn.
+			message.setInternal_message("ProcessLogicInvoiceService.deleteInvoice:" + e.getMessage());
+			logger.error("ProcessLogicInvoiceService.deleteInvoice:" + e.getMessage(), e);
+
+			// Ném lại exception để tuân thủ EJB spec (nếu cần thiết,
+			// nhưng ở đây ta đang xử lý lỗi và trả về res, nên có thể bỏ qua
+			// việc ném lại)
+			// throw new EJBException(e);
+
+		} finally {
+			if (con != null) {
+				try {
+					con.close();
+				} catch (SQLException sqlEx) {
+					logger.error("Lỗi đóng kết nối JDBC: " + sqlEx.getMessage(), sqlEx);
+				}
+			}
+		}
+		return res;
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see
+	 * lixco.com.interfaces.IProcessLogicInvoiceService#deleteInvoiceDetailMaster
+	 * (lixco.com.reqInfo.WrapDelInvoiceDetailReqInfo,
+	 * lixco.com.reqInfo.Message)
+	 */
+	@Override
+	public int deleteInvoiceDetailMaster(WrapDelInvoiceDetailReqInfo ta, Message message, String userAction)
+			throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+
+			Query queryUpdateInvoice = em
+					.createQuery("UPDATE InvoiceDetail SET useraction=:useraction, act='Del' where id = :id ");
+			queryUpdateInvoice.setParameter("id", ta.getId());
+			queryUpdateInvoice.setParameter("useraction", userAction);
+			if (queryUpdateInvoice.executeUpdate() < 0) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Cập nhật để hóa đơn thất bại!");
+				message.setInternal_message("error update delete InvoiceDetail " + ta.getId());
+				return res;
+			}
+
+			Query queryDelInvoiceDetailMain = em.createQuery("delete from InvoiceDetail where id=:id");
+			queryDelInvoiceDetailMain.setParameter("id", ta.getId());
+			if (queryDelInvoiceDetailMain.executeUpdate() <= 0) {
+				res = -1;
+				message.setUser_message("Xóa chi tiết hóa đơn chính thất bại");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+
+			res = 0;
+			ut.commit();
+		} catch (Exception e) {
+			ut.rollback();
+			message.setUser_message("Xóa chi tiết hóa đơn thất bại!");
+			message.setInternal_message("ProcessLogicInvoiceService.deleteInvoiceDetailMaster:" + e.getMessage());
+			logger.error("ProcessLogicInvoiceService.deleteInvoiceDetailMaster:" + e.getMessage(), e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	public int deleteInvoiceTempMaster(WrapInvoiceDelInfo t, Message message, String userAction)
+			throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+
+			Query queryUpdateInvoice = em
+					.createQuery("UPDATE InvoiceTemp SET useraction = :useraction, act = 'Del' WHERE id = :id");
+			queryUpdateInvoice.setParameter("id", t.getInvoice_id());
+			queryUpdateInvoice.setParameter("useraction", userAction);
+			if (queryUpdateInvoice.executeUpdate() < 0) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Cập nhật trạng thái hóa đơn thất bại!");
+				message.setInternal_message("Lỗi khi cập nhật trạng thái hóa đơn: " + t.getInvoice_id());
+				return res;
+			}
+
+
+
+			TypedQuery<Long> queryGetIds = em.createQuery(
+					"SELECT id FROM InvoiceDetailTemp WHERE invoicetemp_id = :id", Long.class);
+			queryGetIds.setParameter("id", t.getInvoice_id());
+			List<Long> idsToDelete = queryGetIds.getResultList();
+			if (!idsToDelete.isEmpty()) {
+				Query queryDeleteChildren = em.createQuery("DELETE FROM InvoiceDetailTemp WHERE detail_own_id IN :ids");
+				queryDeleteChildren.setParameter("ids", idsToDelete);
+				queryDeleteChildren.executeUpdate();
+			}
+			Query queryDelInvoiceDetails = em.createQuery("DELETE FROM InvoiceDetailTemp WHERE invoicetemp_id = :id");
+			queryDelInvoiceDetails.setParameter("id", t.getInvoice_id());
+			queryDelInvoiceDetails.executeUpdate();
+			Query queryDelInvoice = em.createQuery("DELETE FROM InvoiceTemp WHERE id = :id");
+			queryDelInvoice.setParameter("id", t.getInvoice_id());
+			if (queryDelInvoice.executeUpdate() < 0) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Xóa hóa đơn thất bại!");
+				message.setInternal_message("Lỗi khi xóa InvoiceTemp: " + t.getInvoice_id());
+				return res;
+			}
+
+
+
+
+			Query queryDelRefInvoiceWithOrderLix = em
+					.createQuery("UPDATE InvoiceTemp SET order_lix.id = null WHERE id = :id");
+			queryDelRefInvoiceWithOrderLix.setParameter("id", t.getInvoice_id());
+			if (queryDelRefInvoiceWithOrderLix.executeUpdate() < 0) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Xóa liên kết đơn hàng thất bại!");
+				message.setInternal_message("Không thể xóa liên kết Invoice - OrderLix, InvoiceID: "
+						+ t.getInvoice_id());
+				return res;
+			}
+
+
+			res = 0;
+			ut.commit();
+
+		} catch (Exception e) {
+			res = -1;
+			message.setUser_message("Xóa hóa đơn thất bại!");
+			message.setInternal_message("Lỗi deleteInvoiceTempMaster: " + e.getMessage());
+			logger.error("ProcessLogicInvoiceService.deleteInvoice:", e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	@Override
+	public int deleteInvoiceDetailTempMaster(WrapDelInvoiceDetailReqInfo ta, Message message, String userAction)
+			throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+
+			Query queryUpdateInvoice = em
+					.createQuery("UPDATE InvoiceDetailTemp SET useraction=:useraction, act='Del' where id = :id ");
+			queryUpdateInvoice.setParameter("id", ta.getId());
+			queryUpdateInvoice.setParameter("useraction", userAction);
+			if (queryUpdateInvoice.executeUpdate() < 0) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Cập nhật để hóa đơn thất bại!");
+				message.setInternal_message("error update delete InvoiceDetail " + ta.getId());
+				return res;
+			}
+
+			Query queryDelInvoiceDetailMain = em.createQuery("delete from InvoiceDetailTemp where id=:id");
+			queryDelInvoiceDetailMain.setParameter("id", ta.getId());
+			if (queryDelInvoiceDetailMain.executeUpdate() <= 0) {
+				res = -1;
+				message.setUser_message("Xóa chi tiết hóa đơn chính thất bại");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+
+			res = 0;
+			ut.commit();
+		} catch (Exception e) {
+			ut.rollback();
+			message.setUser_message("Xóa chi tiết hóa đơn thất bại!");
+			message.setInternal_message("ProcessLogicInvoiceService.deleteInvoiceDetailTempMaster:" + e.getMessage());
+			logger.error("ProcessLogicInvoiceService.deleteInvoiceDetailTempMaster:" + e.getMessage(), e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	private String initInvoiceCode() {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Integer> cq = cb.createQuery(Integer.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			// cq.multiselect(cb.coalesce(cb.max(root.get("id")),0));
+			cq.multiselect(cb.coalesce(cb.max(cb.quot((Expression) root.get("invoice_code"), 1)), 0));
+			TypedQuery<Integer> query = em.createQuery(cq);
+			int max = query.getSingleResult();
+			double p = (double) max / 10000000;
+			if (p < 1) {
+				return String.format("%08d", max + 1);
+			}
+			return (max + 1) + "";
+		} catch (Exception e) {
+			logger.error("ProcessLogicInvoiceService.initReceiptNoteCode:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	private int initCodeVoucher(Invoice t) {
+		int res = -1;
+
+		try {
+			Date date = t.getInvoice_date();
+			int year = ToolTimeCustomer.getYearM(date);
+			int month = ToolTimeCustomer.getMonthM(date);
+			int day = ToolTimeCustomer.getDayM(date);
+
+			String voucher = day + "" + month + "" + year + "/";
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<String> cq = cb.createQuery(String.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			cq.select(root.get("voucher_code"))
+					.where(cb.equal(root.get("invoice_date"), ToolTimeCustomer.getFirstDateOfDay(date)))
+					.orderBy(cb.desc(root.get("invoice_date")));
+			TypedQuery<String> query = em.createQuery(cq);
+			List<String> list = query.getResultList();
+
+			if (list.size() > 0) {
+				String temp = list.get(0);
+				if (temp != null) {
+					int last = temp.lastIndexOf("/");
+					String sub = temp.substring(last + 1);
+					voucher = voucher + String.format("%02d", Integer.parseInt(sub) + 1);
+					t.setVoucher_code(voucher);
+				}
+			} else {
+				voucher = voucher + String.format("%02d", 1);
+				t.setVoucher_code(voucher);
+			}
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ProcessLogicInvoiceService.initCode:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	private int initCodeVoucher(InvoiceTemp t) {
+		int res = -1;
+
+		try {
+			Date date = t.getInvoice_temp_date();
+			int year = ToolTimeCustomer.getYearM(date);
+			int month = ToolTimeCustomer.getMonthM(date);
+			int day = ToolTimeCustomer.getDayM(date);
+
+			String voucher = day + "" + month + "" + year + "/";
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<String> cq = cb.createQuery(String.class);
+			Root<InvoiceTemp> root = cq.from(InvoiceTemp.class);
+			cq.select(root.get("voucher_code"))
+					.where(cb.equal(root.get("invoice_temp_date"), ToolTimeCustomer.getFirstDateOfDay(date)))
+					.orderBy(cb.desc(root.get("invoice_temp_date")));
+			TypedQuery<String> query = em.createQuery(cq);
+			List<String> list = query.getResultList();
+
+			if (list.size() > 0) {
+				String temp = list.get(0);
+				if (temp != null) {
+					int last = temp.lastIndexOf("/");
+					String sub = temp.substring(last + 1);
+					voucher = voucher + String.format("%02d", Integer.parseInt(sub) + 1);
+					t.setVoucher_code(voucher);
+				}
+			} else {
+				voucher = voucher + String.format("%02d", 1);
+				t.setVoucher_code(voucher);
+			}
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ProcessLogicInvoiceService.initCode:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	private IECategories selectBindIECategories(IECategories source) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<IECategories> cq = cb.createQuery(IECategories.class);
+			Root<BindIECategories> root = cq.from(BindIECategories.class);
+			Join<BindIECategories, IECategories> source_ = root.join("ie_categories_source", JoinType.INNER);
+			Join<BindIECategories, IECategories> bind_ = root.join("ie_categories_bind", JoinType.INNER);
+			cq.select(bind_).where(cb.equal(source_.get("id"), source.getId()));
+			TypedQuery<IECategories> query = em.createQuery(cq);
+			List<IECategories> list = query.getResultList();
+			if (list.size() > 0) {
+				return list.get(0);
+			}
+		} catch (Exception e) {
+			logger.error("ProcessLogicInvoiceService.selectBindIECategories:" + e.getMessage(), e);
+		}
+		return source;
+	}
+
+	private IECategories selectIECategoriesByCode(String code) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<IECategories> cq = cb.createQuery(IECategories.class);
+			Root<IECategories> root = cq.from(IECategories.class);
+			cq.select(root).where(cb.equal(root.get("code"), code));
+			TypedQuery<IECategories> query = em.createQuery(cq);
+			List<IECategories> list = query.getResultList();
+			if (list.size() > 0) {
+				return list.get(0);
+			}
+		} catch (Exception e) {
+			logger.error("ProcessLogicInvoiceService.selectBindIECategories:" + e.getMessage(), e);
+		}
+		return null;
+	}
+	private PaymentMethod selectPaymentMethodByCode(String code) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<PaymentMethod> cq = cb.createQuery(PaymentMethod.class);
+			Root<PaymentMethod> root = cq.from(PaymentMethod.class);
+			cq.select(root).where(cb.equal(root.get("method_code"), code));
+			TypedQuery<PaymentMethod> query = em.createQuery(cq);
+			List<PaymentMethod> list = query.getResultList();
+			if (list.size() > 0) {
+				return list.get(0);
+			}
+		} catch (Exception e) {
+			logger.error("ProcessLogicInvoiceService.selectBindIECategories:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Inject
+	IInvoiceService invoiceService;
+	@Inject
+	ICarService carService;
+	@Inject
+	IStockerService stockerService;
+
+	@Override
+	public int createInvoiceByExtensionOrder(WrapExtensionOrderReqInfo t, List<Long> listIdResult,
+			StringBuilder messages, String soxe, boolean kiemton, String thukho)
+			throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		Date now = MyUtilEJB.loaibogio(new Date());
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			long orderId = t.getOrder_id();
+			CriteriaQuery<OrderLix> cqOrderLix = cb.createQuery(OrderLix.class);
+			Root<OrderLix> rootOrder = cqOrderLix.from(OrderLix.class);
+			rootOrder.fetch("customer", JoinType.INNER);
+			rootOrder.fetch("promotion_program", JoinType.LEFT);
+			rootOrder.fetch("pricing_program", JoinType.LEFT);
+			rootOrder.fetch("payment_method", JoinType.LEFT);
+			rootOrder.fetch("car", JoinType.LEFT);
+			rootOrder.fetch("warehouse", JoinType.LEFT);
+			rootOrder.fetch("ie_categories", JoinType.LEFT);
+			rootOrder.fetch("delivery_pricing", JoinType.LEFT);
+			rootOrder.fetch("freight_contract", JoinType.LEFT);
+			cqOrderLix.select(rootOrder).where(cb.equal(rootOrder.get("id"), orderId));
+			TypedQuery<OrderLix> queryOrder = em.createQuery(cqOrderLix);
+			List<OrderLix> listOrderTrans = queryOrder.getResultList();
+			if (listOrderTrans.size() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Đơn hàng không tồn tại!");
+				return res;
+			}
+			OrderLix orderLixTrans = listOrderTrans.get(0);
+
+			List<InvoiceDetail> listInvoiceDetail = new ArrayList<>();
+			Map<OrderDetail, InvoiceDetail> map = new LinkedHashMap<>();
+			for (WrapOrderDetailLixReqInfo dt : t.getList_wrap_extension_order_detail()) {
+				// chuẩn bị danh sách chi tiết hóa đơn
+				OrderDetail orderDetail = dt.getOrder_detail();
+				InvoiceDetail detail = new InvoiceDetail();
+				detail.setEx_order(true);
+				detail.setProduct(orderDetail.getProduct());
+				detail.setQuantity(dt.getExport_unit_quantity());// số lượng đơn
+																	// vị tính
+				detail.setReal_quantity(detail.getQuantity());
+				detail.setNote_batch_code(orderDetail.getBatch_code());
+				detail.setUnit_price(orderDetail.getUnit_price());
+				detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+				detail.setNote(orderDetail.getNote());
+				detail.setIdchitietdonhang(orderDetail.getId());
+				detail.setNote_batch_code(orderDetail.getBatch_code());
+				boolean dutonkho = true;
+				double tonkho = 0;
+				if (kiemton) {
+					tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+					if (tonkho < detail.getQuantity()) {
+						dutonkho = false;
+					}
+				}
+				if (dutonkho) {
+					if (detail.getQuantity() != 0) {
+						listInvoiceDetail.add(detail);
+						if (!map.containsKey(dt)) {
+							map.put(orderDetail, detail);
+						}
+					}
+				} else {
+					messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+							+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+					return res;
+				}
+
+			}
+			// Thu kho
+			Stocker stocker = null;
+			if (thukho != null) {
+				stocker = stockerService.selectByName(thukho);
+			}
+			// tạo hóa đơn thứ nhất
+			Invoice invoice = new Invoice();
+			invoice.setStocker(stocker);
+			invoice.setOrder_lix(orderLixTrans);
+			invoice.setIdorderlix(orderLixTrans.getId());
+			invoice.setOrder_code(orderLixTrans.getOrder_code());
+			invoice.setOrder_voucher(orderLixTrans.getVoucher_code());
+			invoice.setCreated_by_id(t.getMember_id());
+			invoice.setCreated_by(t.getMember_name());
+			invoice.setCreated_date(new Date());
+			invoice.setCustomer(orderLixTrans.getCustomer());
+			invoice.setInvoice_date(now);
+			invoice.setDelivery_date(orderLixTrans.getDelivery_date());
+			invoice.setPayment_method(orderLixTrans.getPayment_method());
+			invoice.setCar(orderLixTrans.getCar());
+			invoice.setDelivery_pricing(orderLixTrans.getDelivery_pricing());// đơn
+																				// giá
+																				// vận
+																				// chuyển
+																				// chứa
+																				// nơi
+																				// đến
+			invoice.setFreight_contract(orderLixTrans.getFreight_contract());
+			invoice.setIe_categories(orderLixTrans.getIe_categories());
+			invoice.setWarehouse(orderLixTrans.getWarehouse());
+			invoice.setTax_value(orderLixTrans.getTax_value());
+			invoice.setVoucher_code(orderLixTrans.getVoucher_code());
+			invoice.setPricing_program(orderLixTrans.getPricing_program());
+			invoice.setPromotion_program(orderLixTrans.getPromotion_program());
+			invoice.setPo_no(orderLixTrans.getPo_no());
+			invoice.setInvoice_code(initInvoiceCode());
+			invoice.setExported(true);
+			invoice.setLdd(orderLixTrans.getLdd());
+			invoice.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+			invoice.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+			if (soxe != null) {
+				invoice.setCar(carService.selectByCode(soxe));
+			}
+
+			double totalevent = listInvoiceDetail.stream().mapToDouble(f -> f.getTotal()).sum();
+			invoice.setTongtien(MyMath.round(totalevent));
+			invoice.setThue(MyMath.round(totalevent * invoice.getTax_value()));
+			invoice.setSophieuvc(orderLixTrans.getSophieuvc());
+			// invoice.setMovement_commands_no(orderLixTrans.getLdd());
+			invoice.setCarrier(orderLixTrans.getCarrier());
+			invoice.setChietkhau(orderLixTrans.getChietkhau());
+			invoice.setLydochietkhau(orderLixTrans.getLydochietkhau());
+			initCodeVoucher(invoice);
+			em.persist(invoice);
+			if (invoice.getId() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Tạo hóa đơn thất bại!");
+				return res;
+			}
+			listIdResult.add(invoice.getId());
+			// tạo chi tiết cho đơn hàng thứ nhất
+			for (InvoiceDetail v : listInvoiceDetail) {
+				v.setInvoice(invoice);
+				v.setCreated_by(t.getMember_name());
+				v.setCreated_by_id(t.getMember_id());
+				v.setCreated_date(new Date());
+				em.persist(v);
+				// xuất lô hàng
+				if (v.getId() == 0) {
+					res = -1;
+					messages.append("Tạo chi tiết hóa đơn thất bại!");
+					ut.rollback();
+					return res;
+				}
+			}
+			List<PromotionOrderDetail> listPromotionOrderDetail = t.getList_promotion_order_detail();
+			if (listPromotionOrderDetail.size() > 0) {
+
+				List<PromotionOrderDetail> khuyenmainos = new ArrayList<PromotionOrderDetail>();
+				// lưu chi tiết hóa đơn khuyến mãi
+				for (PromotionOrderDetail p : listPromotionOrderDetail) {
+					if (p.isNo())
+						khuyenmainos.add(p);
+				}
+				listPromotionOrderDetail.removeAll(khuyenmainos);
+				if (listPromotionOrderDetail.size() != 0) {
+					// tạo đơn hàng khuyến mãi(thứ 2)
+					Invoice invoice2 = new Invoice();
+					invoice2.setStocker(stocker);
+					invoice2.setIpromotion(true);
+					invoice2.setOrder_lix(orderLixTrans);
+					invoice2.setIdorderlix(orderLixTrans.getId());
+					invoice2.setOrder_code(orderLixTrans.getOrder_code());
+					invoice2.setOrder_voucher(orderLixTrans.getVoucher_code());
+					invoice2.setCreated_by_id(t.getMember_id());
+					invoice2.setCreated_by(t.getMember_name());
+					invoice2.setCreated_date(new Date());
+					invoice2.setCustomer(orderLixTrans.getCustomer());
+					invoice2.setInvoice_date(now);
+					invoice2.setDelivery_date(orderLixTrans.getDelivery_date());
+					invoice2.setPayment_method(orderLixTrans.getPayment_method());
+					invoice2.setCar(orderLixTrans.getCar());
+					invoice2.setDelivery_pricing(orderLixTrans.getDelivery_pricing());
+					invoice2.setFreight_contract(orderLixTrans.getFreight_contract());
+					if (soxe != null) {
+						invoice2.setCar(carService.selectByCode(soxe));
+					}
+					String codeiec = "";
+					if (orderLixTrans.getIe_categories() != null) {
+						if ("1".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "(";
+						} else if ("E".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "5";
+						} else if ("X".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "A";
+						} else if ("-".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "+";
+						} else if ("$".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "&";
+						}
+					}
+					invoice2.setIe_categories(selectIECategoriesByCode(codeiec));
+					invoice2.setWarehouse(orderLixTrans.getWarehouse());
+					invoice2.setTax_value(0);
+					invoice2.setVoucher_code(orderLixTrans.getVoucher_code());
+					invoice2.setPricing_program(orderLixTrans.getPricing_program());
+					invoice2.setPromotion_program(orderLixTrans.getPromotion_program());
+					invoice2.setPo_no(orderLixTrans.getPo_no());
+					invoice2.setInvoice_code(initInvoiceCode());
+					invoice2.setExported(true);
+					// hóa đơn sở hữu khuyến mãi này
+					invoice2.setInvoice_own(invoiceService.findByIdSafe(invoice.getId()));
+					invoice2.setSophieuvc(orderLixTrans.getSophieuvc());
+					invoice2.setCarrier(orderLixTrans.getCarrier());
+					invoice2.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+					invoice2.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+					// Hoa don khuyen mai khong cai tham so nay
+					// invoice2.setChietkhau(orderLixTrans.getChietkhau());
+					// invoice2.setLydochietkhau(orderLixTrans.getLydochietkhau());
+					initCodeVoucher(invoice2);
+					em.persist(invoice2);
+					if (invoice2.getId() == 0) {
+						res = -1;
+						ut.rollback();
+						messages.append("Tạo hóa đơn khuyến mãi thất bại!");
+						return res;
+					}
+					listIdResult.add(invoice2.getId());
+					// lưu chi tiết hóa đơn khuyến mãi
+					double totalevent2 = 0;
+
+					for (PromotionOrderDetail p : listPromotionOrderDetail) {
+						InvoiceDetail invoiceDetailMain = null;
+						if (map.containsKey(p.getOrder_detail())) {
+							invoiceDetailMain = map.get(p.getOrder_detail());
+						}
+						InvoiceDetail detail = new InvoiceDetail();
+						// chi tiết khuyến thuộc hóa đơn chính nào
+						detail.setInvoice_detail_own(invoiceDetailMain);
+						detail.setEx_order(true);
+						detail.setProductdh_code(p.getOrder_detail().getProduct().getProduct_code());
+						detail.setInvoice(invoice2);
+						detail.setCreated_by(t.getMember_name());
+						detail.setCreated_date(new Date());
+						detail.setCreated_by_id(t.getMember_id());
+						detail.setProduct(p.getProduct());
+						detail.setQuantity(p.getQuantity());
+						detail.setReal_quantity(detail.getQuantity());
+						detail.setUnit_price(p.getUnit_price());
+						detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+						detail.setNote(p.getNote());
+						detail.setNote_batch_code(p.getBatch_code());
+						detail.setIdchitietdonhangkm(p.getId());
+						detail.setNote_batch_code(p.getBatch_code());
+						totalevent2 += detail.getTotal();
+
+						boolean dutonkho = true;
+						double tonkho = 0;
+						if (kiemton) {
+							tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+							if (tonkho < detail.getQuantity()) {
+								dutonkho = false;
+							}
+						}
+						if (dutonkho) {
+							// detail.setOrder_detail(p.getOrder_detail());//
+							// không
+							// cần
+							// set vì đây là chi tiết của hóa đơn trích từ hóa
+							// đơn
+							// khuyến mãi
+							if (detail.getQuantity() != 0) {
+								em.persist(detail);
+								if (detail.getId() == 0) {
+									res = -1;
+									messages.append("Tạo chi tiết hóa đơn thất bại!");
+									ut.rollback();
+									return res;
+								}
+							}
+						} else {
+							messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+									+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification())
+									+ " thùng)");
+							return res;
+						}
+					}
+					invoiceService.updateTongTienKM(invoice2.getId(), MyMath.round(totalevent2), t.getMember_name());
+				}
+				if (khuyenmainos.size() != 0) {
+					// tạo đơn hàng khuyến mãi(thứ 3)
+					Invoice invoice3 = new Invoice();
+					invoice3.setStocker(stocker);
+					invoice3.setIpromotion(true);
+					invoice3.setOrder_lix(orderLixTrans);
+					invoice3.setIdorderlix(orderLixTrans.getId());
+					invoice3.setOrder_code(orderLixTrans.getOrder_code());
+					invoice3.setOrder_voucher(orderLixTrans.getVoucher_code());
+					invoice3.setCreated_by_id(t.getMember_id());
+					invoice3.setCreated_by(t.getMember_name());
+					invoice3.setCreated_date(new Date());
+					invoice3.setCustomer(orderLixTrans.getCustomer());
+					invoice3.setInvoice_date(now);
+					invoice3.setDelivery_date(orderLixTrans.getDelivery_date());
+					invoice3.setPayment_method(orderLixTrans.getPayment_method());
+					invoice3.setCar(orderLixTrans.getCar());
+					invoice3.setDelivery_pricing(orderLixTrans.getDelivery_pricing());// đơn
+																						// giá
+																						// vận
+																						// chuyển
+																						// chứa
+																						// nơi
+																						// đến
+					invoice3.setFreight_contract(orderLixTrans.getFreight_contract());
+					String codeiec = "";
+					if (orderLixTrans.getIe_categories() != null) {
+						if ("X".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "0";
+						}
+					}
+					// Mã '0': nợ khuyến mãi
+					invoice3.setIe_categories(selectIECategoriesByCode(codeiec));
+					invoice3.setWarehouse(orderLixTrans.getWarehouse());
+					invoice3.setTax_value(0);
+					invoice3.setVoucher_code(orderLixTrans.getVoucher_code());
+					invoice3.setPricing_program(orderLixTrans.getPricing_program());
+					invoice3.setPromotion_program(orderLixTrans.getPromotion_program());
+					invoice3.setPo_no(orderLixTrans.getPo_no());
+					invoice3.setInvoice_code(initInvoiceCode());
+					invoice3.setExported(true);
+					if (soxe != null) {
+						invoice3.setCar(carService.selectByCode(soxe));
+					}
+					// hóa đơn sở hữu khuyến mãi này
+					invoice3.setInvoice_own(invoice);
+					invoice3.setSophieuvc(orderLixTrans.getSophieuvc());
+					invoice3.setCarrier(orderLixTrans.getCarrier());
+					invoice3.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+					invoice3.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+					// Hoa don no khuyen mai khong cai tham so nay
+					// invoice3.setChietkhau(orderLixTrans.getChietkhau());
+					// invoice3.setLydochietkhau(orderLixTrans.getLydochietkhau());
+					initCodeVoucher(invoice3);
+					em.persist(invoice3);
+					if (invoice3.getId() == 0) {
+						res = -1;
+						ut.rollback();
+						messages.append("Tạo hóa đơn nợ thất bại!");
+						return res;
+					}
+					listIdResult.add(invoice3.getId());
+					// lưu chi tiết hóa đơn khuyến mãi
+					for (PromotionOrderDetail p : khuyenmainos) {
+						InvoiceDetail invoiceDetailMain = null;
+						if (map.containsKey(p.getOrder_detail())) {
+							invoiceDetailMain = map.get(p.getOrder_detail());
+						}
+						InvoiceDetail detail = new InvoiceDetail();
+						// chi tiết khuyến thuộc hóa đơn chính nào
+						detail.setInvoice_detail_own(invoiceDetailMain);
+						detail.setEx_order(true);
+						detail.setProductdh_code(p.getOrder_detail().getProduct().getProduct_code());
+						detail.setInvoice(invoice3);
+						detail.setCreated_by(t.getMember_name());
+						detail.setCreated_date(new Date());
+						detail.setCreated_by_id(t.getMember_id());
+						detail.setProduct(p.getProduct());
+						detail.setQuantity(p.getQuantity());
+						detail.setReal_quantity(detail.getQuantity());
+						detail.setUnit_price(p.getUnit_price());
+						detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+						detail.setNote(p.getNote());
+						detail.setNote_batch_code(p.getBatch_code());
+						detail.setIdchitietdonhangkm(p.getId());
+
+						boolean dutonkho = true;
+						double tonkho = 0;
+						if (kiemton) {
+							tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+							if (tonkho < detail.getQuantity()) {
+								dutonkho = false;
+							}
+						}
+						if (dutonkho) {
+							// detail.setOrder_detail(p.getOrder_detail());//
+							// không
+							// cần
+							// set vì đây là chi tiết của hóa đơn trích từ hóa
+							// đơn
+							// khuyến mãi
+							if (detail.getQuantity() != 0) {
+								em.persist(detail);
+								if (detail.getId() == 0) {
+									res = -1;
+									messages.append("Tạo chi tiết hóa đơn thất bại!");
+									ut.rollback();
+									return res;
+								}
+							}
+						} else {
+							messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+									+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification())
+									+ " thùng)");
+							return res;
+						}
+					}
+				}
+
+			}
+			// List<Object[]> slhoadons = new ArrayList<>();
+			// orderLixService.getListExportExtensionOrder(orderLixTrans.getId(),
+			// slhoadons);
+			// boolean kt = true;
+			// List<OrderDetail> orderDetails = new ArrayList<OrderDetail>();
+			// orderDetailService.selectByOrder(orderLixTrans.getId(),
+			// orderDetails);
+			// for (int i = 0; i < orderDetails.size(); i++) {
+			// double slhdthung = 0;
+			// for (Object[] v : slhoadons) {
+			// long productId = Long.parseLong(Objects.toString(v[0]));
+			// if (orderDetails.get(i).getProduct().getId() == productId) {
+			// slhdthung = Double.parseDouble(Objects.toString(v[1], "0"));
+			// }
+			// }
+			// if (orderDetails.get(i).getBox_quantity() != slhdthung) {
+			// kt = false;
+			// break;
+			// }
+			// }
+			//
+			// // nếu đơn hàng đã chuyển hết số lượng qua rồi thì check trạng
+			// // thái đã chuyển qua phiếu xuất
+			// Query query =
+			// em.createQuery("update OrderLix set status=:s,delivered=true where id=:id");
+			// query.setParameter("id", orderId);
+			// if (kt) {
+			// query.setParameter("s", 2);
+			// } else {
+			// query.setParameter("s", 1);
+			// }
+			// if (query.executeUpdate() <= 0) {
+			// res = -1;
+			// messages.append("Cập nhật trạng thái đơn hàng thất bại");
+			// ut.rollback();
+			// return res;
+			// }
+
+			ut.commit();
+			res = 0;
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			messages.append("ProcessLogicInvoicePosService.createInvoiceByExtensionOrder:");
+			logger.error("ProcessLogicInvoicePosService.createInvoiceByExtensionOrder:" + e.getMessage(), e);
+			e.printStackTrace();
+		} finally {
+			if (con != null) {
+				con.close();
+			}
+		}
+		return res;
+	}
+
+	@Override
+	public int createInvoiceTempByExtensionOrder(WrapExtensionOrderReqInfo t, List<Long> listIdResult,
+			StringBuilder messages, String soxe, boolean kiemton) throws IllegalStateException, SystemException,
+			SQLException {
+		int res = -1;
+		Connection con = null;
+		Date now = MyUtilEJB.loaibogio(new Date());
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			long orderId = t.getOrder_id();
+			CriteriaQuery<OrderLix> cqOrderLix = cb.createQuery(OrderLix.class);
+			Root<OrderLix> rootOrder = cqOrderLix.from(OrderLix.class);
+			rootOrder.fetch("customer", JoinType.INNER);
+			rootOrder.fetch("promotion_program", JoinType.LEFT);
+			rootOrder.fetch("pricing_program", JoinType.LEFT);
+			rootOrder.fetch("payment_method", JoinType.LEFT);
+			rootOrder.fetch("car", JoinType.LEFT);
+			rootOrder.fetch("warehouse", JoinType.LEFT);
+			rootOrder.fetch("ie_categories", JoinType.LEFT);
+			rootOrder.fetch("delivery_pricing", JoinType.LEFT);
+			rootOrder.fetch("freight_contract", JoinType.LEFT);
+			cqOrderLix.select(rootOrder).where(cb.equal(rootOrder.get("id"), orderId));
+			TypedQuery<OrderLix> queryOrder = em.createQuery(cqOrderLix);
+			List<OrderLix> listOrderTrans = queryOrder.getResultList();
+			if (listOrderTrans.size() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Đơn hàng không tồn tại!");
+				return res;
+			}
+			OrderLix orderLixTrans = listOrderTrans.get(0);
+
+			List<InvoiceDetailTemp> listInvoiceDetail = new ArrayList<>();
+			Map<OrderDetail, InvoiceDetailTemp> map = new LinkedHashMap<>();
+			for (WrapOrderDetailLixReqInfo dt : t.getList_wrap_extension_order_detail()) {
+				// chuẩn bị danh sách chi tiết hóa đơn
+				OrderDetail orderDetail = dt.getOrder_detail();
+				InvoiceDetailTemp detail = new InvoiceDetailTemp();
+				detail.setEx_order(true);
+				detail.setProduct(orderDetail.getProduct());
+				detail.setQuantity(dt.getExport_unit_quantity());// số lượng đơn
+																	// vị tính
+				detail.setReal_quantity(0);
+				detail.setNote_batch_code(orderDetail.getBatch_code());
+				detail.setUnit_price(orderDetail.getUnit_price());
+				detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+				detail.setNote(orderDetail.getNote());
+				detail.setIdchitietdonhang(orderDetail.getId());
+				detail.setNote_batch_code(orderDetail.getBatch_code());
+				detail.setPromotion_forms(orderDetail.getPromotion_forms());
+				boolean dutonkho = true;
+				double tonkho = 0;
+				if (kiemton) {
+					tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+					if (tonkho < detail.getQuantity()) {
+						dutonkho = false;
+					}
+				}
+				if (dutonkho) {
+					if (detail.getQuantity() != 0) {
+						listInvoiceDetail.add(detail);
+						if (!map.containsKey(dt)) {
+							map.put(orderDetail, detail);
+						}
+					}
+				} else {
+					messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+							+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+					return res;
+				}
+
+			}
+			// tạo hóa đơn thứ nhất
+			InvoiceTemp invoice = new InvoiceTemp();
+			invoice.setOrder_lix(orderLixTrans);
+			invoice.setIdorderlix(orderLixTrans.getId());
+			invoice.setOrder_code(orderLixTrans.getOrder_code());
+			invoice.setOrder_voucher(orderLixTrans.getVoucher_code());
+			invoice.setCreated_by_id(t.getMember_id());
+			invoice.setCreated_by(t.getMember_name());
+			invoice.setCreated_date(new Date());
+			invoice.setCustomer(orderLixTrans.getCustomer());
+			invoice.setInvoice_temp_date(now);
+			invoice.setDelivery_date(orderLixTrans.getDelivery_date());
+			invoice.setPayment_method(orderLixTrans.getPayment_method());
+			invoice.setCar(orderLixTrans.getCar());
+			invoice.setDelivery_pricing(orderLixTrans.getDelivery_pricing());// đơn
+																				// giá
+																				// vận
+																				// chuyển
+																				// chứa
+																				// nơi
+																				// đến
+			invoice.setFreight_contract(orderLixTrans.getFreight_contract());
+			invoice.setIe_categories(orderLixTrans.getIe_categories());
+			invoice.setWarehouse(orderLixTrans.getWarehouse());
+			invoice.setTax_value(orderLixTrans.getTax_value());
+			invoice.setVoucher_code(orderLixTrans.getVoucher_code());
+			invoice.setPricing_program(orderLixTrans.getPricing_program());
+			invoice.setPromotion_program(orderLixTrans.getPromotion_program());
+			invoice.setPo_no(orderLixTrans.getPo_no());
+			invoice.setInvoice_temp_code(initInvoiceCode());
+			// invoice.setExported(true);
+			invoice.setLdd(orderLixTrans.getLdd());
+			invoice.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+			invoice.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+			if (soxe != null) {
+				invoice.setCar(carService.selectByCode(soxe));
+			}
+
+			double totalevent = listInvoiceDetail.stream().mapToDouble(f -> f.getTotal()).sum();
+			invoice.setTongtien(MyMath.round(totalevent));
+			invoice.setThue(MyMath.round(totalevent * invoice.getTax_value()));
+			invoice.setSophieuvc(orderLixTrans.getSophieuvc());
+			// invoice.setMovement_commands_no(orderLixTrans.getLdd());
+			invoice.setCarrier(orderLixTrans.getCarrier());
+			invoice.setChietkhau(orderLixTrans.getChietkhau());
+			invoice.setLydochietkhau(orderLixTrans.getLydochietkhau());
+			initCodeVoucher(invoice);
+			em.persist(invoice);
+			if (invoice.getId() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Tạo hóa đơn thất bại!");
+				return res;
+			}
+			listIdResult.add(invoice.getId());
+			// tạo chi tiết cho đơn hàng thứ nhất
+			for (InvoiceDetailTemp v : listInvoiceDetail) {
+				v.setInvoicetemp(invoice);
+				v.setCreated_by(t.getMember_name());
+				v.setCreated_by_id(t.getMember_id());
+				v.setCreated_date(new Date());
+				em.persist(v);
+				// xuất lô hàng
+				if (v.getId() == 0) {
+					res = -1;
+					messages.append("Tạo chi tiết hóa đơn thất bại!");
+					ut.rollback();
+					return res;
+				}
+			}
+
+			List<PromotionOrderDetail> listPromotionOrderDetail = t.getList_promotion_order_detail();
+			if (listPromotionOrderDetail.size() > 0) {
+
+				List<PromotionOrderDetail> khuyenmainos = new ArrayList<PromotionOrderDetail>();
+				// lưu chi tiết hóa đơn khuyến mãi
+				for (PromotionOrderDetail p : listPromotionOrderDetail) {
+					if (p.isNo())
+						khuyenmainos.add(p);
+				}
+				listPromotionOrderDetail.removeAll(khuyenmainos);
+				if (listPromotionOrderDetail.size() != 0) {
+
+					// lưu chi tiết hóa đơn khuyến mãi
+					double totalevent2 = 0;
+
+					for (PromotionOrderDetail p : listPromotionOrderDetail) {
+						InvoiceDetailTemp invoiceDetailMain = null;
+						if (map.containsKey(p.getOrder_detail())) {
+							invoiceDetailMain = map.get(p.getOrder_detail());
+						}
+						InvoiceDetailTemp detail = new InvoiceDetailTemp();
+						// chi tiết khuyến thuộc hóa đơn chính nào
+						detail.setInvoice_detail_temp_own(invoiceDetailMain);
+						detail.setEx_order(true);
+						detail.setProductdh_code(p.getOrder_detail().getProduct().getProduct_code());
+						detail.setInvoicetemp(invoice);
+						detail.setCreated_by(t.getMember_name());
+						detail.setCreated_date(new Date());
+						detail.setCreated_by_id(t.getMember_id());
+						detail.setProduct(p.getProduct());
+						detail.setQuantity(p.getQuantity());
+						detail.setReal_quantity(0);
+						detail.setUnit_price(p.getUnit_price());
+						detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+						detail.setNote(p.getNote());
+						detail.setNote_batch_code(p.getBatch_code());
+						detail.setIdchitietdonhangkm(p.getId());
+						detail.setNote_batch_code(p.getBatch_code());
+						totalevent2 += detail.getTotal();
+
+						boolean dutonkho = true;
+						double tonkho = 0;
+						if (kiemton) {
+							tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+							if (tonkho < detail.getQuantity()) {
+								dutonkho = false;
+							}
+						}
+						if (dutonkho) {
+							// detail.setOrder_detail(p.getOrder_detail());//
+							// không
+							// cần
+							// set vì đây là chi tiết của hóa đơn trích từ hóa
+							// đơn
+							// khuyến mãi
+							if (detail.getQuantity() != 0) {
+								em.persist(detail);
+								if (detail.getId() == 0) {
+									res = -1;
+									messages.append("Tạo chi tiết hóa đơn thất bại!");
+									ut.rollback();
+									return res;
+								}
+							}
+						} else {
+							messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+									+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+							return res;
+						}
+					}
+					invoiceService.updateTongTienKM(invoice.getId(), MyMath.round(totalevent2), t.getMember_name());
+				}
+			}
+			ut.commit();
+			res = 0;
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			messages.append("ProcessLogicInvoicePosService.createInvoiceByExtensionOrder:");
+			logger.error("ProcessLogicInvoicePosService.createInvoiceByExtensionOrder:" + e.getMessage(), e);
+			e.printStackTrace();
+		} finally {
+			if (con != null) {
+				con.close();
+			}
+		}
+		return res;
+	}
+
+	@Override
+	public int createInvoiceByTemp(WrapInvoiceDetailTempReqInfo t, List<Long> listIdResult, StringBuilder messages,
+			String soxe, boolean kiemton) throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		Date now = MyUtilEJB.loaibogio(new Date());
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			long invoice_id = t.getInvoice_id();
+			CriteriaQuery<InvoiceTemp> cqOrderLix = cb.createQuery(InvoiceTemp.class);
+			Root<InvoiceTemp> rootOrder = cqOrderLix.from(InvoiceTemp.class);
+			rootOrder.fetch("customer", JoinType.INNER);
+			rootOrder.fetch("promotion_program", JoinType.LEFT);
+			rootOrder.fetch("pricing_program", JoinType.LEFT);
+			rootOrder.fetch("payment_method", JoinType.LEFT);
+			rootOrder.fetch("car", JoinType.LEFT);
+			rootOrder.fetch("warehouse", JoinType.LEFT);
+			rootOrder.fetch("ie_categories", JoinType.LEFT);
+			rootOrder.fetch("delivery_pricing", JoinType.LEFT);
+			rootOrder.fetch("freight_contract", JoinType.LEFT);
+			cqOrderLix.select(rootOrder).where(cb.equal(rootOrder.get("id"), invoice_id));
+			TypedQuery<InvoiceTemp> queryOrder = em.createQuery(cqOrderLix);
+			List<InvoiceTemp> listOrderTrans = queryOrder.getResultList();
+			if (listOrderTrans.size() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Đơn hàng không tồn tại!");
+				return res;
+			}
+			InvoiceTemp orderLixTrans = listOrderTrans.get(0);
+
+			List<InvoiceDetail> listInvoiceDetail = new ArrayList<>();
+			Map<InvoiceDetailTemp, InvoiceDetail> map = new LinkedHashMap<>();
+			for (WrapInvoiceDetailTempReqInfo dt : t.getList_wrap_invoice_detail()) {
+				// chuẩn bị danh sách chi tiết hóa đơn
+				InvoiceDetailTemp invoiceDetail = dt.getInvoice_detail();
+				InvoiceDetail detail = new InvoiceDetail();
+				detail.setEx_order(true);
+				detail.setProduct(invoiceDetail.getProduct());
+
+				detail.setQuantity(dt.getInvoice_detail().getReal_quantity());// số
+																				// lượng
+																				// đơn
+				// vị tính
+
+				detail.setReal_quantity(detail.getQuantity());
+				detail.setNote_batch_code(invoiceDetail.getNote_batch_code());
+				detail.setUnit_price(invoiceDetail.getUnit_price());
+				detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+				detail.setNote(invoiceDetail.getNote());
+				detail.setIdchitietdonhang(invoiceDetail.getIdchitietdonhang());
+				boolean dutonkho = true;
+				double tonkho = 0;
+				if (kiemton) {
+					tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+					if (tonkho < detail.getQuantity()) {
+						dutonkho = false;
+					}
+				}
+				if (dutonkho) {
+					if (detail.getQuantity() != 0) {
+						listInvoiceDetail.add(detail);
+						if (!map.containsKey(dt)) {
+							map.put(invoiceDetail, detail);
+						}
+					}
+				} else {
+					messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+							+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+					return res;
+				}
+
+			}
+			// tạo hóa đơn thứ nhất
+			Invoice invoice = new Invoice();
+			invoice.setOrder_lix(orderLixTrans.getOrder_lix());
+			invoice.setIdorderlix(orderLixTrans.getOrder_lix().getId());
+			invoice.setOrder_code(orderLixTrans.getOrder_code());
+			invoice.setOrder_voucher(orderLixTrans.getOrder_voucher());
+			invoice.setCreated_by_id(t.getMember_id());
+			invoice.setCreated_by(t.getMember_name());
+			invoice.setCreated_date(new Date());
+			invoice.setCustomer(orderLixTrans.getCustomer());
+			invoice.setInvoice_date(now);
+			invoice.setDelivery_date(orderLixTrans.getDelivery_date());
+			invoice.setPayment_method(orderLixTrans.getPayment_method());
+			invoice.setCar(orderLixTrans.getCar());
+			invoice.setDelivery_pricing(orderLixTrans.getDelivery_pricing());// đơn
+																				// giá
+																				// vận
+																				// chuyển
+																				// chứa
+																				// nơi
+																				// đến
+			invoice.setFreight_contract(orderLixTrans.getFreight_contract());
+			invoice.setIe_categories(orderLixTrans.getIe_categories());
+			invoice.setWarehouse(orderLixTrans.getWarehouse());
+			invoice.setTax_value(orderLixTrans.getTax_value());
+			invoice.setVoucher_code(orderLixTrans.getVoucher_code());
+			invoice.setPricing_program(orderLixTrans.getPricing_program());
+			invoice.setPromotion_program(orderLixTrans.getPromotion_program());
+			invoice.setPo_no(orderLixTrans.getPo_no());
+			invoice.setInvoice_code(initInvoiceCode());
+			invoice.setExported(true);
+			invoice.setLdd(orderLixTrans.getLdd());
+			invoice.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+			invoice.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+			if (soxe != null) {
+				invoice.setCar(carService.selectByCode(soxe));
+			}
+
+			double totalevent = listInvoiceDetail.stream().mapToDouble(f -> f.getTotal()).sum();
+			invoice.setTongtien(MyMath.round(totalevent));
+			invoice.setThue(MyMath.round(totalevent * invoice.getTax_value()));
+			invoice.setSophieuvc(orderLixTrans.getSophieuvc());
+			// invoice.setMovement_commands_no(orderLixTrans.getLdd());
+			invoice.setCarrier(orderLixTrans.getCarrier());
+			invoice.setChietkhau(orderLixTrans.getChietkhau());
+			invoice.setLydochietkhau(orderLixTrans.getLydochietkhau());
+			initCodeVoucher(invoice);
+
+			em.persist(invoice);
+			if (invoice.getId() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Tạo hóa đơn thất bại!");
+				return res;
+			}
+			listIdResult.add(invoice.getId());
+			// tạo chi tiết cho đơn hàng thứ nhất
+			for (InvoiceDetail v : listInvoiceDetail) {
+				v.setInvoice(invoice);
+				v.setCreated_by(t.getMember_name());
+				v.setCreated_by_id(t.getMember_id());
+				v.setCreated_date(new Date());
+				em.persist(v);
+				// xuất lô hàng
+				if (v.getId() == 0) {
+					res = -1;
+					messages.append("Tạo chi tiết hóa đơn thất bại!");
+					ut.rollback();
+					return res;
+				}
+			}
+			List<PromotionOrderDetail> listPromotionOrderDetail = t.getList_promotion_order_detail();
+			if (listPromotionOrderDetail.size() > 0) {
+
+				List<PromotionOrderDetail> khuyenmainos = new ArrayList<PromotionOrderDetail>();
+				// lưu chi tiết hóa đơn khuyến mãi
+				for (PromotionOrderDetail p : listPromotionOrderDetail) {
+					if (p.isNo())
+						khuyenmainos.add(p);
+				}
+				listPromotionOrderDetail.removeAll(khuyenmainos);
+				if (listPromotionOrderDetail.size() != 0) {
+					// tạo đơn hàng khuyến mãi(thứ 2)
+					Invoice invoice2 = new Invoice();
+					invoice2.setIpromotion(true);
+					invoice2.setOrder_lix(orderLixTrans.getOrder_lix());
+					invoice2.setIdorderlix(orderLixTrans.getOrder_lix().getId());
+					invoice2.setOrder_code(orderLixTrans.getOrder_code());
+					invoice2.setOrder_voucher(orderLixTrans.getOrder_voucher());
+					invoice2.setCreated_by_id(t.getMember_id());
+					invoice2.setCreated_by(t.getMember_name());
+					invoice2.setCreated_date(new Date());
+					invoice2.setCustomer(orderLixTrans.getCustomer());
+					invoice2.setInvoice_date(now);
+					invoice2.setDelivery_date(orderLixTrans.getDelivery_date());
+					invoice2.setPayment_method(orderLixTrans.getPayment_method());
+					invoice2.setCar(orderLixTrans.getCar());
+					invoice2.setDelivery_pricing(orderLixTrans.getDelivery_pricing());
+					invoice2.setFreight_contract(orderLixTrans.getFreight_contract());
+					if (soxe != null) {
+						invoice2.setCar(carService.selectByCode(soxe));
+					}
+					String codeiec = "";
+					if (orderLixTrans.getIe_categories() != null) {
+						if ("1".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "(";
+						} else if ("E".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "5";
+						} else if ("X".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "A";
+						} else if ("-".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "+";
+						}
+					}
+					invoice2.setIe_categories(selectIECategoriesByCode(codeiec));
+					invoice2.setWarehouse(orderLixTrans.getWarehouse());
+					invoice2.setTax_value(0);
+					invoice2.setVoucher_code(orderLixTrans.getVoucher_code());
+					invoice2.setPricing_program(orderLixTrans.getPricing_program());
+					invoice2.setPromotion_program(orderLixTrans.getPromotion_program());
+					invoice2.setPo_no(orderLixTrans.getPo_no());
+					invoice2.setInvoice_code(initInvoiceCode());
+					invoice2.setExported(true);
+					// hóa đơn sở hữu khuyến mãi này
+					invoice2.setInvoice_own(invoiceService.findByIdSafe(invoice.getId()));
+					invoice2.setSophieuvc(orderLixTrans.getSophieuvc());
+					invoice2.setCarrier(orderLixTrans.getCarrier());
+					invoice2.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+					invoice2.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+					// Hoa don khuyen mai khong cai tham so nay
+					// invoice2.setChietkhau(orderLixTrans.getChietkhau());
+					// invoice2.setLydochietkhau(orderLixTrans.getLydochietkhau());
+					initCodeVoucher(invoice2);
+					em.persist(invoice2);
+					if (invoice2.getId() == 0) {
+						res = -1;
+						ut.rollback();
+						messages.append("Tạo hóa đơn khuyến mãi thất bại!");
+						return res;
+					}
+					listIdResult.add(invoice2.getId());
+					// lưu chi tiết hóa đơn khuyến mãi
+					double totalevent2 = 0;
+
+					for (PromotionOrderDetail p : listPromotionOrderDetail) {
+						InvoiceDetail invoiceDetailMain = null;
+						if (map.containsKey(p.getInvoice_detail_temp())) {
+							invoiceDetailMain = map.get(p.getInvoice_detail_temp());
+						}
+						InvoiceDetail detail = new InvoiceDetail();
+						// chi tiết khuyến thuộc hóa đơn chính nào
+						detail.setInvoice_detail_own(invoiceDetailMain);
+						detail.setEx_order(true);
+						detail.setProductdh_code(p.getInvoice_detail_temp().getProductdh_code());
+						detail.setInvoice(invoice2);
+						detail.setCreated_by(t.getMember_name());
+						detail.setCreated_date(new Date());
+						detail.setCreated_by_id(t.getMember_id());
+						detail.setProduct(p.getProduct());
+						detail.setQuantity(p.getQuantity());
+						detail.setReal_quantity(detail.getQuantity());
+						detail.setUnit_price(p.getUnit_price());
+						detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+						detail.setNote(p.getNote());
+						detail.setNote_batch_code(p.getBatch_code());
+						detail.setIdchitietdonhangkm(p.getId());
+						detail.setNote_batch_code(p.getBatch_code());
+						totalevent2 += detail.getTotal();
+
+						boolean dutonkho = true;
+						double tonkho = 0;
+						if (kiemton) {
+							tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+							if (tonkho < detail.getQuantity()) {
+								dutonkho = false;
+							}
+						}
+						if (dutonkho) {
+							// detail.setOrder_detail(p.getOrder_detail());//
+							// không
+							// cần
+							// set vì đây là chi tiết của hóa đơn trích từ hóa
+							// đơn
+							// khuyến mãi
+							if (detail.getQuantity() != 0) {
+								em.persist(detail);
+								if (detail.getId() == 0) {
+									res = -1;
+									messages.append("Tạo chi tiết hóa đơn thất bại!");
+									ut.rollback();
+									return res;
+								}
+							}
+						} else {
+							messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+									+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+							return res;
+						}
+					}
+					invoiceService.updateTongTienKM(invoice2.getId(), MyMath.round(totalevent2), t.getMember_name());
+				}
+				if (khuyenmainos.size() != 0) {
+					// tạo đơn hàng khuyến mãi(thứ 3)
+					Invoice invoice3 = new Invoice();
+					invoice3.setIpromotion(true);
+					invoice3.setOrder_lix(orderLixTrans.getOrder_lix());
+					invoice3.setIdorderlix(orderLixTrans.getId());
+					invoice3.setOrder_code(orderLixTrans.getOrder_code());
+					invoice3.setOrder_voucher(orderLixTrans.getVoucher_code());
+					invoice3.setCreated_by_id(t.getMember_id());
+					invoice3.setCreated_by(t.getMember_name());
+					invoice3.setCreated_date(new Date());
+					invoice3.setCustomer(orderLixTrans.getCustomer());
+					invoice3.setInvoice_date(now);
+					invoice3.setDelivery_date(orderLixTrans.getDelivery_date());
+					invoice3.setPayment_method(orderLixTrans.getPayment_method());
+					invoice3.setCar(orderLixTrans.getCar());
+					invoice3.setDelivery_pricing(orderLixTrans.getDelivery_pricing());// đơn
+																						// giá
+																						// vận
+																						// chuyển
+																						// chứa
+																						// nơi
+																						// đến
+					invoice3.setFreight_contract(orderLixTrans.getFreight_contract());
+					String codeiec = "";
+					if (orderLixTrans.getIe_categories() != null) {
+						if ("X".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "0";
+						}
+					}
+					// Mã '0': nợ khuyến mãi
+					invoice3.setIe_categories(selectIECategoriesByCode(codeiec));
+					invoice3.setWarehouse(orderLixTrans.getWarehouse());
+					invoice3.setTax_value(0);
+					invoice3.setVoucher_code(orderLixTrans.getVoucher_code());
+					invoice3.setPricing_program(orderLixTrans.getPricing_program());
+					invoice3.setPromotion_program(orderLixTrans.getPromotion_program());
+					invoice3.setPo_no(orderLixTrans.getPo_no());
+					invoice3.setInvoice_code(initInvoiceCode());
+					invoice3.setExported(true);
+					if (soxe != null) {
+						invoice3.setCar(carService.selectByCode(soxe));
+					}
+					// hóa đơn sở hữu khuyến mãi này
+					invoice3.setInvoice_own(invoice);
+					invoice3.setSophieuvc(orderLixTrans.getSophieuvc());
+					invoice3.setCarrier(orderLixTrans.getCarrier());
+					invoice3.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+					invoice3.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+					// Hoa don no khuyen mai khong cai tham so nay
+					// invoice3.setChietkhau(orderLixTrans.getChietkhau());
+					// invoice3.setLydochietkhau(orderLixTrans.getLydochietkhau());
+					initCodeVoucher(invoice3);
+					em.persist(invoice3);
+					if (invoice3.getId() == 0) {
+						res = -1;
+						ut.rollback();
+						messages.append("Tạo hóa đơn nợ thất bại!");
+						return res;
+					}
+					listIdResult.add(invoice3.getId());
+					// lưu chi tiết hóa đơn khuyến mãi
+					for (PromotionOrderDetail p : khuyenmainos) {
+						InvoiceDetail invoiceDetailMain = null;
+						if (map.containsKey(p.getInvoice_detail_temp())) {
+							invoiceDetailMain = map.get(p.getInvoice_detail_temp());
+						}
+						InvoiceDetail detail = new InvoiceDetail();
+						// chi tiết khuyến thuộc hóa đơn chính nào
+						detail.setInvoice_detail_own(invoiceDetailMain);
+						detail.setEx_order(true);
+						detail.setProductdh_code(p.getInvoice_detail_temp().getProductdh_code());
+						detail.setInvoice(invoice3);
+						detail.setCreated_by(t.getMember_name());
+						detail.setCreated_date(new Date());
+						detail.setCreated_by_id(t.getMember_id());
+						detail.setProduct(p.getProduct());
+						detail.setQuantity(p.getQuantity());
+						detail.setReal_quantity(detail.getQuantity());
+						detail.setUnit_price(p.getUnit_price());
+						detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+						detail.setNote(p.getNote());
+						detail.setNote_batch_code(p.getBatch_code());
+						detail.setIdchitietdonhangkm(p.getId());
+
+						boolean dutonkho = true;
+						double tonkho = 0;
+						if (kiemton) {
+							tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+							if (tonkho < detail.getQuantity()) {
+								dutonkho = false;
+							}
+						}
+						if (dutonkho) {
+							// detail.setOrder_detail(p.getOrder_detail());//
+							// không
+							// cần
+							// set vì đây là chi tiết của hóa đơn trích từ hóa
+							// đơn
+							// khuyến mãi
+							if (detail.getQuantity() != 0) {
+								em.persist(detail);
+								if (detail.getId() == 0) {
+									res = -1;
+									messages.append("Tạo chi tiết hóa đơn thất bại!");
+									ut.rollback();
+									return res;
+								}
+							}
+						} else {
+							messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+									+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+							return res;
+						}
+					}
+				}
+
+			}
+			// List<Object[]> slhoadons = new ArrayList<>();
+			// orderLixService.getListExportExtensionOrder(orderLixTrans.getId(),
+			// slhoadons);
+			// boolean kt = true;
+			// List<OrderDetail> orderDetails = new ArrayList<OrderDetail>();
+			// orderDetailService.selectByOrder(orderLixTrans.getId(),
+			// orderDetails);
+			// for (int i = 0; i < orderDetails.size(); i++) {
+			// double slhdthung = 0;
+			// for (Object[] v : slhoadons) {
+			// long productId = Long.parseLong(Objects.toString(v[0]));
+			// if (orderDetails.get(i).getProduct().getId() == productId) {
+			// slhdthung = Double.parseDouble(Objects.toString(v[1], "0"));
+			// }
+			// }
+			// if (orderDetails.get(i).getBox_quantity() != slhdthung) {
+			// kt = false;
+			// break;
+			// }
+			// }
+			//
+			// // nếu đơn hàng đã chuyển hết số lượng qua rồi thì check trạng
+			// // thái đã chuyển qua phiếu xuất
+			// Query query =
+			// em.createQuery("update OrderLix set status=:s,delivered=true where id=:id");
+			// query.setParameter("id", orderId);
+			// if (kt) {
+			// query.setParameter("s", 2);
+			// } else {
+			// query.setParameter("s", 1);
+			// }
+			// if (query.executeUpdate() <= 0) {
+			// res = -1;
+			// messages.append("Cập nhật trạng thái đơn hàng thất bại");
+			// ut.rollback();
+			// return res;
+			// }
+
+			ut.commit();
+			res = 0;
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			messages.append("ProcessLogicInvoicePosService.createInvoiceByExtensionOrder:");
+			logger.error("ProcessLogicInvoicePosService.createInvoiceByExtensionOrder:" + e.getMessage(), e);
+			e.printStackTrace();
+		} finally {
+			if (con != null) {
+				con.close();
+			}
+		}
+		return res;
+	}
+
+	@Inject
+	IOrderDetailService orderDetailService;
+
+	// Tao hoa don tu don hang
+	@Override
+	public void capnhattrangthaidonhang(List<OrderLix> orderLixTrans) throws IllegalStateException, SecurityException,
+			SystemException, SQLException {
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			for (int m = 0; m < orderLixTrans.size(); m++) {
+				List<Object[]> slhoadons = new ArrayList<>();
+				orderLixService.getListExportExtensionOrder(orderLixTrans.get(m).getId(), slhoadons);
+				List<OrderDetail> orderDetails = new ArrayList<OrderDetail>();
+				orderDetailService.selectByOrder(orderLixTrans.get(m).getId(), orderDetails);
+				boolean dagiaohang = false;
+				boolean giaochuadu = false;
+				for (int i = 0; i < orderDetails.size(); i++) {
+					double slhdthung = 0;
+					for (Object[] v : slhoadons) {
+						long productId = Long.parseLong(Objects.toString(v[0]));
+						if (orderDetails.get(i).getProduct().getId() == productId) {
+							slhdthung = Double.parseDouble(Objects.toString(v[1], "0"));
+						}
+					}
+					if (slhdthung != 0) {
+						dagiaohang = true;
+						break;
+					}
+
+				}
+				if (dagiaohang) {
+					for (int i = 0; i < orderDetails.size(); i++) {
+						double slhdthung = 0;
+						for (Object[] v : slhoadons) {
+							long productId = Long.parseLong(Objects.toString(v[0]));
+							if (orderDetails.get(i).getProduct().getId() == productId) {
+								slhdthung = Double.parseDouble(Objects.toString(v[1], "0"));
+							}
+						}
+
+						if (orderDetails.get(i).getBox_quantity() != slhdthung) {
+							giaochuadu = true;
+							break;
+						}
+					}
+				}
+				// nếu đơn hàng đã chuyển hết số lượng qua rồi thì check trạng
+				// thái đã chuyển qua phiếu xuất
+				Query query = em.createQuery("update OrderLix set status=:s, delivered=:delivered where id=:id");
+				query.setParameter("id", orderLixTrans.get(m).getId());
+				if (dagiaohang) {
+					query.setParameter("delivered", true);
+					if (giaochuadu) {
+						query.setParameter("s", 1);
+					} else {
+						query.setParameter("s", 2);
+					}
+				} else {
+					query.setParameter("s", 0);
+					query.setParameter("delivered", false);
+				}
+				query.executeUpdate();
+
+			}
+			ut.commit();
+		} catch (Exception e) {
+			ut.rollback();
+			logger.error("ProcessLogicInvoicePosService.createInvoiceByExtensionOrder:" + e.getMessage(), e);
+			e.printStackTrace();
+		} finally {
+			if (con != null) {
+				con.close();
+			}
+		}
+	}
+
+	@Inject
+	IOrderLixService orderLixService;
+	@Inject
+	TonKhoThucTeService tonKhoThucTeService;
+
+	// Tao hoa don tu don hang
+	@Override
+	public int createInvoiceByOrderLix(WrapOrderLixReqInfo t, StringBuilder messages, boolean kiemton)
+			throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		long start = System.currentTimeMillis();
+		try {
+			Date now = MyUtilEJB.loaibogio(new Date());
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			long orderId = t.getOrder_id();
+			CriteriaQuery<OrderLix> cqOrderLix = cb.createQuery(OrderLix.class);
+			Root<OrderLix> rootOrder = cqOrderLix.from(OrderLix.class);
+			rootOrder.fetch("customer", JoinType.INNER);
+			rootOrder.fetch("promotion_program", JoinType.LEFT);
+			rootOrder.fetch("pricing_program", JoinType.LEFT);
+			rootOrder.fetch("payment_method", JoinType.LEFT);
+			rootOrder.fetch("car", JoinType.LEFT);
+			rootOrder.fetch("warehouse", JoinType.LEFT);
+			rootOrder.fetch("ie_categories", JoinType.LEFT);
+			rootOrder.fetch("delivery_pricing", JoinType.LEFT);
+			rootOrder.fetch("freight_contract", JoinType.LEFT);
+			rootOrder.fetch("carrier", JoinType.LEFT);
+			cqOrderLix.select(rootOrder).where(cb.equal(rootOrder.get("id"), orderId));
+			TypedQuery<OrderLix> queryOrder = em.createQuery(cqOrderLix);
+			List<OrderLix> listOrderTrans = queryOrder.getResultList();
+			if (listOrderTrans.size() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Đơn hàng không tồn tại!");
+				return res;
+			}
+			OrderLix orderLixTrans = listOrderTrans.get(0);
+			// lấy danh sách chi tiết đơn hàng
+			CriteriaQuery<OrderDetail> cqOD = cb.createQuery(OrderDetail.class);
+			Root<OrderDetail> rootOD = cqOD.from(OrderDetail.class);
+			rootOD.fetch("product", JoinType.INNER);
+			cqOD.select(rootOD).where(cb.equal(rootOD.get("order_lix").get("id"), orderId));
+			TypedQuery<OrderDetail> queryOD = em.createQuery(cqOD);
+			List<OrderDetail> listOrderDetailTrans = queryOD.getResultList();
+			if (listOrderDetailTrans.size() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Không có chi tiết đơn hàng");
+				return res;
+			}
+
+			List<InvoiceDetail> listInvoiceDetail = new ArrayList<>();
+			Map<OrderDetail, InvoiceDetail> map = new LinkedHashMap<>();
+			for (OrderDetail dt : listOrderDetailTrans) {
+				// chuẩn bị danh sách chi tiết hóa đơn
+				InvoiceDetail detail = new InvoiceDetail();
+				detail.setEx_order(true);
+				detail.setProduct(dt.getProduct());
+				double slthungconlai = dt.getBox_quantity() - dt.getBox_quantity_actual();
+				detail.setQuantity(MyMath.roundCustom(slthungconlai * detail.getProduct().getSpecification(), 2));
+				detail.setReal_quantity(detail.getQuantity());
+				detail.setUnit_price(dt.getUnit_price());
+				detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+				detail.setNote(dt.getNote());
+				detail.setNote_batch_code(dt.getBatch_code());
+				detail.setIdchitietdonhang(dt.getId());
+				boolean dutonkho = true;
+				double tonkho = 0;
+				if (kiemton) {
+					tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+					if (tonkho < detail.getQuantity()) {
+						dutonkho = false;
+					}
+				}
+				if (dutonkho) {
+					if (detail.getQuantity() != 0) {
+						listInvoiceDetail.add(detail);
+						if (!map.containsKey(dt)) {
+							map.put(dt, detail);
+						}
+					}
+				} else {
+					messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+							+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+					return res;
+				}
+			}
+			// tạo hóa đơn thứ nhất
+			Invoice invoice = new Invoice();
+			invoice.setOrder_lix(orderLixTrans);
+			invoice.setIdorderlix(orderLixTrans.getId());
+			invoice.setOrder_code(orderLixTrans.getOrder_code());
+			invoice.setOrder_voucher(orderLixTrans.getVoucher_code());
+			invoice.setCreated_by_id(t.getMember_id());
+			invoice.setCreated_by(t.getMember_name());
+			invoice.setCreated_date(new Date());
+			invoice.setCustomer(orderLixTrans.getCustomer());
+			invoice.setInvoice_date(now);
+			invoice.setDelivery_date(orderLixTrans.getDelivery_date());
+			invoice.setPayment_method(orderLixTrans.getPayment_method());
+			invoice.setCar(orderLixTrans.getCar());
+			invoice.setTime_up_goods((int) MyUtilEJB.sophutgiua2ngay(orderLixTrans.getS_up_goods_date(),
+					orderLixTrans.getC_up_goods_date()));
+			invoice.setDelivery_pricing(orderLixTrans.getDelivery_pricing());// đơn
+																				// giá
+																				// vận
+																				// chuyển
+																				// chứa
+																				// nơi
+																				// đến
+			invoice.setFreight_contract(orderLixTrans.getFreight_contract());
+			invoice.setIe_categories(orderLixTrans.getIe_categories());
+			invoice.setWarehouse(orderLixTrans.getWarehouse());
+			invoice.setTax_value(orderLixTrans.getTax_value());
+			invoice.setVoucher_code(orderLixTrans.getVoucher_code());
+			invoice.setPricing_program(orderLixTrans.getPricing_program());
+			invoice.setPromotion_program(orderLixTrans.getPromotion_program());
+			invoice.setPo_no(orderLixTrans.getPo_no());
+			invoice.setInvoice_code(initInvoiceCode());
+			invoice.setExported(true);
+			invoice.setLdd(orderLixTrans.getLdd());
+			invoice.setSophieuvc(orderLixTrans.getSophieuvc());
+			invoice.setCarrier(orderLixTrans.getCarrier());
+			invoice.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+			invoice.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+			initCodeVoucher(invoice);
+
+			double totalevent = listInvoiceDetail.stream().mapToDouble(f -> f.getTotal()).sum();
+			invoice.setTongtien(MyMath.round(totalevent));
+			invoice.setThue(MyMath.round(totalevent * invoice.getTax_value()));
+			invoice.setChietkhau(orderLixTrans.getChietkhau());
+			invoice.setLydochietkhau(orderLixTrans.getLydochietkhau());
+
+			em.persist(invoice);
+			if (invoice.getId() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Tạo hóa đơn thất bại!");
+				return res;
+			}
+			// tạo chi tiết cho đơn hàng thứ nhất
+			for (InvoiceDetail v : listInvoiceDetail) {
+				v.setInvoice(invoice);
+				v.setCreated_by(t.getMember_name());
+				v.setCreated_by_id(t.getMember_id());
+				v.setCreated_date(new Date());
+				em.persist(v);
+				// xuất lô hàng
+				if (v.getId() == 0) {
+					res = -1;
+					messages.append("Tạo chi tiết hóa đơn thất bại!");
+					ut.rollback();
+					return res;
+				}
+			}
+			// lấy danh sách chi tiết khuyến mãi của đơn hàng
+			CriteriaQuery<PromotionOrderDetail> cqPOD = cb.createQuery(PromotionOrderDetail.class);
+			Root<PromotionOrderDetail> rootPOD = cqPOD.from(PromotionOrderDetail.class);
+			rootPOD.fetch("product", JoinType.INNER);
+			Join<PromotionOrderDetail, OrderDetail> OD_ = (Join) rootPOD.fetch("order_detail", JoinType.INNER);
+			OD_.fetch("product", JoinType.INNER);
+			cqPOD.select(rootPOD).where(cb.equal(OD_.get("order_lix").get("id"), orderId))
+					.orderBy(cb.asc(rootPOD.get("id")));
+			TypedQuery<PromotionOrderDetail> queryPOD = em.createQuery(cqPOD);
+			List<PromotionOrderDetail> listPromotionOrderDetailTrans = queryPOD.getResultList();
+
+			if (listPromotionOrderDetailTrans.size() > 0) {
+				List<PromotionOrderDetail> khuyenmainos = new ArrayList<PromotionOrderDetail>();
+				// lưu chi tiết hóa đơn khuyến mãi
+				for (PromotionOrderDetail p : listPromotionOrderDetailTrans) {
+					if (p.isNo())
+						khuyenmainos.add(p);
+				}
+				listPromotionOrderDetailTrans.removeAll(khuyenmainos);
+				if (listPromotionOrderDetailTrans.size() != 0) {
+					// tạo đơn hàng khuyến mãi(thứ 2)
+					Invoice invoice2 = new Invoice();
+					invoice2.setIpromotion(true);
+					invoice2.setOrder_lix(orderLixTrans);
+					invoice2.setIdorderlix(orderLixTrans.getId());
+					invoice2.setOrder_code(orderLixTrans.getOrder_code());
+					invoice2.setOrder_voucher(orderLixTrans.getVoucher_code());
+					invoice2.setCreated_by_id(t.getMember_id());
+					invoice2.setCreated_by(t.getMember_name());
+					invoice2.setCreated_date(new Date());
+					invoice2.setCustomer(orderLixTrans.getCustomer());
+					invoice2.setInvoice_date(now);
+					invoice2.setDelivery_date(orderLixTrans.getDelivery_date());
+					invoice2.setPayment_method(orderLixTrans.getPayment_method());
+					invoice2.setCar(orderLixTrans.getCar());
+					invoice2.setDelivery_pricing(orderLixTrans.getDelivery_pricing());// đơn
+																						// giá
+																						// vận
+																						// chuyển
+																						// chứa
+																						// nơi
+																						// đến
+					invoice2.setFreight_contract(orderLixTrans.getFreight_contract());
+					String codeiec = "";
+					if (orderLixTrans.getIe_categories() != null) {
+						if ("1".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "(";
+						} else if ("E".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "5";
+						} else if ("X".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "A";
+						} else if ("-".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "+";
+						}
+					}
+
+					invoice2.setIe_categories(selectIECategoriesByCode(codeiec));
+					invoice2.setWarehouse(orderLixTrans.getWarehouse());
+					invoice2.setTax_value(0);
+					invoice2.setVoucher_code(orderLixTrans.getVoucher_code());
+					invoice2.setPricing_program(orderLixTrans.getPricing_program());
+					invoice2.setPromotion_program(orderLixTrans.getPromotion_program());
+					invoice2.setPo_no(orderLixTrans.getPo_no());
+					invoice2.setInvoice_code(initInvoiceCode());
+					invoice2.setExported(true);
+					// hóa đơn sở hữu khuyến mãi này
+					invoice2.setInvoice_own(invoice);
+					invoice2.setSophieuvc(orderLixTrans.getSophieuvc());
+					invoice2.setCarrier(orderLixTrans.getCarrier());
+					invoice2.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+					invoice2.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+					// Hoa don khuyen mai khong cai tham so nay
+					// invoice2.setChietkhau(orderLixTrans.getChietkhau());
+					// invoice2.setLydochietkhau(orderLixTrans.getLydochietkhau());
+					initCodeVoucher(invoice2);
+					em.persist(invoice2);
+					if (invoice2.getId() == 0) {
+						res = -1;
+						ut.rollback();
+						messages.append("Tạo hóa đơn khuyến mãi thất bại!");
+						return res;
+					}
+					// lưu chi tiết hóa đơn khuyến mãi
+					for (PromotionOrderDetail p : listPromotionOrderDetailTrans) {
+						InvoiceDetail invoiceDetailMain = null;
+						if (map.containsKey(p.getOrder_detail())) {
+							invoiceDetailMain = map.get(p.getOrder_detail());
+						}
+						InvoiceDetail detail = new InvoiceDetail();
+						// chi tiết khuyến thuộc hóa đơn chính nào
+						detail.setInvoice_detail_own(invoiceDetailMain);
+						detail.setEx_order(true);
+						detail.setProductdh_code(p.getOrder_detail().getProduct().getProduct_code());
+						detail.setInvoice(invoice2);
+						detail.setCreated_by(t.getMember_name());
+						detail.setCreated_date(new Date());
+						detail.setCreated_by_id(t.getMember_id());
+						detail.setProduct(p.getProduct());
+						detail.setQuantity(p.getQuantity());
+						detail.setReal_quantity(detail.getQuantity());
+						detail.setUnit_price(p.getUnit_price());
+						detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+						detail.setNote(p.getNote());
+						detail.setIdchitietdonhangkm(p.getId());
+						// detail.setOrder_detail(p.getOrder_detail());// không
+						// cần
+						// set vì đây là chi tiết của hóa đơn trích từ hóa đơn
+						// khuyến mãi
+
+						boolean dutonkho = true;
+						double tonkho = 0;
+						if (kiemton) {
+							tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+							if (tonkho < detail.getQuantity()) {
+								dutonkho = false;
+							}
+						}
+						if (dutonkho) {
+							if (detail.getQuantity() != 0) {
+								em.persist(detail);
+								if (detail.getId() == 0) {
+									res = -1;
+									messages.append("Tạo chi tiết hóa đơn thất bại!");
+									ut.rollback();
+									return res;
+								}
+							}
+						} else {
+							messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+									+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+							return res;
+						}
+
+					}
+				}
+				if (khuyenmainos.size() != 0) {
+					// tạo đơn hàng khuyến mãi(thứ 3)
+					Invoice invoice3 = new Invoice();
+					invoice3.setIpromotion(true);
+					invoice3.setOrder_lix(orderLixTrans);
+					invoice3.setIdorderlix(orderLixTrans.getId());
+					invoice3.setOrder_code(orderLixTrans.getOrder_code());
+					invoice3.setOrder_voucher(orderLixTrans.getVoucher_code());
+					invoice3.setCreated_by_id(t.getMember_id());
+					invoice3.setCreated_by(t.getMember_name());
+					invoice3.setCreated_date(new Date());
+					invoice3.setCustomer(orderLixTrans.getCustomer());
+					invoice3.setInvoice_date(now);
+					invoice3.setDelivery_date(orderLixTrans.getDelivery_date());
+					invoice3.setPayment_method(orderLixTrans.getPayment_method());
+					invoice3.setCar(orderLixTrans.getCar());
+					invoice3.setDelivery_pricing(orderLixTrans.getDelivery_pricing());// đơn
+																						// giá
+																						// vận
+																						// chuyển
+																						// chứa
+																						// nơi
+																						// đến
+					invoice3.setFreight_contract(orderLixTrans.getFreight_contract());
+					String codeiec = "";
+					if (orderLixTrans.getIe_categories() != null) {
+						if ("X".equals(orderLixTrans.getIe_categories().getCode())) {
+							codeiec = "0";
+						}
+					}
+					// Mã '0': là mã nợ khuyến mãi
+					invoice3.setIe_categories(selectIECategoriesByCode(codeiec));
+					invoice3.setWarehouse(orderLixTrans.getWarehouse());
+					invoice3.setTax_value(0);
+					invoice3.setVoucher_code(orderLixTrans.getVoucher_code());
+					invoice3.setPricing_program(orderLixTrans.getPricing_program());
+					invoice3.setPromotion_program(orderLixTrans.getPromotion_program());
+					invoice3.setPo_no(orderLixTrans.getPo_no());
+					invoice3.setInvoice_code(initInvoiceCode());
+					invoice3.setExported(true);
+					// hóa đơn sở hữu khuyến mãi này
+					invoice3.setInvoice_own(invoice);
+					invoice3.setSophieuvc(orderLixTrans.getSophieuvc());
+					invoice3.setCarrier(orderLixTrans.getCarrier());
+					invoice3.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+					invoice3.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+					// Hoa don no khuyen mai khong cai tham so nay
+					// invoice2.setChietkhau(orderLixTrans.getChietkhau());
+					// invoice2.setLydochietkhau(orderLixTrans.getLydochietkhau());
+					initCodeVoucher(invoice3);
+					em.persist(invoice3);
+					if (invoice3.getId() == 0) {
+						res = -1;
+						ut.rollback();
+						messages.append("Tạo hóa đơn khuyến mãi thất bại!");
+						return res;
+					}
+					// lưu chi tiết hóa đơn khuyến mãi
+					for (PromotionOrderDetail p : khuyenmainos) {
+						InvoiceDetail invoiceDetailMain = null;
+						if (map.containsKey(p.getOrder_detail())) {
+							invoiceDetailMain = map.get(p.getOrder_detail());
+						}
+						InvoiceDetail detail = new InvoiceDetail();
+						// chi tiết khuyến thuộc hóa đơn chính nào
+						detail.setInvoice_detail_own(invoiceDetailMain);
+						detail.setEx_order(true);
+						detail.setProductdh_code(p.getOrder_detail().getProduct().getProduct_code());
+						detail.setInvoice(invoice3);
+						detail.setCreated_by(t.getMember_name());
+						detail.setCreated_date(new Date());
+						detail.setCreated_by_id(t.getMember_id());
+						detail.setProduct(p.getProduct());
+						detail.setQuantity(p.getQuantity());
+						detail.setReal_quantity(detail.getQuantity());
+						detail.setUnit_price(p.getUnit_price());
+						detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+						detail.setNote(p.getNote());
+						detail.setIdchitietdonhangkm(p.getId());
+						// detail.setOrder_detail(p.getOrder_detail());// không
+						// cần
+						// set vì đây là chi tiết của hóa đơn trích từ hóa đơn
+						// khuyến mãi
+						if (detail.getQuantity() != 0) {
+							em.persist(detail);
+							if (detail.getId() == 0) {
+								res = -1;
+								messages.append("Tạo chi tiết hóa đơn thất bại!");
+								ut.rollback();
+								return res;
+							}
+						}
+					}
+				}
+			}
+			// cập nhật trạng thái đơn hàng là đã chuyển qua phiếu xuất
+			// Query queryUpOrder =
+			// em.createQuery("update OrderLix set status=2,delivered=true where id=:id ");
+			// queryUpOrder.setParameter("id", orderLixTrans.getId());
+			// if (queryUpOrder.executeUpdate() <= 0) {
+			// res = -1;
+			// messages.append("Cập nhật trạng thái đơn hàng thất bại");
+			// ut.rollback();
+			// return res;
+			// }
+			ut.commit();
+			res = 0;
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			messages.append("ProcessLogicInvoicePosService.createInvoiceByOrderLix:" + e.getMessage());
+			logger.error("ProcessLogicInvoicePosService.createInvoiceByOrderLix:" + e.getMessage(), e);
+			e.printStackTrace();
+		} finally {
+			if (con != null) {
+				con.close();
+			}
+		}
+		long end = System.currentTimeMillis();
+		System.out.println("--------Thoi gian chay: " + (end - start));
+		return res;
+	}
+
+	public int createInvoiceTempByOrderLix(WrapOrderLixReqInfo t, StringBuilder messages, boolean kiemton)
+			throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		long start = System.currentTimeMillis();
+		try {
+			Date now = MyUtilEJB.loaibogio(new Date());
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			long orderId = t.getOrder_id();
+			CriteriaQuery<OrderLix> cqOrderLix = cb.createQuery(OrderLix.class);
+			Root<OrderLix> rootOrder = cqOrderLix.from(OrderLix.class);
+			rootOrder.fetch("customer", JoinType.INNER);
+			rootOrder.fetch("promotion_program", JoinType.LEFT);
+			rootOrder.fetch("pricing_program", JoinType.LEFT);
+			rootOrder.fetch("payment_method", JoinType.LEFT);
+			rootOrder.fetch("car", JoinType.LEFT);
+			rootOrder.fetch("warehouse", JoinType.LEFT);
+			rootOrder.fetch("ie_categories", JoinType.LEFT);
+			rootOrder.fetch("delivery_pricing", JoinType.LEFT);
+			rootOrder.fetch("freight_contract", JoinType.LEFT);
+			rootOrder.fetch("carrier", JoinType.LEFT);
+			cqOrderLix.select(rootOrder).where(cb.equal(rootOrder.get("id"), orderId));
+			TypedQuery<OrderLix> queryOrder = em.createQuery(cqOrderLix);
+			List<OrderLix> listOrderTrans = queryOrder.getResultList();
+			if (listOrderTrans.size() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Đơn hàng không tồn tại!");
+				return res;
+			}
+			OrderLix orderLixTrans = listOrderTrans.get(0);
+			// lấy danh sách chi tiết đơn hàng
+			CriteriaQuery<OrderDetail> cqOD = cb.createQuery(OrderDetail.class);
+			Root<OrderDetail> rootOD = cqOD.from(OrderDetail.class);
+			rootOD.fetch("product", JoinType.INNER);
+			cqOD.select(rootOD).where(cb.equal(rootOD.get("order_lix").get("id"), orderId));
+			TypedQuery<OrderDetail> queryOD = em.createQuery(cqOD);
+			List<OrderDetail> listOrderDetailTrans = queryOD.getResultList();
+			if (listOrderDetailTrans.size() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Không có chi tiết đơn hàng");
+				return res;
+			}
+
+			List<InvoiceDetailTemp> listInvoiceDetail = new ArrayList<>();
+			Map<OrderDetail, InvoiceDetailTemp> map = new LinkedHashMap<>();
+			for (OrderDetail dt : listOrderDetailTrans) {
+				// chuẩn bị danh sách chi tiết hóa đơn
+				InvoiceDetailTemp detail = new InvoiceDetailTemp();
+				detail.setEx_order(true);
+				detail.setProduct(dt.getProduct());
+				double slthungconlai = dt.getBox_quantity() - dt.getBox_quantity_actual();
+				detail.setQuantity(MyMath.roundCustom(slthungconlai * detail.getProduct().getSpecification(), 2));
+				detail.setReal_quantity(0);
+				detail.setUnit_price(dt.getUnit_price());
+				detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+				detail.setNote(dt.getNote());
+				detail.setNote_batch_code(dt.getBatch_code());
+				detail.setIdchitietdonhang(dt.getId());
+				detail.setPromotion_forms(dt.getPromotion_forms());
+				boolean dutonkho = true;
+				double tonkho = 0;
+				if (kiemton) {
+					tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+					if (tonkho < detail.getQuantity()) {
+						dutonkho = false;
+					}
+				}
+				if (dutonkho) {
+					if (detail.getQuantity() != 0) {
+						listInvoiceDetail.add(detail);
+						if (!map.containsKey(dt)) {
+							map.put(dt, detail);
+						}
+					}
+				} else {
+					messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+							+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+					return res;
+				}
+			}
+			// tạo hóa đơn thứ nhất (hóa đơn hàng bán)
+			InvoiceTemp invoice = new InvoiceTemp();
+			invoice.setOrder_lix(orderLixTrans);
+			invoice.setIdorderlix(orderLixTrans.getId());
+			invoice.setOrder_code(orderLixTrans.getOrder_code());
+			invoice.setOrder_voucher(orderLixTrans.getVoucher_code());
+			invoice.setCreated_by_id(t.getMember_id());
+			invoice.setCreated_by(t.getMember_name());
+			invoice.setCreated_date(new Date());
+			invoice.setCustomer(orderLixTrans.getCustomer());
+			invoice.setInvoice_temp_date(now);
+			invoice.setDelivery_date(orderLixTrans.getDelivery_date());
+			invoice.setPayment_method(orderLixTrans.getPayment_method());
+			invoice.setCar(orderLixTrans.getCar());
+			invoice.setTime_up_goods((int) MyUtilEJB.sophutgiua2ngay(orderLixTrans.getS_up_goods_date(),
+					orderLixTrans.getC_up_goods_date()));
+			invoice.setDelivery_pricing(orderLixTrans.getDelivery_pricing());// đơn
+																				// giá
+																				// vận
+																				// chuyển
+																				// chứa
+																				// nơi
+																				// đến
+			invoice.setFreight_contract(orderLixTrans.getFreight_contract());
+			invoice.setIe_categories(orderLixTrans.getIe_categories());
+			invoice.setWarehouse(orderLixTrans.getWarehouse());
+			invoice.setTax_value(orderLixTrans.getTax_value());
+			invoice.setVoucher_code(orderLixTrans.getVoucher_code());
+			invoice.setPricing_program(orderLixTrans.getPricing_program());
+			invoice.setPromotion_program(orderLixTrans.getPromotion_program());
+			invoice.setPo_no(orderLixTrans.getPo_no());
+			invoice.setInvoice_temp_code(initInvoiceCode());
+			// invoice.setExported(true);
+			invoice.setLdd(orderLixTrans.getLdd());
+			invoice.setSophieuvc(orderLixTrans.getSophieuvc());
+			invoice.setCarrier(orderLixTrans.getCarrier());
+			invoice.setS_up_goods_date(orderLixTrans.getS_up_goods_date());
+			invoice.setC_up_goods_date(orderLixTrans.getC_up_goods_date());
+			initCodeVoucher(invoice);
+
+			double totalevent = listInvoiceDetail.stream().mapToDouble(f -> f.getTotal()).sum();
+			invoice.setTongtien(MyMath.round(totalevent));
+			invoice.setThue(MyMath.round(totalevent * invoice.getTax_value()));
+			invoice.setChietkhau(orderLixTrans.getChietkhau());
+			invoice.setLydochietkhau(orderLixTrans.getLydochietkhau());
+
+			em.persist(invoice);
+			if (invoice.getId() == 0) {
+				res = -1;
+				ut.rollback();
+				messages.append("Tạo hóa đơn thất bại!");
+				return res;
+			}
+			// Danh sách chi tiết hóa đơn hàng bán
+			for (InvoiceDetailTemp v : listInvoiceDetail) {
+				v.setInvoicetemp(invoice);
+				v.setCreated_by(t.getMember_name());
+				v.setCreated_by_id(t.getMember_id());
+				v.setCreated_date(new Date());
+				em.persist(v);
+				// xuất lô hàng
+				if (v.getId() == 0) {
+					res = -1;
+					messages.append("Tạo chi tiết hóa đơn thất bại!");
+					ut.rollback();
+					return res;
+				}
+			}
+
+			/**
+			 * Danh sách hóa đơn hàng khuyến mãi (lưu tại đây)
+			 */
+			CriteriaQuery<PromotionOrderDetail> cqPOD = cb.createQuery(PromotionOrderDetail.class);
+			Root<PromotionOrderDetail> rootPOD = cqPOD.from(PromotionOrderDetail.class);
+			rootPOD.fetch("product", JoinType.INNER);
+			Join<PromotionOrderDetail, OrderDetail> OD_ = (Join) rootPOD.fetch("order_detail", JoinType.INNER);
+			OD_.fetch("product", JoinType.INNER);
+			cqPOD.select(rootPOD).where(cb.equal(OD_.get("order_lix").get("id"), orderId));
+			TypedQuery<PromotionOrderDetail> queryPOD = em.createQuery(cqPOD);
+			List<PromotionOrderDetail> listPromotionOrderDetailTrans = queryPOD.getResultList();
+			if (listPromotionOrderDetailTrans.size() > 0) {
+				List<PromotionOrderDetail> khuyenmainos = new ArrayList<PromotionOrderDetail>();
+				// lưu chi tiết hóa đơn khuyến mãi
+				for (PromotionOrderDetail p : listPromotionOrderDetailTrans) {
+					if (p.isNo())
+						khuyenmainos.add(p);
+				}
+				listPromotionOrderDetailTrans.removeAll(khuyenmainos);
+				if (listPromotionOrderDetailTrans.size() != 0) {
+					// Danh sách chi tiết hóa đơn hàng khuyến mãi
+					for (PromotionOrderDetail p : listPromotionOrderDetailTrans) {
+						InvoiceDetailTemp invoiceDetailMain = null;
+						if (map.containsKey(p.getOrder_detail())) {
+							invoiceDetailMain = map.get(p.getOrder_detail());
+						}
+						InvoiceDetailTemp detail = new InvoiceDetailTemp();
+						// chi tiết khuyến thuộc hóa đơn chính nào
+						detail.setInvoice_detail_temp_own(invoiceDetailMain);
+						detail.setEx_order(true);
+						detail.setProductdh_code(p.getOrder_detail().getProduct().getProduct_code());
+						detail.setInvoicetemp(invoice);
+						detail.setCreated_by(t.getMember_name());
+						detail.setCreated_date(new Date());
+						detail.setCreated_by_id(t.getMember_id());
+						detail.setProduct(p.getProduct());
+						detail.setQuantity(p.getQuantity());
+						detail.setReal_quantity(0);
+						detail.setUnit_price(p.getUnit_price());
+						detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+						detail.setNote(p.getNote());
+						detail.setIdchitietdonhangkm(p.getId());
+						// detail.setOrder_detail(p.getOrder_detail());// không
+						// cần
+						// set vì đây là chi tiết của hóa đơn trích từ hóa đơn
+						// khuyến mãi
+
+						boolean dutonkho = true;
+						double tonkho = 0;
+						if (kiemton) {
+							tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+							if (tonkho < detail.getQuantity()) {
+								dutonkho = false;
+							}
+						}
+						if (dutonkho) {
+							if (detail.getQuantity() != 0) {
+								em.persist(detail);
+								if (detail.getId() == 0) {
+									res = -1;
+									messages.append("Tạo chi tiết hóa đơn thất bại!");
+									ut.rollback();
+									return res;
+								}
+							}
+						} else {
+							messages.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+									+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+							return res;
+						}
+
+					}
+				}
+
+			}
+
+			ut.commit();
+			res = 0;
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			messages.append("ProcessLogicInvoicePosService.createInvoiceByOrderLix:" + e.getMessage());
+			logger.error("ProcessLogicInvoicePosService.createInvoiceByOrderLix:" + e.getMessage(), e);
+			e.printStackTrace();
+		} finally {
+			if (con != null) {
+				con.close();
+			}
+		}
+		long end = System.currentTimeMillis();
+		System.out.println("--------Thoi gian chay: " + (end - start));
+		return res;
+	}
+
+	// Tao hoa don tu don hang
+	@Override
+	public int createInvoiceByExcelOnline(Invoice invoice, List<InvoiceDetail> invoiceDetails)
+			throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			em.persist(invoice);
+			if (invoice.getId() == 0) {
+				res = -1;
+				ut.rollback();
+				return res;
+			}
+			// tạo chi tiết cho đơn hàng thứ nhất
+			for (InvoiceDetail v : invoiceDetails) {
+				v.setInvoice(invoice);
+				v.setCreated_date(new Date());
+				em.persist(v);
+				if (v.getId() == 0) {
+					res = -1;
+					ut.rollback();
+					return res;
+				}
+			}
+			ut.commit();
+			res = 0;
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			logger.error("ProcessLogicInvoicePosService.createInvoiceByExcelOnline:" + e.getMessage(), e);
+			e.printStackTrace();
+		} finally {
+			if (con != null) {
+				con.close();
+			}
+		}
+		return res;
+	}
+
+	// public int createInvoiceByOrderLix2(WrapOrderLixReqInfo t,StringBuilder
+	// messages) throws IllegalStateException, SystemException, SQLException {
+	// int res=-1;
+	// Connection con=null;
+	// try{
+	// ut.begin();
+	// con = datasource.getConnection();
+	// con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+	// OrderLix pOrderLix=t.getOrder_lix();
+	// List<WrapOrderDetailLixReqInfo>
+	// pListWrapOrderDetail=t.getList_wrap_order_detail();
+	// List<PromotionOrderDetail>
+	// pListPromotionOrderDetail=t.getList_promotion_order_detail();
+	// if(pOrderLix !=null && pListWrapOrderDetail !=null &&
+	// pListWrapOrderDetail.size()>0){
+	// //lấy trans đơn hàng
+	// OrderLix transOrder=em.find(OrderLix.class, pOrderLix.getId());
+	// if(transOrder !=null){
+	// List<InvoiceDetail> listInvoiceDetail=new ArrayList<>();
+	// //cập nhật đơn hàng trạng thái và thực xuất
+	// //cập nhật chi tiết thực xuất đơn hàng.
+	// Map<OrderDetail, InvoiceDetail> map=new LinkedHashMap<>();
+	// for(WrapOrderDetailLixReqInfo w : pListWrapOrderDetail){
+	// OrderDetail d=w.getOrder_detail();
+	// //lấy trans orderdetail
+	// OrderDetail transOrderDetail=em.find(OrderDetail.class, d.getId());
+	// if(transOrderDetail==null){
+	// res=-1;
+	// ut.rollback();
+	// messages.append("Chi tiết hóa đơn không tồn tại!");
+	// return res;
+	// }
+	// // //cập nhật thực xuất
+	// // double
+	// slthucxuat=BigDecimal.valueOf(transOrderDetail.getRealbox_quantity()).add(BigDecimal.valueOf(w.getQuantity())).doubleValue();
+	// // transOrderDetail.setRealbox_quantity(slthucxuat);
+	// // //update trans
+	// // if(em.merge(transOrderDetail)==null){
+	// // res=-1;
+	// // ut.rollback();
+	// // messages.append("Cập nhật chi tiết đơn hàng thất bại!");
+	// // return res;
+	// // }
+	// //chuẩn bị danh sách chi tiết hóa đơn
+	// InvoiceDetail detail=new InvoiceDetail();
+	// detail.setEx_order(true);
+	// detail.setProduct(d.getProduct());
+	// //số số lượng theo đơn vị sản phẩm
+	// detail.setQuantity(w.getQuantity()*d.getProduct().getSpecification());
+	// detail.setUnit_price(transOrderDetail.getUnit_price());
+	// detail.setNote(transOrderDetail.getNote());
+	// listInvoiceDetail.add(detail);
+	// if(!map.containsKey(d)){
+	// map.put(d, detail);
+	// }
+	// }
+	// //tạo hóa đơn thứ nhất
+	// Invoice invoice=new Invoice();
+	// invoice.setOrder_lix(transOrder);
+	// invoice.setOrder_code(transOrder.getOrder_code());
+	// invoice.setOrder_voucher(transOrder.getVoucher_code());
+	// invoice.setCreated_by_id(t.getMember_id());
+	// invoice.setCreated_by(t.getMember_name());
+	// invoice.setCreated_date(new Date());
+	// invoice.setCustomer(pOrderLix.getCustomer());
+	// invoice.setInvoice_date(new Date());
+	// invoice.setPayment_method(pOrderLix.getPayment_method());
+	// invoice.setCar(pOrderLix.getCar());
+	// invoice.setDelivery_pricing(pOrderLix.getDelivery_pricing());//đơn giá
+	// vận chuyển chứa nơi đến
+	// invoice.setFreight_contract(pOrderLix.getFreight_contract());
+	// invoice.setIe_categories(pOrderLix.getIe_categories());
+	// invoice.setWarehouse(pOrderLix.getWarehouse());
+	// invoice.setTax_value(pOrderLix.getTax_value());
+	// invoice.setVoucher_code(pOrderLix.getVoucher_code());
+	// invoice.setPricing_program(pOrderLix.getPricing_program());
+	// invoice.setPromotion_program(pOrderLix.getPromotion_program());
+	// invoice.setPo_no(pOrderLix.getPo_no());
+	// invoice.setInvoice_code(initInvoiceCode());
+	// initCodeVoucher(invoice);
+	// em.persist(invoice);
+	// if(invoice.getId()==0){
+	// res=-1;
+	// ut.rollback();
+	// messages.append("Tạo hóa đơn thất bại!");
+	// return res;
+	// }
+	// //tạo chi tiết cho đơn hàng thứ nhất
+	// for(InvoiceDetail v:listInvoiceDetail){
+	// v.setInvoice(invoice);
+	// v.setCreated_by(t.getMember_name());
+	// v.setCreated_by_id(t.getMember_id());
+	// v.setCreated_date(new Date());
+	// em.persist(v);
+	// //xuất lô hàng
+	// if(v.getId()==0){
+	// res=-1;
+	// messages.append("Tạo chi tiết hóa đơn thất bại!");
+	// ut.rollback();
+	// return res;
+	// }
+	// }
+	// if(pListPromotionOrderDetail != null &&
+	// pListPromotionOrderDetail.size()>0){
+	// //tạo đơn hàng khuyến mãi(thứ 2)
+	// Invoice invoice2=new Invoice();
+	// invoice2.setIpromotion(true);
+	// invoice2.setOrder_lix(transOrder);
+	// invoice2.setOrder_code(transOrder.getOrder_code());
+	// invoice2.setOrder_voucher(transOrder.getVoucher_code());
+	// invoice2.setCreated_by_id(t.getMember_id());
+	// invoice2.setCreated_by(t.getMember_name());
+	// invoice2.setCreated_date(new Date());
+	// invoice2.setCustomer(pOrderLix.getCustomer());
+	// invoice2.setInvoice_date(new Date());
+	// invoice2.setPayment_method(pOrderLix.getPayment_method());
+	// invoice2.setCar(pOrderLix.getCar());
+	// invoice2.setDelivery_pricing(pOrderLix.getDelivery_pricing());//đơn giá
+	// vận chuyển chứa nơi đến
+	// invoice2.setFreight_contract(pOrderLix.getFreight_contract());
+	// invoice2.setIe_categories(pOrderLix.getIe_categories());
+	// invoice2.setWarehouse(pOrderLix.getWarehouse());
+	// invoice2.setTax_value(pOrderLix.getTax_value());
+	// invoice2.setVoucher_code(pOrderLix.getVoucher_code());
+	// invoice2.setPricing_program(pOrderLix.getPricing_program());
+	// invoice2.setPromotion_program(pOrderLix.getPromotion_program());
+	// invoice2.setPo_no(pOrderLix.getPo_no());
+	// invoice2.setInvoice_code(initInvoiceCode());
+	// //hóa đơn sở hữu khuyến mãi này
+	// invoice2.setInvoice_own(invoice);
+	// initCodeVoucher(invoice2);
+	// em.persist(invoice2);
+	// if(invoice2.getId()==0){
+	// res=-1;
+	// ut.rollback();
+	// messages.append("Tạo hóa đơn khuyến mãi thất bại!");
+	// return res;
+	// }
+	// //lưu chi tiết hóa đơn khuyến mãi
+	// for(PromotionOrderDetail p: pListPromotionOrderDetail){
+	// InvoiceDetail invoiceMain=null;
+	// if(map.containsKey(p.getOrder_detail())){
+	// invoiceMain=map.get(p.getOrder_detail());
+	// }
+	// InvoiceDetail detail=new InvoiceDetail();
+	// detail.setInvoice_detail_own(invoiceMain);
+	// detail.setEx_order(true);
+	// detail.setProductdh_code(p.getOrder_detail().getProduct().getProduct_code());
+	// detail.setInvoice(invoice2);
+	// detail.setCreated_by(t.getMember_name());
+	// detail.setCreated_date(new Date());
+	// detail.setCreated_by_id(t.getMember_id());
+	// detail.setProduct(p.getProduct());
+	// detail.setQuantity(p.getQuantity());
+	// detail.setUnit_price(p.getUnit_price());
+	// detail.setNote(p.getNote());
+	// // detail.setOrder_detail(p.getOrder_detail());// không cần set vì đây là
+	// chi tiết của hóa đơn trích từ hóa đơn khuyến mãi
+	// em.persist(detail);
+	// if(detail.getId()==0){
+	// res=-1;
+	// messages.append("Tạo chi tiết hóa đơn thất bại!");
+	// ut.rollback();
+	// return res;
+	// }
+	// }
+	// }
+	// //kiểm tra số lượng để set trạng thái
+	// //sum số lượng đvt đơn hàng
+	// CriteriaBuilder cb=em.getCriteriaBuilder();
+	// CriteriaQuery<Double> cqSumOrderDetail=cb.createQuery(Double.class);
+	// Root<OrderDetail>
+	// rootOrderDetail=cqSumOrderDetail.from(OrderDetail.class);
+	// Join<OrderDetail, Product>
+	// product_=rootOrderDetail.join("product",JoinType.INNER);
+	// cqSumOrderDetail.select(cb.sum(cb.prod(rootOrderDetail.get("box_quantity"),
+	// product_.get("specification")))).
+	// where(cb.equal(rootOrderDetail.get("order_lix").get("id"),
+	// transOrder.getId()));
+	// TypedQuery<Double> querySumOrderDetail=em.createQuery(cqSumOrderDetail);
+	// double
+	// totalQuantityOrder=Double.parseDouble(Objects.toString(querySumOrderDetail.getSingleResult(),"0"));
+	// //sum số lương đvt hóa đơn
+	// CriteriaQuery<Double> cqSumInvoiceDetail=cb.createQuery(Double.class);
+	// Root<InvoiceDetail>
+	// rootInvoiceDetail=cqSumInvoiceDetail.from(InvoiceDetail.class);
+	// Join<InvoiceDetail, Invoice> invoice_
+	// =rootInvoiceDetail.join("invoice",JoinType.INNER);
+	// Predicate consid=cb.conjunction();
+	// consid.getExpressions().add(cb.equal(invoice_.get("order_lix").get("id"),transOrder.getId()));
+	// consid.getExpressions().add(cb.isFalse(invoice_.get("ipromotion")));
+	// consid.getExpressions().add(cb.isTrue(rootInvoiceDetail.get("ex_order")));
+	// cqSumInvoiceDetail.select(cb.coalesce(cb.sum(rootInvoiceDetail.get("quantity")),0.0)).
+	// where(consid);
+	// TypedQuery<Double>
+	// querySumInvoiceDetail=em.createQuery(cqSumInvoiceDetail);
+	// double
+	// totalQuantityInvoice=Double.parseDouble(Objects.toString(querySumInvoiceDetail.getSingleResult()));
+	// if(totalQuantityInvoice<totalQuantityOrder){
+	// //cập nhật trạng thái đơn hàng là đang giao hàng
+	// transOrder.setStatus(1);
+	// if(em.merge(transOrder)==null){
+	// res=-1;
+	// ut.rollback();
+	// messages.append("Cập nhật trạng thái đơn hàng thất bại!");
+	// return res;
+	// }
+	//
+	// }else if(totalQuantityInvoice==totalQuantityOrder){
+	// //cập nhật trạng thái đã hoàn thành
+	// transOrder.setStatus(2);
+	// if(em.merge(transOrder)==null){
+	// res=-1;
+	// ut.rollback();
+	// messages.append("Cập nhật trạng thái đơn hàng thất bại!");
+	// return res;
+	// }
+	// }else{
+	// res=-1;
+	// ut.rollback();
+	// messages.append("Dữ liệu sai!");
+	// return res;
+	//
+	// }
+	// }else{
+	// res=-1;
+	// ut.commit();
+	// messages.append("Đơn hàng không tồn tại!");
+	// }
+	// }
+	// res=0;
+	// ut.commit();
+	// }catch (Exception e) {
+	// res=-1;
+	// ut.rollback();
+	// messages.append("ProcessLogicInvoicePosService.createInvoicePosByOrder:"+e.getMessage());
+	// logger.error("ProcessLogicInvoicePosService.createInvoicePosByOrder:"+e.getMessage(),e);
+	// }finally {
+	// if(con!=null){
+	// con.close();
+	// }
+	// }
+	// return res;
+	// }
+	@Override
+	public int createInvoiceByIEInvoice(WrapIEInvocieReqInfo t, Message message) throws SQLException,
+			IllegalStateException, SecurityException, SystemException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			long iEInvoiceId = t.getIe_invoice_id();
+			// kiểm tra hóa đơn đã chuyển qua hóa đơn chính chưa. nếu đã chuyển
+			// hóa đơn chính thì không cho nó insert vào.
+			CriteriaQuery<IEInvoice> cq = cb.createQuery(IEInvoice.class);
+			Root<IEInvoice> root = cq.from(IEInvoice.class);
+			// root.fetch("invoice",JoinType.LEFT);
+			// root.fetch("payment_method",JoinType.LEFT);
+			// root.fetch("customer",JoinType.INNER);
+			// root.fetch("car",JoinType.LEFT);
+			// root.fetch("ie_categories",JoinType.INNER);
+			// root.fetch("contract",JoinType.LEFT);
+			// root.fetch("stevedore",JoinType.LEFT);
+			// root.fetch("form_up_goods",JoinType.LEFT);
+			// root.fetch("warehouse",JoinType.LEFT);
+			// root.fetch("harbor_category",JoinType.LEFT);
+			// root.fetch("stocker",JoinType.LEFT);
+			cq.select(root).where(cb.equal(root.get("id"), iEInvoiceId));
+			TypedQuery<IEInvoice> query = em.createQuery(cq);
+			IEInvoice iEInvoiceTrans = query.getSingleResult();
+			if (iEInvoiceTrans == null) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("phiếu xuất hàng xuất khẩu không tồn tại!");
+				return res;
+			}
+			if (iEInvoiceTrans.getInvoice() != null) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Phiếu xuất hàng xuất khẩu đã chuyển qua hóa đơn không được chuyển!");
+				return res;
+			}
+			// lấy danh sách chi tiết phiếu nhâp
+			CriteriaQuery<IEInvoiceDetail> cqDetail = cb.createQuery(IEInvoiceDetail.class);
+			Root<IEInvoiceDetail> rootIEInvocieDetail = cqDetail.from(IEInvoiceDetail.class);
+			cqDetail.select(rootIEInvocieDetail).where(
+					cb.equal(rootIEInvocieDetail.get("ie_invoice").get("id"), iEInvoiceId));
+			TypedQuery<IEInvoiceDetail> queryDetail = em.createQuery(cqDetail);
+			List<IEInvoiceDetail> listIEInvoiceDetailTrans = queryDetail.getResultList();
+			if (listIEInvoiceDetailTrans.size() == 0) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Danh sách chi tiết xuất hàng xuất khẩu không có!");
+				return res;
+			}
+			Invoice invoice = new Invoice();
+			invoice.setIdhoadonxk(iEInvoiceTrans.getId());// id don hang xuat
+			// khau
+			invoice.setInvoice_date(iEInvoiceTrans.getInvoice_date());
+			invoice.setOrder_lix(null);
+			invoice.setOrder_code(null);
+			invoice.setOrder_voucher(null);
+			invoice.setCreated_by_id(t.getCreated_by_id());
+			invoice.setCreated_by(t.getCreated_by());
+			invoice.setCreated_date(new Date());
+			invoice.setCustomer(iEInvoiceTrans.getCustomer());
+			invoice.setPayment_method(iEInvoiceTrans.getPayment_method());
+			invoice.setCar(iEInvoiceTrans.getCar());
+			invoice.setDonvitien(iEInvoiceTrans.getCurrency() == null ? "" : iEInvoiceTrans.getCurrency()
+					.getCurrency_type());
+			invoice.setTygia(iEInvoiceTrans.getExchange_rate());
+			// lấy nơi vận chuyển
+			CriteriaQuery<DeliveryPricing> cqDeliveryPricing = cb.createQuery(DeliveryPricing.class);
+			Root<DeliveryPricing> rootDeliveryPricing = cqDeliveryPricing.from(DeliveryPricing.class);
+			cqDeliveryPricing.select(rootDeliveryPricing)
+					.where(cb.and(cb.equal(rootDeliveryPricing.get("customer").get("id"), iEInvoiceTrans.getCustomer()
+							.getId()), cb.isFalse(rootDeliveryPricing.get("disable"))));
+			TypedQuery<DeliveryPricing> queryDeliveryPricing = em.createQuery(cqDeliveryPricing);
+			List<DeliveryPricing> listDPTrans = queryDeliveryPricing.getResultList();
+			if (listDPTrans.size() > 0) {
+				invoice.setDelivery_pricing(listDPTrans.get(0));// đơn giá vận
+																// chuyển chứa
+																// nơi đến
+			}
+			invoice.setFreight_contract(null);
+			invoice.setIe_categories(iEInvoiceTrans.getIe_categories());
+			invoice.setWarehouse(iEInvoiceTrans.getWarehouse());
+			invoice.setTax_value(iEInvoiceTrans.getTax_value());
+			invoice.setVoucher_code(iEInvoiceTrans.getVoucher_code());
+			invoice.setPricing_program(null);
+			invoice.setPromotion_program(null);
+			invoice.setPo_no(null);
+			invoice.setInvoice_code(initInvoiceCode());
+			invoice.setStevedore(iEInvoiceTrans.getStevedore());
+			invoice.setStocker(iEInvoiceTrans.getStocker());
+			invoice.setForm_up_goods(iEInvoiceTrans.getForm_up_goods());
+			invoice.setHarbor_category(iEInvoiceTrans.getHarbor_category());
+			invoice.setIe_reason(iEInvoiceTrans.getIe_reason());
+			invoice.setContract(iEInvoiceTrans.getContract());
+			invoice.setDelivery_date(iEInvoiceTrans.getInvoice_date());
+			invoice.setDepartment_name(iEInvoiceTrans.getDepartment_name());
+			invoice.setNote(iEInvoiceTrans.getNote());
+			invoice.setPayment(iEInvoiceTrans.isPaid());
+			invoice.setTimeout(iEInvoiceTrans.isTime_out());
+			invoice.setExported(true);
+
+			// initCodeVoucher(invoice);
+			em.persist(invoice);
+			if (invoice.getId() == 0) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Không tạo được hóa đơn!");
+				return res;
+			}
+			List<InvoiceDetail> invoiceDetails = new ArrayList<InvoiceDetail>();
+			boolean cospkm = false;
+			for (IEInvoiceDetail dt : listIEInvoiceDetailTrans) {
+				InvoiceDetail detail = new InvoiceDetail();
+				detail.setCreated_date(new Date());
+				detail.setCreated_by(t.getCreated_by());
+				detail.setForeign_unit_price(dt.getForeign_unit_price());
+				detail.setTotal_foreign_amount(dt.getTotal_foreign_amount());
+				detail.setProduct(dt.getProduct());
+				detail.setQuantity(dt.getQuantity());
+				detail.setReal_quantity(detail.getQuantity());
+				detail.setUnit_price(dt.getUnit_price());
+				detail.setTotal(dt.getTotal_amount());
+				detail.setInvoice(invoice);
+				detail.setIdcthdxuatkhau(dt.getId());
+				invoiceDetails.add(detail);
+				// detail.setIE_invoice_detail không cần thiết
+				em.persist(detail);
+				if (detail.getId() == 0) {
+					res = -1;
+					ut.rollback();
+					message.setUser_message("Tạo chi tiết hóa đơn thất bại!");
+					return res;
+				}
+				if (cospkm == false) {
+					List<ProductKM> productKMs = productKMService.findByIdProductMain(dt.getProduct().getId());
+					for (int i = 0; i < productKMs.size(); i++) {
+						if (productKMs.get(i).isSpchinh() == false) {
+							cospkm = true;
+							break;
+						}
+					}
+				}
+			}
+			if (cospkm) {
+				message.setUser_message("Hóa đơn có sản phẩm khuyến mãi");
+			}
+			double totalevent = invoiceDetails.stream().mapToDouble(f -> f.getTotal()).sum();
+			invoice.setTongtien(totalevent);
+			invoice.setThue(MyMath.round(invoice.getTongtien() * invoice.getTax_value()));
+			// cập nhật lại phiếu xuất xuất khẩu là đã copy qua hóa đơn chính
+			iEInvoiceTrans.setInvoice(invoice);
+			if (em.merge(iEInvoiceTrans) == null) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Tạo hóa đơn không thành công.");
+				return res;
+			}
+			res = 0;
+			ut.commit();
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			message.setUser_message("Lưu thất bại!");
+			message.setInternal_message("ProcessLogicIEInvoiceService.createInvoiceByIEInvoice:" + e.getMessage());
+			logger.error("ProcessLogicIEInvoiceService.createInvoiceByIEInvoice:" + e.getMessage(), e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+
+	}
+
+	@Inject
+	ProductKMService productKMService;
+
+	private double sumTotalDetails(List<IEInvoiceDetail> ieInvoiceDetails) {
+		try {
+			if (ieInvoiceDetails != null && ieInvoiceDetails.size() != 0) {
+				double totalevent = ieInvoiceDetails.stream().mapToDouble(f -> f.getTotal_amount()).sum();
+				return MyMath.round(totalevent);
+			}
+		} catch (Exception e) {
+		}
+		return 0;
+	}
+
+	@Override
+	public int deleteExportBatch(WrapDelExportBatchReqInfo t, Message message) throws SQLException,
+			IllegalStateException, SecurityException, SystemException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<ExportBatch> cqExportBatch = cb.createQuery(ExportBatch.class);
+			Root<ExportBatch> rootExportBatch = cqExportBatch.from(ExportBatch.class);
+			rootExportBatch.fetch("batch", JoinType.INNER);
+			cqExportBatch.select(rootExportBatch).where(cb.equal(rootExportBatch.get("id"), t.getId()));
+			TypedQuery<ExportBatch> queryEB = em.createQuery(cqExportBatch);
+			List<ExportBatch> list = queryEB.getResultList();
+			if (list.size() == 0) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Lô hàng xuất không tồn tại!");
+				message.setInternal_message("error export_batch id:" + t.getId());
+				return res;
+			}
+			ExportBatch exportBatchTrans = list.get(0);
+			Batch batchTrans = exportBatchTrans.getBatch();
+			// trả số lượng cho lô hàng
+			// giảm số lượng xuất của lô hàng đó đi
+			double quantityExport = BigDecimal.valueOf(batchTrans.getQuantity_export())
+					.subtract(BigDecimal.valueOf(exportBatchTrans.getQuantity())).doubleValue();
+			batchTrans.setLast_modifed_by(t.getMember_name());
+			batchTrans.setLast_modifed_date(new Date());
+			batchTrans.setQuantity_export(quantityExport);
+			if (em.merge(batchTrans) == null) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Cập nhật lại số lượng lô hàng thất bại!");
+				message.setInternal_message("error batch_code:" + batchTrans.getBatch_code() + " id:"
+						+ batchTrans.getId());
+				return res;
+			}
+			// xóa lô hàng xuất (ExportBatch) sử dụng JQPL
+			Query queryDelEB = em.createQuery("delete from ExportBatch where id= :id ");
+			queryDelEB.setParameter("id", exportBatchTrans.getId());
+			if (queryDelEB.executeUpdate() <= 0) {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Xóa lô hàng xuất thất bại!");
+				message.setInternal_message("error delele ExportBatch id:" + exportBatchTrans.getId());
+				return res;
+			}
+			//
+			res = 0;
+			ut.commit();
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			message.setUser_message("Xóa lô hàng xuất thất bại!");
+			message.setInternal_message("ProcessLogicIEInvoiceService.deleteExportBatch:" + e.getMessage());
+			logger.error("ProcessLogicIEInvoiceService.deleteExportBatch:" + e.getMessage(), e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	@Override
+	public int saveListWrapExportData(WrapDataInvoiceDetail t, Message message) throws SQLException,
+			IllegalStateException, SecurityException, SystemException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			InvoiceDetail detail = t.getInvoice_detail();
+			List<WrapExportDataReqInfo> listData = t.getList_wrap_export_data();
+			if (detail != null && detail.getId() != 0 && listData != null && listData.size() > 0) {
+				// load trans chi tiết hóa đơn
+				InvoiceDetail invoiceDetailTrans = em.find(InvoiceDetail.class, detail.getId());
+				if (invoiceDetailTrans == null) {
+					res = -1;
+					ut.rollback();
+					message.setUser_message("Chi tiết hóa đơn không tồn tại!");
+					message.setInternal_message("error invoice detail not found id:" + detail.getId());
+					return res;
+				}
+				double sumExport = 0;
+				// kiểm tra tổng số lượng xuất có lơn hơn số lượng yêu cầu
+				// không.
+				for (WrapExportDataReqInfo q : listData) {
+					sumExport = BigDecimal.valueOf(sumExport).add(BigDecimal.valueOf(q.getQuantity_export()))
+							.doubleValue();
+				}
+				// nếu tổng số lượng xuất lớn hơn số lượng yêu cầu thì rollback
+				if (sumExport > invoiceDetailTrans.getQuantity()) {
+					res = -1;
+					ut.rollback();
+					message.setUser_message("Tổng số lượng thực xuất lớn hơn số lượng yêu cầu!");
+					message.setInternal_message("");
+					return res;
+				}
+				// xóa tất cả lô hàng xuất trước đó và trả lại số lượng lô hàng.
+				// load danh sách lô hàng xuất trong trans.
+				CriteriaQuery<ExportBatch> cqEB = cb.createQuery(ExportBatch.class);
+				Root<ExportBatch> rootEB = cqEB.from(ExportBatch.class);
+				rootEB.fetch("batch", JoinType.INNER);
+				cqEB.select(rootEB).where(cb.equal(rootEB.get("invoice_detail").get("id"), detail.getId()));
+				TypedQuery<ExportBatch> queryEB = em.createQuery(cqEB);
+				List<ExportBatch> listExportBatchTrans = queryEB.getResultList();
+				if (listExportBatchTrans.size() > 0) {
+					for (ExportBatch ex : listExportBatchTrans) {
+						double quantityEB = ex.getQuantity();
+						Batch bTrans = ex.getBatch();
+						// trả lại số lượng cho lô hàng bằng cách giảm số lượng
+						// xuất của lô hàng lại
+						double quantityExportBP = BigDecimal.valueOf(bTrans.getQuantity_export())
+								.subtract(BigDecimal.valueOf(quantityEB)).doubleValue();
+						bTrans.setQuantity_export(quantityExportBP);
+						bTrans.setLast_modifed_date(new Date());
+						bTrans.setLast_modifed_by(t.getMember_name());
+						if (em.merge(bTrans) == null) {
+							res = -1;
+							ut.rollback();
+							message.setUser_message("Trả lại số lượng lô hàng thất bại!");
+							message.setInternal_message("error batch!!");
+							return res;
+						}
+					}
+					Query queryDelExportBatch = em
+							.createQuery("delete from ExportBatch as p where p.invoice_detail.id=:idd");
+					queryDelExportBatch.setParameter("idd", detail.getId());
+					if (queryDelExportBatch.executeUpdate() <= 0) {
+						res = -1;
+						ut.rollback();
+						message.setUser_message("Xóa lô hàng xuất thất bại!");
+						message.setInternal_message("error del ExportBatch");
+						return res;
+					}
+				}
+				// tiến hành kiễm tra dữ liệu hợp lệ và tạo lại dữ liệu
+				int i = 0;
+				for (WrapExportDataReqInfo ex : listData) {
+					i++;
+					ExportBatch exportBatchOld = ex.getExport_batch();
+					// số lượng xuất của lô hàng thực tế.
+					double quantityExport = ex.getQuantity_export();
+					// set id bằng 0 cho trường hợp đã xuất trước đó(persist)
+					exportBatchOld.setId(0);
+					// số lượng lô hàng
+					exportBatchOld.setQuantity(quantityExport);
+					Batch batchOld = ex.getExport_batch().getBatch();
+					Batch batchTrans = em.find(Batch.class, batchOld.getId());
+					if (batchTrans == null) {
+						res = -1;
+						ut.rollback();
+						message.setUser_message("Lô hàng không tồn tại!");
+						message.setInternal_message("not exists batch id:" + batchOld.getId());
+						return res;
+					}
+					// cập nhật tăng số lượng xuất của lô hàng lên
+					double quantityExportNew = BigDecimal.valueOf(batchTrans.getQuantity_export())
+							.add(BigDecimal.valueOf(quantityExport)).doubleValue();
+					batchTrans.setQuantity_export(quantityExportNew);
+					batchTrans.setLast_modifed_by(t.getMember_name());
+					batchTrans.setLast_modifed_date(new Date());
+					if (em.merge(batchTrans) == null) {
+						res = -1;
+						ut.rollback();
+						message.setUser_message("Cập nhật số lượng xuất của lô hàng thất bại");
+						message.setUser_message("error merge batch id:" + batchTrans.getId());
+						return res;
+					}
+					// persit exportbatch
+					exportBatchOld.setCreated_by(t.getMember_name());
+					exportBatchOld.setLast_modifed_by(t.getMember_name());
+					exportBatchOld.setCreated_date(new Date());
+					exportBatchOld.setLast_modifed_date(new Date());
+					exportBatchOld.setInvoice_detail(invoiceDetailTrans);
+					em.persist(exportBatchOld);
+					if (exportBatchOld.getId() == 0) {
+						res = -1;
+						ut.rollback();
+						message.setUser_message("Lưu lô hàng xuất thất bại!");
+						message.setInternal_message("error persit ExportBatch row:" + i);
+					}
+				}
+				invoiceDetailTrans.setReal_quantity(sumExport);
+				invoiceDetailTrans.setLast_modifed_by(t.getMember_name());
+				invoiceDetailTrans.setLast_modifed_date(new Date());
+				if (em.merge(invoiceDetailTrans) == null) {
+					res = -1;
+					ut.rollback();
+					message.setUser_message("Cập nhật thực xuất chi tiết hóa đơn thất bại!");
+					message.setInternal_message("");
+					return res;
+				}
+			} else {
+				res = -1;
+				ut.rollback();
+				message.setUser_message("Thông tin không đúng!");
+				message.setInternal_message("error request data!");
+				return res;
+			}
+			res = 0;
+			ut.commit();
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			message.setUser_message("Lưu thất bại!");
+			message.setInternal_message("ProcessLogicInvoiceService.saveListWrapExportData:" + e.getMessage());
+			logger.error("ProcessLogicInvoiceService.saveListWrapExportData:" + e.getMessage(), e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	@Override
+	public int saveOrUpdateInvoiceDetail(WrapPMInvoiceDetailReqInfo t, Message message, String userAction)
+			throws SQLException, IllegalStateException, SecurityException, SystemException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			InvoiceDetail invoiceDetail = t.getInvoice_detail();
+			Invoice invoice = invoiceDetail.getInvoice();
+			String memberName = t.getMember_name();
+			// kiểm tra nếu hóa đơn chuyển từ đơn hàng qua thì không cho xuất
+			Invoice invoiceTrans = em.find(Invoice.class, invoice.getId());
+			if (invoiceTrans == null) {
+				res = -1;
+				message.setUser_message("Chi tiết không tồn tại");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+
+			if (invoiceDetail.getId() == 0) {
+				// lưu chi tiết phiêu nhập
+				invoiceDetail.setCreated_by(memberName);
+				invoiceDetail.setCreated_date(new Date());
+				invoiceDetail.setReal_quantity(invoiceDetail.getQuantity());
+				em.persist(invoiceDetail);
+				if (invoiceDetail.getId() == 0) {
+					res = -1;
+					message.setUser_message("Lưa chi tiết hóa đơn thất bại");
+					message.setInternal_message("");
+					ut.rollback();
+					return res;
+				}
+
+			} else {
+
+				// cập nhật chi tiết hoa don.
+				Query queryUpdateInvoiceDetail = em
+						.createQuery("update InvoiceDetail set product.id=:p,quantity=:q,real_quantity=:rq,unit_price=:up,total=:total,note=:n,foreign_unit_price=:fup,note_batch_code=:nbc,last_modifed_date=:lmd,last_modifed_by=:lmb,useraction=:useraction, act='All' where id=:id ");
+				queryUpdateInvoiceDetail.setParameter("p", invoiceDetail.getProduct().getId());
+				queryUpdateInvoiceDetail.setParameter("q", invoiceDetail.getQuantity());
+				queryUpdateInvoiceDetail.setParameter("rq", invoiceDetail.getQuantity());
+				queryUpdateInvoiceDetail.setParameter("up", invoiceDetail.getUnit_price());
+				queryUpdateInvoiceDetail.setParameter("total", (invoiceDetail.getTotal()));
+				queryUpdateInvoiceDetail.setParameter("n", invoiceDetail.getNote());
+				queryUpdateInvoiceDetail.setParameter("fup", invoiceDetail.getForeign_unit_price());
+				queryUpdateInvoiceDetail.setParameter("nbc", invoiceDetail.getNote_batch_code());
+				queryUpdateInvoiceDetail.setParameter("lmd", new Date());
+				queryUpdateInvoiceDetail.setParameter("lmb", memberName);
+				queryUpdateInvoiceDetail.setParameter("id", invoiceDetail.getId());
+				queryUpdateInvoiceDetail.setParameter("useraction", userAction);
+				if (queryUpdateInvoiceDetail.executeUpdate() <= 0) {
+					res = -1;
+					message.setUser_message("Cập nhật chi tiết hóa đơn thất bại");
+					message.setInternal_message("");
+					ut.rollback();
+					return res;
+				}
+			}
+			res = 0;
+			ut.commit();
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			message.setUser_message("Lưu thất bại!");
+			message.setInternal_message("ProcessLogicInvoiceService.saveOrUpdateInvoiceDetail:" + e.getMessage());
+			logger.error("ProcessLogicInvoiceService.saveOrUpdateInvoiceDetail:" + e.getMessage(), e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	@Override
+	public int processExported(Invoice invoice, Message message) throws SQLException, IllegalStateException,
+			SecurityException, SystemException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+			Invoice invoiceTrans = em.find(Invoice.class, invoice.getId());
+			if (invoiceTrans == null) {
+				res = -1;
+				message.setUser_message("Phiếu xuất không tìm thấy");
+				message.setInternal_message("error Invocie not found");
+				ut.rollback();
+				return res;
+			}
+			// nếu hóa đơn đa hủy hoặc hóa đơn đã hoàn thành
+			if (invoiceTrans.getStatus() == 1 || invoiceTrans.getStatus() == 2) {
+				res = -1;
+				if (invoiceTrans.getStatus() == 1) {
+					message.setUser_message("Phiếu xuất đã hoàn thành việc thanh toán không được cập nhật");
+				} else {
+					message.setUser_message("Phiếu xuất đã hủy không được cập nhật");
+				}
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			if (invoice.isExported() == true) {
+				if (invoiceTrans.isExported() == false) {
+					// kiểm tra đã hoàn thành xuất lô hàng cho chi tiết phiếu
+					// xuất chưa
+					Query queryCountID = em
+							.createQuery("select count(d.id) from InvoiceDetail as d where d.invoice.id=:id and d.quantity <> d.real_quantity ");
+					queryCountID.setParameter("id", invoiceTrans.getId());
+					int countID = Integer.parseInt(Objects.toString(queryCountID.getSingleResult(), "0"));
+					if (countID > 0) {
+						res = -1;
+						message.setUser_message("Phiếu xuất chưa hoàn thành xuất lô hàng");
+						message.setInternal_message("");
+						ut.rollback();
+						return res;
+					}
+				}
+			}
+			// thực hiện cập nhật hóa đơn là hóa đơn đã xuất
+			Query queryUpdateInvoice = em.createQuery("update Invoice set exported=:ex where id=:id");
+			queryUpdateInvoice.setParameter("id", invoice.getId());
+			queryUpdateInvoice.setParameter("ex", invoice.isExported());
+			if (queryUpdateInvoice.executeUpdate() <= 0) {
+				res = -1;
+				message.setUser_message("Cập nhật phiếu xuất thất bại");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			ut.commit();
+			res = 0;
+
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			message.setUser_message("Lưu thất bại!");
+			message.setInternal_message("ProcessLogicInvoiceService.processExported:" + e.getMessage());
+			logger.error("ProcessLogicInvoiceService.processExported:" + e.getMessage(), e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	@Override
+	public int saveOrUpdateInvoiceDetail2(WrapPMInvoiceDetailReqInfo t, Message message, String userAction,
+			boolean hdsuagia) throws SQLException, IllegalStateException, SecurityException, SystemException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			InvoiceDetail invoiceDetail = t.getInvoice_detail();
+			Invoice invoice = invoiceDetail.getInvoice();
+			String memberName = t.getMember_name();
+			CriteriaQuery<Invoice> cqInvoice = cb.createQuery(Invoice.class);
+			Root<Invoice> rootInvoice = cqInvoice.from(Invoice.class);
+			rootInvoice.fetch("pricing_program", JoinType.LEFT);
+			rootInvoice.fetch("order_lix", JoinType.LEFT);
+			cqInvoice.select(rootInvoice).where(cb.equal(rootInvoice.get("id"), invoice.getId()));
+			TypedQuery<Invoice> queryInvoice = em.createQuery(cqInvoice);
+			List<Invoice> listInvoiceTrans = queryInvoice.getResultList();
+			if (listInvoiceTrans.size() == 0) {
+				res = -1;
+				message.setUser_message("Hóa đơn không tồn tại");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			Invoice invoiceTrans = listInvoiceTrans.get(0);
+
+			if (invoiceDetail.getId() == 0) {
+				// lưu chi tiết phiêu nhập
+				if (hdsuagia) {
+					invoiceDetail.setHdsuagia(true);
+				}
+				invoiceDetail.setCreated_by(memberName);
+				invoiceDetail.setCreated_date(new Date());
+				em.persist(invoiceDetail);
+				if (invoiceDetail.getId() == 0) {
+					res = -1;
+					message.setUser_message("Lưu chi tiết hóa đơn thất bại");
+					message.setInternal_message("");
+					ut.rollback();
+					return res;
+				}
+			} else {
+				// lấy chi tiết hóa đơn trong trans
+				invoiceDetail.setReal_quantity(invoiceDetail.getQuantity());
+				// cập nhật chi tiết hóa đơn
+				String sql = "update InvoiceDetail set ### product=:p,quantity=:q,real_quantity=:r_q,unit_price=:up,total=:total,note=:n,foreign_unit_price=:fup,total_foreign_amount=:total_foreign_amount, note_batch_code=:nbc,last_modifed_date=:lmd,last_modifed_by=:lmb,productdh_code=:pddh,useraction=:useraction, act='ALL', slpallet=:slpallet where id=:id ";
+				if (invoiceDetail.getDetail_own_id() != 0) {
+					sql = "update InvoiceDetail set ### product=:p,quantity=:q,real_quantity=:r_q,unit_price=:up,total=:total,note=:n,foreign_unit_price=:fup,total_foreign_amount=:total_foreign_amount,note_batch_code=:nbc,last_modifed_date=:lmd,last_modifed_by=:lmb,productdh_code=:pddh,detail_own_id=:detail_own_id,useraction=:useraction, act='ALL', slpallet=:slpallet where id=:id ";
+				}
+				if (hdsuagia) {
+					sql = sql.replaceFirst("###", " hdsuagia=:hdsuagia, ");
+				} else {
+					sql = sql.replaceFirst("###", " ");
+				}
+				Query queryUpdateInvoiceDetail = em.createQuery(sql);
+				if (hdsuagia) {
+					queryUpdateInvoiceDetail.setParameter("hdsuagia", true);
+				}
+				queryUpdateInvoiceDetail.setParameter("p", invoiceDetail.getProduct());
+				queryUpdateInvoiceDetail.setParameter("q", invoiceDetail.getQuantity());
+				queryUpdateInvoiceDetail.setParameter("r_q", invoiceDetail.getReal_quantity());
+				queryUpdateInvoiceDetail.setParameter("up", invoiceDetail.getUnit_price());
+				queryUpdateInvoiceDetail.setParameter("total", (invoiceDetail.getTotal()));
+				queryUpdateInvoiceDetail.setParameter("n", invoiceDetail.getNote());
+				queryUpdateInvoiceDetail.setParameter("fup", invoiceDetail.getForeign_unit_price());
+				queryUpdateInvoiceDetail.setParameter("total_foreign_amount", invoiceDetail.getTotal_foreign_amount());
+				queryUpdateInvoiceDetail.setParameter("nbc", invoiceDetail.getNote_batch_code());
+				queryUpdateInvoiceDetail.setParameter("lmd", new Date());
+				queryUpdateInvoiceDetail.setParameter("lmb", memberName);
+				queryUpdateInvoiceDetail.setParameter("pddh", invoiceDetail.getProductdh_code());
+				queryUpdateInvoiceDetail.setParameter("slpallet", invoiceDetail.getSlpallet());
+				if (invoiceDetail.getDetail_own_id() != 0) {
+					queryUpdateInvoiceDetail.setParameter("detail_own_id", invoiceDetail.getDetail_own_id());
+				}
+				queryUpdateInvoiceDetail.setParameter("id", invoiceDetail.getId());
+				queryUpdateInvoiceDetail.setParameter("useraction", userAction);
+				if (queryUpdateInvoiceDetail.executeUpdate() <= 0) {
+					res = -1;
+					message.setUser_message("Cập nhật chi tiết hóa đơn không thành công");
+					message.setInternal_message("");
+					ut.rollback();
+					return res;
+				}
+			}
+			res = 0;
+			ut.commit();
+
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			message.setUser_message("Lưu thất bại!");
+			message.setInternal_message("ProcessLogicInvoiceService.saveOrUpdateInvoiceDetail2:" + e.getMessage());
+			logger.error("ProcessLogicInvoiceService.saveOrUpdateInvoiceDetail2:" + e.getMessage(), e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	@Override
+	public int completeInvoice(long id, Message message) throws SQLException, IllegalStateException, SecurityException,
+			SystemException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			// kiểm tra hóa đơn có tồn tại không
+			Invoice invoiceTrans = em.find(Invoice.class, id);
+			if (invoiceTrans == null) {
+				res = -1;
+				message.setUser_message("Không tìm thấy hóa đơn");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			// nếu hóa đơn chưa xuất không được cập nhật
+			if (!invoiceTrans.isExported()) {
+				res = -1;
+				message.setUser_message("Hóa đơn chưa xuất không được cập nhật");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			// nếu hóa đơn đã hủy không được cập nhật
+			if (invoiceTrans.getStatus() == 2) {
+				res = -1;
+				message.setUser_message("Hóa đơn đã hủy không được cập nhật");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			// set trạng thái đã hoàn thành
+			invoiceTrans.setStatus(1);
+			if (em.merge(invoiceTrans) == null) {
+				res = -1;
+				message.setUser_message("Cập nhật trạng thái đã hoàn thành thất bại");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			res = 0;
+			ut.commit();
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			message.setUser_message("Lưu thất bại!");
+			message.setInternal_message("ProcessLogicInvoiceService.completeInvoice:" + e.getMessage());
+			logger.error("ProcessLogicInvoiceService.completeInvoice:" + e.getMessage(), e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	@Override
+	public int destroyInvoice(long id, Message message) throws SQLException, IllegalStateException, SecurityException,
+			SystemException {
+		int res = -1;
+		Connection con = null;
+		try {
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			// kiểm tra hóa đơn có tồn tại không
+			Invoice invoiceTrans = em.find(Invoice.class, id);
+			if (invoiceTrans == null) {
+				res = -1;
+				message.setUser_message("Không tìm thấy hóa đơn");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			// nếu hóa đơn chưa xuất không được cập nhật
+			if (!invoiceTrans.isExported()) {
+				res = -1;
+				message.setUser_message("Hóa đơn chưa xuất không được cập nhật");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			// hóa đơn đã hoàn thành và đã ghi nhận doanh thu không được hủy
+			if (invoiceTrans.getStatus() == 1) {
+				res = -1;
+				message.setUser_message("Hóa đơn đã hoàn thành không được hủy");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			// cập nhật trạng thái đã hủy
+			invoiceTrans.setStatus(2);
+			if (em.merge(invoiceTrans) == null) {
+				res = -1;
+				message.setUser_message("Cập nhật trạng thái hóa đơn hủy thất bại");
+				message.setInternal_message("");
+				ut.rollback();
+				return res;
+			}
+			res = 0;
+			ut.commit();
+
+		} catch (Exception e) {
+			res = -1;
+			ut.rollback();
+			message.setUser_message("Lưu thất bại!");
+			message.setInternal_message("ProcessLogicInvoiceService.destroyInvoice:" + e.getMessage());
+			logger.error("ProcessLogicInvoiceService.destroyInvoice:" + e.getMessage(), e);
+		} finally {
+			if (con != null)
+				con.close();
+		}
+		return res;
+	}
+
+	@Override
+	public int createInvoiceByOrderEcom(EcomOrder t, StringBuilder messages, boolean kiemton)
+	        throws IllegalStateException, SystemException, SQLException {
+	    int res = -1;
+	    Connection con = null;
+	    long start = System.currentTimeMillis();
+	    try {
+	        Date now = MyUtilEJB.loaibogio(new Date());
+	        ut.begin();
+	        con = datasource.getConnection();
+	        con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+	        CriteriaBuilder cb = em.getCriteriaBuilder();
+	        long orderId = t.getId();
+	        String orderType = t.getOrderType();
+	        logger.info("Bắt đầu xử lý đơn hàng với orderId: " + orderId + ", orderNumber: " + t.getOrderNumber() + ", orderType: " + orderType);
+
+	        // Kiểm tra tồn tại của EcomOrder
+	        CriteriaQuery<EcomOrder> cqOrderEcom = cb.createQuery(EcomOrder.class);
+	        Root<EcomOrder> rootOrder = cqOrderEcom.from(EcomOrder.class);
+	        rootOrder.fetch("customer", JoinType.INNER);
+	        rootOrder.fetch("payment_method", JoinType.LEFT);
+	        cqOrderEcom.select(rootOrder).where(cb.equal(rootOrder.get("id"), orderId));
+	        TypedQuery<EcomOrder> queryOrder = em.createQuery(cqOrderEcom);
+	        List<EcomOrder> listOrderTrans = queryOrder.getResultList();
+	        if (listOrderTrans.isEmpty()) {
+	            res = -1;
+	            ut.rollback();
+	            messages.append("Đơn hàng không tồn tại!");
+	            logger.warn("Đơn hàng không tồn tại cho orderId: " + orderId);
+	            return res;
+	        }
+	        EcomOrder orderEcomTrans = listOrderTrans.get(0);
+
+	        if (orderEcomTrans.isDaxuathddt()) {
+	            res = 0;
+	            ut.rollback();
+	            messages.append("Hóa đơn đã được xuất cho đơn hàng: " + orderEcomTrans.getOrderNumber());
+	            logger.info("Hóa đơn đã xuất cho orderId: " + orderId + ", orderType: " + orderType);
+	            return res;
+	        }
+	        orderEcomTrans.setDaxuathddt(true);
+	        em.merge(orderEcomTrans);
+
+	        // Kiểm tra hóa đơn hiện có
+	        CriteriaQuery<Invoice> cqInvoice = cb.createQuery(Invoice.class);
+	        Root<Invoice> rootInvoice = cqInvoice.from(Invoice.class);
+	        cqInvoice.select(rootInvoice)
+	                .where(cb.and(
+	                        cb.equal(rootInvoice.get("order_code"), orderEcomTrans.getOrderId()),
+	                        cb.equal(rootInvoice.get("invoiceType"), orderEcomTrans.getOrderType()),
+	                        cb.equal(rootInvoice.get("idorderlix"), orderEcomTrans.getId())));
+	        TypedQuery<Invoice> queryInvoice = em.createQuery(cqInvoice);
+	        List<Invoice> existingInvoices = queryInvoice.getResultList();
+	        logger.info("Số lượng hóa đơn hiện có cho orderNumber " + orderEcomTrans.getOrderNumber()
+	                + ", idorderlix " + orderEcomTrans.getId() + ", orderType: " + orderType + ": " + existingInvoices.size());
+	        if (!existingInvoices.isEmpty()) {
+	            messages.append("Hóa đơn đã tồn tại cho đơn hàng với orderNumber: " + orderEcomTrans.getOrderNumber()
+	                    + ", idorderlix: " + orderEcomTrans.getId() + ", orderType: " + orderType);
+	            res = 0;
+	            ut.rollback();
+	            logger.info("Rollback transaction do hóa đơn đã tồn tại cho orderType: " + orderType);
+	            return res;
+	        }
+
+	        // Lấy danh sách chi tiết đơn hàng, lọc theo orderType
+	        CriteriaQuery<EcomOrderDetail> cqOD = cb.createQuery(EcomOrderDetail.class);
+	        Root<EcomOrderDetail> rootOD = cqOD.from(EcomOrderDetail.class);
+	        cqOD.select(rootOD).where(
+	                cb.and(
+	                        cb.equal(rootOD.get("order").get("id"), orderId),
+	                        cb.equal(rootOD.get("orderType"), orderType)
+	                )
+	        );
+	        TypedQuery<EcomOrderDetail> queryOD = em.createQuery(cqOD);
+	        List<EcomOrderDetail> listOrderDetailTrans = queryOD.getResultList().stream()
+	                .distinct()
+	                .collect(Collectors.toList());
+	        logger.info("Số lượng chi tiết đơn hàng cho orderId: " + orderId + ", orderType: " + orderType + ": " + listOrderDetailTrans.size());
+	        if (listOrderDetailTrans.isEmpty()) {
+	            res = -1;
+	            ut.rollback();
+	            messages.append("Không có chi tiết đơn hàng cho orderType: " + orderType);
+	            logger.warn("Không có chi tiết đơn hàng cho orderId: " + orderId + ", orderType: " + orderType);
+	            return res;
+	        }
+
+	        // Log chi tiết đơn hàng
+	        for (EcomOrderDetail dt : listOrderDetailTrans) {
+	            logger.info("Chi tiết đơn hàng: idchitietdonhang: " + dt.getId() + ", sku: " + dt.getSku()
+	                    + ", product: " + (dt.getProduct() != null ? dt.getProduct().getProduct_code() : "null")
+	                    + ", quantity: " + dt.getQuantity() + ", unitPrice: " + dt.getUnitPrice()
+	                    + ", splitPrice: " + dt.getSplitPrice() + ", orderType: " + dt.getOrderType());
+	        }
+
+	        // Tính tổng chiết khấu từ dòng CKDH
+	        double totalDiscount = listOrderDetailTrans.stream()
+	                .filter(dt -> dt.getProduct() != null && dt.getProduct().getProduct_com() != null
+	                        && "CKDH".equals(dt.getProduct().getProduct_code()))
+	                .mapToDouble(EcomOrderDetail::getSplitPrice)
+	                .sum();
+	        logger.info("Tổng chiết khấu CKDH cho orderId: " + orderId + ", orderType: " + orderType + ": " + totalDiscount);
+
+	        List<InvoiceDetail> listInvoiceDetail = new ArrayList<>();
+	        Map<EcomOrderDetail, InvoiceDetail> map = new LinkedHashMap<>();
+	        for (EcomOrderDetail dt : listOrderDetailTrans) {
+	            // Kiểm tra trùng lặp chi tiết hóa đơn
+	            CriteriaQuery<InvoiceDetail> cqDetail = cb.createQuery(InvoiceDetail.class);
+	            Root<InvoiceDetail> rootDetail = cqDetail.from(InvoiceDetail.class);
+	            cqDetail.select(rootDetail).where(cb.equal(rootDetail.get("idchitietdonhang"), dt.getId()));
+	            TypedQuery<InvoiceDetail> queryDetail = em.createQuery(cqDetail);
+	            List<InvoiceDetail> existingDetails = queryDetail.getResultList();
+	            if (!existingDetails.isEmpty()) {
+	                logger.info("Chi tiết hóa đơn đã tồn tại cho idchitietdonhang: " + dt.getId() + ", orderType: " + orderType);
+	                continue;
+	            }
+
+	            InvoiceDetail detail = new InvoiceDetail();
+	            detail.setEx_order(true);
+	            detail.setProduct(dt.getProduct());
+	            detail.setQuantity(dt.getQuantity());
+	            detail.setReal_quantity(dt.getQuantity());
+	            detail.setUnit_price(dt.getUnitPrice());
+	            detail.setTotal(dt.getSplitPrice());
+	            detail.setNote(dt.getNote());
+	            detail.setIdchitietdonhang(dt.getId());
+
+	            listInvoiceDetail.add(detail);
+	            if (!map.containsKey(dt)) {
+	                map.put(dt, detail);
+	            }
+	        }
+
+	        if (listInvoiceDetail.isEmpty()) {
+	            res = -1;
+	            ut.rollback();
+	            messages.append("Không có chi tiết hóa đơn hợp lệ để tạo cho orderType: " + orderType);
+	            logger.warn("Không có chi tiết hóa đơn hợp lệ để tạo cho orderId: " + orderId + ", orderType: " + orderType);
+	            return res;
+	        }
+
+	        // Tạo hóa đơn
+	        Invoice invoice = new Invoice();
+	        invoice.setIdorderlix(orderEcomTrans.getId());
+	        invoice.setOrder_code(orderEcomTrans.getOrderId());
+	        invoice.setOrder_voucher(orderEcomTrans.getOrderNumber());
+	        invoice.setCreated_date(new Date());
+	        invoice.setCustomer(orderEcomTrans.getCustomer());
+	        invoice.setInvoice_date(now);
+	        invoice.setPayment_method(orderEcomTrans.getPayment_method());
+	        invoice.setTax_value(0.08);
+	        invoice.setPo_no(orderEcomTrans.getOrderNumber());
+	        invoice.setInvoice_code(null);
+	        invoice.setExported(true);
+	        invoice.setInvoiceType(orderEcomTrans.getOrderType());
+	        initCodeVoucher(invoice);
+
+	        if ("PROMO".equalsIgnoreCase(orderEcomTrans.getOrderType())) {
+	            invoice.setTax_value(0.0);
+	            invoice.setIpromotion(true);
+	            invoice.setIe_categories(selectIECategoriesByCode("&"));
+	        } else if ("SALE".equalsIgnoreCase(orderEcomTrans.getOrderType())) {
+	            invoice.setIe_categories(selectIECategoriesByCode("$"));
+	        }
+
+	        double tongtien = orderEcomTrans.getLastPrice();
+	        invoice.setTongtien(tongtien);
+	        invoice.setThue(tongtien * 0.08);
+	        invoice.setPayment_method(selectPaymentMethodByCode("CK/TM"));
+	        logger.info("Thử tạo hóa đơn với idorderlix: " + orderId + ", orderNumber: " + orderEcomTrans.getOrderNumber()
+	                + ", orderType: " + orderType + ", tongtien: " + tongtien + ", thue: " + invoice.getThue());
+	        em.persist(invoice);
+	        logger.info("Hóa đơn tạo thành công, ID: " + invoice.getId() + ", orderType: " + orderType);
+	        if (invoice.getId() == 0) {
+	            res = -1;
+	            ut.rollback();
+	            messages.append("Tạo hóa đơn thất bại!");
+	            logger.error("Tạo hóa đơn thất bại cho idorderlix: " + orderId + ", orderType: " + orderType);
+	            return res;
+	        }
+
+	        for (InvoiceDetail v : listInvoiceDetail) {
+	            v.setInvoice(invoice);
+	            v.setCreated_date(new Date());
+	            em.persist(v);
+	            if (v.getId() == 0) {
+	                res = -1;
+	                messages.append("Tạo chi tiết hóa đơn thất bại!");
+	                logger.error("Tạo chi tiết hóa đơn thất bại cho idchitietdonhang: " + v.getIdchitietdonhang() + ", orderType: " + orderType);
+	                ut.rollback();
+	                return res;
+	            }
+	        }
+
+	        invoice.setList_invoice_detail(listInvoiceDetail);
+	        em.merge(invoice);
+	        ut.commit();
+	        res = 0;
+	        logger.info("Tạo hóa đơn và chi tiết thành công cho orderId: " + orderId + ", orderType: " + orderType);
+	    } catch (Exception e) {
+	        res = -1;
+	        ut.rollback();
+	        messages.append("ProcessLogicInvoicePosService.createInvoiceByOrderEcom:" + e.getMessage());
+	        logger.error("ProcessLogicInvoicePosService.createInvoiceByOrderEcom:" + e.getMessage() + ", orderType: " + (t != null ? t.getOrderType() : "null"), e);
+	        e.printStackTrace();
+	    } finally {
+	        if (con != null) {
+	            con.close();
+	        }
+	    }
+	    long end = System.currentTimeMillis();
+	    logger.info("Thời gian xử lý: " + (end - start) + "ms");
+	    return res;
+	}
+}

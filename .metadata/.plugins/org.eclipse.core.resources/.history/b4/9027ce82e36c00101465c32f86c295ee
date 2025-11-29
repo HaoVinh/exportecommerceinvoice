@@ -1,0 +1,119 @@
+package lixco.com.bean;
+
+import lombok.Getter;
+import lombok.Setter;
+import trong.lixco.com.bean.AbstractBean;
+import vinh.lixco.com.apiecommerce.LazadaAPIServlet;
+import vinh.lixco.com.apiecommerce.OrderDTO;
+
+import javax.faces.application.FacesMessage;
+import javax.faces.bean.ManagedBean;
+import javax.faces.bean.ViewScoped;
+import javax.faces.context.FacesContext;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.*;
+import java.util.logging.Logger;
+
+@ManagedBean
+@ViewScoped
+public class EcomOrderBean extends AbstractBean implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    @Getter
+    @Setter
+    private List<OrderDTO> orders = new ArrayList<>();
+
+    @Getter
+    @Setter
+    private OrderDTO order;
+
+    LazadaAPIServlet lazadaAPIServlet = LazadaAPIServlet.getInstance();
+
+    private static final Logger LOGGER = Logger.getLogger(EcomOrderBean.class.getName());
+
+    @Override
+    protected void initItem() {
+        orders = new ArrayList<>();
+        order = new OrderDTO();
+        order.setOrderDetails(new ArrayList<>());
+
+        try {
+            // Lấy danh sách pendingUpdates từ LazadaAPIServlet
+            Map<String, OrderDTO> pendingUpdates = LazadaAPIServlet.getPendingUpdates();
+            synchronized (pendingUpdates) {
+                for (OrderDTO dto : pendingUpdates.values()) {
+                    // Fetch chi tiết order từ API
+                    OrderDTO updatedOrder = LazadaAPIServlet.fetchOrderData(dto.getOrderId());
+                    if (updatedOrder != null) {
+                        orders.add(updatedOrder);
+                        LOGGER.info("Thêm đơn hàng " + updatedOrder.getOrderId());
+                    } else {
+                        LOGGER.warning("Không lấy được chi tiết đơn hàng " + dto.getOrderId());
+                    }
+                }
+            }
+        } catch (IOException e) {
+            LOGGER.severe("Lỗi khi lấy danh sách đơn hàng: " + e.getMessage());
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Không thể tải đơn hàng: " + e.getMessage()));
+        }
+    }
+
+    @Override
+    protected org.jboss.logging.Logger getLogger() {
+        return org.jboss.logging.Logger.getLogger(EcomOrderBean.class);
+    }
+
+    public void refreshOrders() {
+        try {
+            Set<String> existingOrderIds = new HashSet<>();
+            synchronized (orders) {
+                for (OrderDTO dto : orders) {
+                    existingOrderIds.add(dto.getOrderId());
+                    // Cập nhật đơn hàng hiện tại
+                    OrderDTO updatedOrder = LazadaAPIServlet.fetchOrderData(dto.getOrderId());
+                    if (updatedOrder != null) {
+                        updateOrderInList(updatedOrder);
+                        LOGGER.info("Cập nhật đơn hàng " + updatedOrder.getOrderId());
+                    }
+                }
+            }
+
+            // Kiểm tra pendingUpdates để thêm đơn hàng mới chưa có trong danh sách
+            Map<String, OrderDTO> pendingUpdates = LazadaAPIServlet.getPendingUpdates();
+            synchronized (pendingUpdates) {
+                for (OrderDTO dto : pendingUpdates.values()) {
+                    if (!existingOrderIds.contains(dto.getOrderId())) {
+                        OrderDTO newOrder = LazadaAPIServlet.fetchOrderData(dto.getOrderId());
+                        if (newOrder != null) {
+                            orders.add(newOrder);
+                            LOGGER.info("Thêm đơn hàng mới " + newOrder.getOrderId());
+                        }
+                    }
+                }
+            }
+
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_INFO, "Làm mới", "Đã cập nhật danh sách đơn hàng"));
+
+        } catch (IOException e) {
+            LOGGER.severe("Lỗi làm mới đơn hàng: " + e.getMessage());
+            FacesContext.getCurrentInstance().addMessage(null,
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Không thể làm mới đơn hàng: " + e.getMessage()));
+        }
+    }
+
+    private void updateOrderInList(OrderDTO updatedOrder) {
+        synchronized (orders) {
+            for (int i = 0; i < orders.size(); i++) {
+                if (orders.get(i).getOrderId().equals(updatedOrder.getOrderId())) {
+                    orders.set(i, updatedOrder);
+                    return;
+                }
+            }
+            // Nếu không tìm thấy thì thêm mới
+            orders.add(updatedOrder);
+        }
+    }
+}

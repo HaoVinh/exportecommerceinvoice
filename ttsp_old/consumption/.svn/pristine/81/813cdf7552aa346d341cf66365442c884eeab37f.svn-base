@@ -1,0 +1,690 @@
+package lixco.com.service;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionAttribute;
+import javax.ejb.TransactionAttributeType;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.ParameterExpression;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+
+import lixco.com.commom_ejb.HolderParser;
+import lixco.com.commom_ejb.JsonParserUtil;
+import lixco.com.commom_ejb.ToolTimeCustomer;
+import lixco.com.entity.Customer;
+import lixco.com.entity.CustomerPromotionProgram;
+import lixco.com.entity.Product;
+import lixco.com.entity.PromotionProgram;
+import lixco.com.entity.PromotionProgramDetail;
+import lixco.com.entityapi.CustomerPromotionProgramDTO;
+import lixco.com.entityapi.PromotionProgramAsyncDTO;
+import lixco.com.entityapi.PromotionProgramDTO;
+import lixco.com.entityapi.PromotionProgramDetailDTO;
+import lixco.com.interfaces.ICustomerPromotionProgramService;
+import lixco.com.interfaces.ICustomerService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.interfaces.IPromotionProgramDetailService;
+import lixco.com.interfaces.IPromotionProgramService;
+import lixco.com.reqInfo.CustomerPromotionProgramReqInfo;
+import lixco.com.reqInfo.PromotionProgramDetailReqInfo;
+import lixco.com.reqInfo.PromotionProgramReqInfo;
+import lixco.com.reqfox.WrapDataPromotionProgram;
+
+import org.jboss.logging.Logger;
+
+import com.google.gson.JsonObject;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.CONTAINER)
+public class PromotionProgramService implements IPromotionProgramService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource
+	private SessionContext ct;
+	@Inject
+	IProductService productService;
+	@Inject
+	IPromotionProgramDetailService promotionProgramDetailService;
+	@Inject
+	ICustomerPromotionProgramService customerPromotionProgramService;
+	@Inject
+	ICustomerService customerService;
+
+	@Override
+	public int dongbokhuyenmai(PromotionProgramAsyncDTO programAsyncDTO, StringBuilder errors) {
+		int dem = 0;
+		// Dong bo PromotionProgram
+		List<PromotionProgramDTO> promotionProgramDTOs = programAsyncDTO.getPromotionProgramDTOs();
+		for (PromotionProgramDTO it : promotionProgramDTOs) {
+			PromotionProgram prNew = new PromotionProgram(it);
+			PromotionProgram pOld = findByCode(it.getProgram_code());
+			PromotionProgramReqInfo pr = new PromotionProgramReqInfo(prNew);
+			if (pOld != null) {
+				pr.getPromotion_program().setId(pOld.getId());
+				int result = update(pr);
+				if (result == -1) {
+					errors.append("Lỗi PromotionProgram:" + it.getProgram_code() + ";");
+				} else {
+					Query query = em
+							.createQuery("DELETE FROM PromotionProgramDetail WHERE promotion_program_id = :promotion_program_id");
+					query.setParameter("promotion_program_id", pr.getPromotion_program().getId());
+					query.executeUpdate();
+
+					Query queryCus = em
+							.createQuery("DELETE FROM CustomerPromotionProgram WHERE promotion_program_id = :promotion_program_id");
+					queryCus.setParameter("promotion_program_id", pr.getPromotion_program().getId());
+					queryCus.executeUpdate();
+				}
+			} else {
+				int result = insert(pr);
+				if (result == -1) {
+					errors.append("Lỗi PromotionProgram:" + it.getProgram_code() + ";");
+				}
+			}
+			// Chi tiet km
+			List<PromotionProgramDetailDTO> promotionProgramDetailDTOs = it.getProgramDetailDTOs();
+			for (PromotionProgramDetailDTO itDt : promotionProgramDetailDTOs) {
+				PromotionProgramDetail prDtNew = new PromotionProgramDetail(itDt);
+				prDtNew.setProduct(productService.selectByCode(itDt.getMasp()));
+				prDtNew.setPromotion_product(productService.selectByCode(itDt.getMaspkm()));
+				if (prDtNew.getProduct() != null && prDtNew.getPromotion_product() != null) {
+					prDtNew.setPromotion_program(pr.getPromotion_program());
+					PromotionProgramDetailReqInfo prDt = new PromotionProgramDetailReqInfo(prDtNew);
+					int resultDt = promotionProgramDetailService.insert(prDt);
+					if (resultDt == -1) {
+						errors.append("Lỗi PricingProgramDetail:" + pr.getPromotion_program().getProgram_code() + ": "
+								+ itDt.getMasp() + " hoặc " + itDt.getMaspkm() + ";");
+					}
+				} else {
+					errors.append("Lỗi PromotionProgramDetail:" + pr.getPromotion_program().getProgram_code()
+							+ ": Không có mã SP " + itDt.getMasp() + " hoặc " + itDt.getMaspkm() + ";");
+				}
+			}
+			// khach hang don gia
+			List<CustomerPromotionProgramDTO> customerPromotionProgramDTOs = it.getCustomerPromotionProgramDTOs();
+			for (CustomerPromotionProgramDTO itDt : customerPromotionProgramDTOs) {
+				CustomerPromotionProgram prDtNew = new CustomerPromotionProgram(itDt);
+				prDtNew.setCustomer(customerService.selectByCode(itDt.getCustomer()));
+				if (prDtNew.getCustomer() != null) {
+					prDtNew.setPromotion_program(pr.getPromotion_program());
+					CustomerPromotionProgramReqInfo prDt = new CustomerPromotionProgramReqInfo(prDtNew);
+					int resultDt = customerPromotionProgramService.insert(prDt);
+					if (resultDt == -1) {
+						errors.append("Lỗi CustomerPromotionProgram:" + pr.getPromotion_program().getProgram_code()
+								+ ": " + itDt.getCustomer() + ";");
+					}
+
+				} else {
+					errors.append("Lỗi CustomerPricingProgram:" + pr.getPromotion_program().getProgram_code()
+							+ ": Không có mã KH " + itDt.getCustomer() + ";");
+				}
+			}
+		}
+		return dem;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public List<PromotionProgram> findNotSync() {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<PromotionProgram> cq = cb.createQuery(PromotionProgram.class);
+			Root<PromotionProgram> root = cq.from(PromotionProgram.class);
+			cq.select(root).where(cb.equal(root.get("capnhat"), true));
+			TypedQuery<PromotionProgram> query = em.createQuery(cq);
+			return query.getResultList();
+		} catch (Exception e) {
+			logger.error("CustomerService.selectById:" + e.getMessage(), e);
+		}
+		return new ArrayList<PromotionProgram>();
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int selectAll(List<PromotionProgram> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<PromotionProgram> cq = cb.createQuery(PromotionProgram.class);
+			Root<PromotionProgram> root = cq.from(PromotionProgram.class);
+			cq.select(root);
+			TypedQuery<PromotionProgram> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("PromotionProgramService.selectAll:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int search(String json, List<PromotionProgram> list) {
+		int res = -1;
+		try {/*
+			 * { promotion_program_info:{from_date:
+			 * '',to_date:'',program_code:'',product_id:0,promotion_product_id:0,disable:0},
+			 * page:{page_index:0, page_size:0}}
+			 */
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+			HolderParser hFromDate = JsonParserUtil.getValueString(j.get("promotion_program_info"), "from_date", null);
+			HolderParser hToDate = JsonParserUtil.getValueString(j.get("promotion_program_info"), "to_date", null);
+			HolderParser hProgramCode = JsonParserUtil.getValueString(j.get("promotion_program_info"), "program_code",
+					null);
+			HolderParser hProductId = JsonParserUtil
+					.getValueNumber(j.get("promotion_program_info"), "product_id", null);
+			HolderParser hPromotionProductId = JsonParserUtil.getValueNumber(j.get("promotion_program_info"),
+					"promotion_product_id", null);
+			HolderParser hDisable = JsonParserUtil.getValueNumber(j.get("promotion_program_info"), "disable", null);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<PromotionProgram> cq = cb.createQuery(PromotionProgram.class);
+			Root<PromotionProgram> root_ = cq.from(PromotionProgram.class);
+			Join<PromotionProgram, PromotionProgramDetail> programDetail_ = root_.join("list_promotion_program_detail",
+					JoinType.LEFT);
+			List<Predicate> predicates = new ArrayList<Predicate>();
+			ParameterExpression<Date> pFromDate = cb.parameter(Date.class);
+			ParameterExpression<Date> pToDate = cb.parameter(Date.class);
+			ParameterExpression<String> pProgramCode = cb.parameter(String.class);
+			ParameterExpression<Long> pProductId = cb.parameter(Long.class);
+			ParameterExpression<Long> pPromotionProductId = cb.parameter(Long.class);
+			ParameterExpression<Integer> pDisable = cb.parameter(Integer.class);
+			Predicate dis = cb.disjunction();
+			dis.getExpressions().add(cb.isNull(pFromDate));
+			dis.getExpressions().add(cb.equal(pFromDate, ""));
+			dis.getExpressions().add(cb.greaterThanOrEqualTo(root_.get("expiry_date"), pFromDate));
+			predicates.add(dis);
+			// Predicate dis1=cb.disjunction();
+			// dis1.getExpressions().add(cb.isNull(pToDate));
+			// dis1.getExpressions().add(cb.equal(pToDate,""));
+			// dis1.getExpressions().add(cb.lessThanOrEqualTo(root_.get("expiry_date"),
+			// pToDate));
+			// predicates.add(dis1);
+			Predicate dis2 = cb.disjunction();
+			dis2.getExpressions().add(cb.isNull(pProgramCode));
+			dis2.getExpressions().add(cb.equal(pProgramCode, ""));
+			dis2.getExpressions().add(cb.like(root_.get("program_code"), pProgramCode));
+			predicates.add(dis2);
+			Predicate dis3 = cb.disjunction();
+			dis3.getExpressions().add(cb.equal(pProductId, 0));
+			dis3.getExpressions().add(cb.equal(programDetail_.get("product").get("id"), pProductId));
+			predicates.add(dis3);
+			Predicate dis4 = cb.disjunction();
+			dis4.getExpressions().add(cb.equal(pPromotionProductId, 0));
+			dis4.getExpressions().add(cb.equal(programDetail_.get("promotion_product").get("id"), pPromotionProductId));
+			predicates.add(dis4);
+			Predicate dis5 = cb.disjunction();
+			dis5.getExpressions().add(cb.equal(pDisable, -1));
+			dis5.getExpressions().add(cb.equal(root_.get("disable"), pDisable));
+			predicates.add(dis5);
+			cq.select(root_).distinct(true).where(cb.and(predicates.toArray(new Predicate[0])))
+					.orderBy(cb.desc(root_.get("program_code")));
+			TypedQuery<PromotionProgram> query = em.createQuery(cq);
+			query.setParameter(pFromDate, ToolTimeCustomer.convertStringToDate(
+					Objects.toString(hFromDate.getValue(), null), "dd/MM/yyyy HH:mm:ss"));
+			// query.setParameter(pToDate,ToolTimeCustomer.convertStringToDate(Objects.toString(hToDate.getValue(),
+			// null),"dd/MM/yyyy HH:mm:ss"));
+			query.setParameter(pProgramCode, "%" + Objects.toString(hProgramCode.getValue(), "") + "%");
+			query.setParameter(pProductId, Long.parseLong(Objects.toString(hProductId.getValue(), null)));
+			query.setParameter(pPromotionProductId,
+					Long.parseLong(Objects.toString(hPromotionProductId.getValue(), null)));
+			query.setParameter(pDisable, Integer.parseInt(Objects.toString(hDisable.getValue(), null)));
+			list.addAll(query.getResultList());
+
+			res = 0;
+
+		} catch (Exception e) {
+			logger.error("PromotionProgramService.search:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int insert(PromotionProgramReqInfo t) {
+		int res = -1;
+		try {
+			PromotionProgram p = t.getPromotion_program();
+			if (p != null) {
+				p.setCapnhat(true);
+				em.persist(p);
+				if (p.getId() > 0) {
+					res = 0;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("PromotionProgramService.insert:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int update(PromotionProgramReqInfo t) {
+		int res = -1;
+		try {
+			PromotionProgram p = t.getPromotion_program();
+			if (p != null) {
+				p.setCapnhat(true);
+				p = em.merge(p);
+				if (p != null) {
+					t.setPromotion_program(p);
+					res = 0;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("PromotionProgramService.update:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateCapNhat(List<Long> ids) {
+		int res = -1;
+		try {
+			if (ids != null && ids.size() != 0) {
+				Query query = em.createQuery("update PromotionProgram set capnhat=false where id in :ids");
+				query.setParameter("ids", ids);
+				return query.executeUpdate();
+			}
+		} catch (Exception e) {
+			logger.error("PromotionProgramService.updateCapNhat:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int selectById(long id, PromotionProgramReqInfo t) {
+		int res = -1;
+		try {
+			PromotionProgram p = em.find(PromotionProgram.class, id);
+			if (p != null) {
+				t.setPromotion_program(p);
+				res = 0;
+			}
+		} catch (Exception e) {
+			logger.error("PromotionProgramService.selectById:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int deleteById(long id) {
+		int res = -1;
+		try {
+			// delete chi tiết khuyến mãi
+			Query queryd = em.createQuery("delete from PromotionProgramDetail where promotion_program.id = :id");
+			queryd.setParameter("id", id);
+			if (queryd.executeUpdate() < 0) {
+				ct.getUserTransaction().rollback();
+				return res;
+			}
+			// delete cài đặt khách hàng cho chương trình khuyến mãi
+			Query queryd2 = em.createQuery("delete from CustomerPromotionProgram where promotion_program.id = :id");
+			queryd2.setParameter("id", id);
+			if (queryd2.executeUpdate() < 0) {
+				ct.getUserTransaction().rollback();
+				return res;
+			}
+			// JQPL
+			Query query = em.createQuery("delete from PromotionProgram where id = :id");
+			query.setParameter("id", id);
+			if (query.executeUpdate() < 0) {
+				ct.getUserTransaction().rollback();
+				return res;
+			}
+			res = 1;
+		} catch (Exception e) {
+			logger.error("PromotionProgramService.deleteById:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public String initPromotionProgramCode() {
+		try {
+//			CriteriaBuilder cb = em.getCriteriaBuilder();
+//			CriteriaQuery<Long> cq = cb.createQuery(Long.class);
+//			Root<PromotionProgram> root = cq.from(PromotionProgram.class);
+////			 cq.multiselect(cb.coalesce(cb.max(root.get("id")),0));
+//			cq.multiselect(cb.coalesce(cb.max(cb.quot((Expression) cb.substring(root.get("program_code"), 3), 1)), 0));
+//			TypedQuery<Long> query = em.createQuery(cq);
+//			Long max = query.getSingleResult();
+			
+			
+			String sql="SELECT COALESCE(MAX(CAST(SUBSTRING(program_code, 3) AS UNSIGNED)), 0) FROM promotionprogram";
+			Query query = em.createNativeQuery(sql.toString());
+			BigInteger max = (BigInteger) query.getSingleResult();
+			
+			double p = (double) max.longValue() / 100000;
+			if (p < 1) {
+				return "CT" + String.format("%06d", max.longValue() + 1);
+			}
+			return "CT" + max + 1;
+		} catch (Exception e) {
+			logger.error("PromotionProgramService.initPromotionProgramCode:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Override
+	public int findLike(String text, int size, List<PromotionProgram> list) {
+		int res = -1;
+		try {
+
+		} catch (Exception e) {
+			logger.error("PromotionProgramService.findLike:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int complete(String text, List<PromotionProgram> list) {
+		int res = -1;
+		try {
+			if (text != null && !"".equals(text)) {
+				CriteriaBuilder cb = em.getCriteriaBuilder();
+				CriteriaQuery<PromotionProgram> cq = cb.createQuery(PromotionProgram.class);
+				Root<PromotionProgram> root = cq.from(PromotionProgram.class);
+				Predicate con = cb.conjunction();
+				con.getExpressions().add(
+						cb.like(cb.function("replace", String.class, cb.lower(root.get("program_code")),
+								cb.literal("đ"), cb.literal("d")), "%" + text + "%"));
+				con.getExpressions().add(cb.isFalse(root.get("disable")));
+				cq.select(
+						cb.construct(PromotionProgram.class, root.get("id"), root.get("program_code"),
+								root.get("effective_date"), root.get("expiry_date"))).where(con);
+				TypedQuery<PromotionProgram> query = em.createQuery(cq);
+				list.addAll(query.getResultList());
+				res = 0;
+			}
+		} catch (Exception e) {
+			logger.error("PromotionProgramService.complete:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int selectByCode(String programCode, PromotionProgramReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<PromotionProgram> cq = cb.createQuery(PromotionProgram.class);
+			Root<PromotionProgram> root = cq.from(PromotionProgram.class);
+			cq.select(root).where(cb.equal(root.get("program_code"), programCode));
+			TypedQuery<PromotionProgram> query = em.createQuery(cq);
+			t.setPromotion_program(query.getSingleResult());
+			res = 0;
+		} catch (Exception e) {
+			// logger.error("PromotionProgramService.selectByCode:"+e.getMessage(),e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public PromotionProgram findByCode(String programCode) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<PromotionProgram> cq = cb.createQuery(PromotionProgram.class);
+			Root<PromotionProgram> root = cq.from(PromotionProgram.class);
+			cq.select(root).where(cb.equal(root.get("program_code"), programCode));
+			TypedQuery<PromotionProgram> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	@Override
+	public int saveOrUpdate(List<WrapDataPromotionProgram> data, String userName) {
+		int res = 0;
+		try {
+			for (WrapDataPromotionProgram p : data) {
+				lixco.com.reqfox.WrapDataPromotionProgram.PromotionProgram promotionProgramFox = p
+						.getPromotion_program();
+				List<lixco.com.reqfox.WrapDataPromotionProgram.PromotionProgramDetail> listPromotionProgramDetail = p
+						.getList_promotion_program_detail();
+				List<lixco.com.reqfox.WrapDataPromotionProgram.CustomerPromotionProgram> listCustomerPromotionProgram = p
+						.getList_customer_promotion_program();
+				// tìm chương trình khuyến mãi
+				Query queryPP = em.createQuery("select id from PromotionProgram where program_code=:pc");
+				queryPP.setParameter("pc", promotionProgramFox.getMasoctkm());
+				List<Long> listIdPP = queryPP.getResultList();
+				if (listIdPP.size() > 0) {
+					long idPP = listIdPP.get(0);
+					PromotionProgram promotionProgram = new PromotionProgram(listIdPP.get(0));
+					// thực hiện cập nhật lại chương trình khuyến mãi
+					// id, created_by, created_date, disable, effective_date,
+					// expiry_date, last_modifed_by, last_modifed_date, note,
+					// program_code, voucher_code
+					Query queryUpPP = em
+							.createQuery("update PromotionProgram set effective_date=:efd, expiry_date=:ed, last_modifed_by=:lmb, note=:n where program_code=:pc");
+					queryUpPP.setParameter("efd", promotionProgramFox.getTungay());
+					queryUpPP.setParameter("ed", promotionProgramFox.getDenngay());
+					queryUpPP.setParameter("lmb", userName);
+					queryUpPP.setParameter("n", promotionProgramFox.getGhichu());
+					queryUpPP.setParameter("pc", promotionProgramFox.getMasoctkm());
+					if (queryUpPP.executeUpdate() >= 0) {
+						// thực hiện delete detail
+						Query queryDelDetail = em
+								.createQuery("delete from PromotionProgramDetail where promotion_program.id=:id ");
+						queryDelDetail.setParameter("id", idPP);
+						if (queryDelDetail.executeUpdate() >= 0) {
+							if (listPromotionProgramDetail != null && listPromotionProgramDetail.size() > 0) {
+								// thực hiện insert chi tiết khuyến mãi
+								for (lixco.com.reqfox.WrapDataPromotionProgram.PromotionProgramDetail q : listPromotionProgramDetail) {
+									PromotionProgramDetail item = new PromotionProgramDetail();
+									// id, box_quatity, created_by,
+									// created_date, last_modifed_by,
+									// last_modifed_date, promotion_form,
+									// promotion_quantity, specification,
+									// product_id, promotion_product_id,
+									// promotion_program_id
+									item.setBox_quatity(q.getSothung());
+									item.setCreated_by(userName);
+									item.setCreated_date(new Date());
+									String km = q.getHinhthuckm();
+									if (km != null && !"".equals(km)) {
+										try {
+											item.setPromotion_form(Integer.parseInt(Objects.toString(q.getHinhthuckm()
+													.trim(), "0")));
+										} catch (Exception e) {
+											item.setPromotion_form(0);
+										}
+									}
+									item.setPromotion_quantity(q.getSlkmai());
+									item.setSpecification(q.getSodvsp());
+									// tìm sản phẩm
+									Query queryProduct = em
+											.createQuery("select id from Product where product_code=:pc");
+									queryProduct.setParameter("pc", q.getMasp());
+									List<Long> listIdProduct = queryProduct.getResultList();
+									if (listIdProduct.size() > 0) {
+										item.setProduct(new Product(listIdProduct.get(0)));
+									}
+									// tìm sản phẩm khuyến mãi
+									Query queryProductKM = em
+											.createQuery("select id from Product where product_code=:pc");
+									queryProductKM.setParameter("pc", q.getMaspkm());
+									List<Long> listIdProductKm = queryProductKM.getResultList();
+									if (listIdProductKm.size() > 0) {
+										item.setPromotion_product(new Product(listIdProductKm.get(0)));
+									}
+									item.setPromotion_program(promotionProgram);
+									em.persist(item);
+								}
+							}
+						}
+						// thực hiện delete cài dặt khách hàng cho chương trình
+						// khuyến mãi
+						Query queryDelCustomer = em
+								.createQuery("delete from CustomerPromotionProgram where promotion_program.id=:id ");
+						queryDelCustomer.setParameter("id", idPP);
+						if (queryDelCustomer.executeUpdate() >= 0) {
+							// thực hiện insert cài đặt khuyến mãi cho khách
+							// hàng
+							// id, created_by, created_date, disable,
+							// effective_date, expiry_date, last_modifed_by,
+							// last_modifed_date, customer_id,
+							// promotion_program_id
+							if (listCustomerPromotionProgram != null && listCustomerPromotionProgram.size() > 0) {
+								for (lixco.com.reqfox.WrapDataPromotionProgram.CustomerPromotionProgram q : listCustomerPromotionProgram) {
+									CustomerPromotionProgram item = new CustomerPromotionProgram();
+									item.setCreated_by(userName);
+									item.setCreated_date(new Date());
+									item.setDisable(q.isDiscontinue());
+
+									try {
+										if (2000 > (q.getNgaybd().getYear() + 1900)) {
+											item.setEffective_date(null);
+										} else {
+											item.setEffective_date(q.getNgaybd());
+										}
+									} catch (Exception e) {
+									}
+									try {
+										if (2000 > (q.getNgaykt().getYear() + 1900)) {
+											item.setExpiry_date(null);
+										} else {
+											item.setExpiry_date(q.getNgaykt());
+										}
+									} catch (Exception e) {
+									}
+
+									// tìm khách hàng
+									Query queryCustomer = em
+											.createQuery("select id from Customer where customer_code=:cd");
+									queryCustomer.setParameter("cd", q.getMakh());
+									List<Long> listIdCustomer = queryCustomer.getResultList();
+									if (listIdCustomer.size() > 0) {
+										item.setCustomer(new Customer(listIdCustomer.get(0)));
+									}
+									item.setPromotion_program(promotionProgram);
+									em.persist(item);
+								}
+							}
+						}
+					}
+				} else {
+					// Insert Chương trình khuyến mãi
+					PromotionProgram promotionProgram = new PromotionProgram();
+					// id, created_by, created_date, disable, effective_date,
+					// expiry_date, last_modifed_by, last_modifed_date, note,
+					// program_code, voucher_code
+					promotionProgram.setCreated_by(userName);
+					promotionProgram.setCreated_date(new Date());
+					promotionProgram.setEffective_date(promotionProgramFox.getTungay());
+					promotionProgram.setExpiry_date(promotionProgramFox.getDenngay());
+					promotionProgram.setNote(promotionProgramFox.getGhichu());
+					promotionProgram.setProgram_code(promotionProgramFox.getMasoctkm());
+					em.persist(promotionProgram);
+					if (promotionProgram.getId() > 0) {
+						if (listPromotionProgramDetail != null && listPromotionProgramDetail.size() > 0) {
+							// thực hiện insert chi tiết khuyến mãi
+							for (lixco.com.reqfox.WrapDataPromotionProgram.PromotionProgramDetail q : listPromotionProgramDetail) {
+								PromotionProgramDetail item = new PromotionProgramDetail();
+								// id, box_quatity, created_by, created_date,
+								// last_modifed_by, last_modifed_date,
+								// promotion_form, promotion_quantity,
+								// specification, product_id,
+								// promotion_product_id, promotion_program_id
+								item.setBox_quatity(q.getSothung());
+								item.setCreated_by(userName);
+								item.setCreated_date(new Date());
+								String km = q.getHinhthuckm();
+								if (km != null && !"".equals(km)) {
+									try {
+										item.setPromotion_form(Integer.parseInt(Objects.toString(q.getHinhthuckm()
+												.trim(), "0")));
+									} catch (Exception e) {
+										item.setPromotion_form(0);
+									}
+								}
+								item.setPromotion_quantity(q.getSlkmai());
+								item.setSpecification(q.getSodvsp());
+								// tìm sản phẩm
+								Query queryProduct = em.createQuery("select id from Product where product_code=:pc");
+								queryProduct.setParameter("pc", q.getMasp());
+								List<Long> listIdProduct = queryProduct.getResultList();
+								if (listIdProduct.size() > 0) {
+									item.setProduct(new Product(listIdProduct.get(0)));
+								}
+								// tìm sản phẩm khuyến mãi
+								Query queryProductKM = em.createQuery("select id from Product where product_code=:pc");
+								queryProductKM.setParameter("pc", q.getMaspkm());
+								List<Long> listIdProductKm = queryProductKM.getResultList();
+								if (listIdProductKm.size() > 0) {
+									item.setPromotion_product(new Product(listIdProductKm.get(0)));
+								}
+								item.setPromotion_program(promotionProgram);
+								em.persist(item);
+							}
+						}
+						if (listCustomerPromotionProgram != null && listCustomerPromotionProgram.size() > 0) {
+							for (lixco.com.reqfox.WrapDataPromotionProgram.CustomerPromotionProgram q : listCustomerPromotionProgram) {
+								CustomerPromotionProgram item = new CustomerPromotionProgram();
+								item.setCreated_by(userName);
+								item.setCreated_date(new Date());
+								item.setDisable(q.isDiscontinue());
+
+								try {
+									if (2000 > (q.getNgaybd().getYear() + 1900)) {
+										item.setEffective_date(null);
+									} else {
+										item.setEffective_date(q.getNgaybd());
+									}
+								} catch (Exception e) {
+								}
+								try {
+									if (2000 > (q.getNgaykt().getYear() + 1900)) {
+										item.setExpiry_date(null);
+									} else {
+										item.setExpiry_date(q.getNgaykt());
+									}
+								} catch (Exception e) {
+								}
+
+								// tìm khách hàng
+								Query queryCustomer = em.createQuery("select id from Customer where customer_code=:cd");
+								queryCustomer.setParameter("cd", q.getMakh());
+								List<Long> listIdCustomer = queryCustomer.getResultList();
+								if (listIdCustomer.size() > 0) {
+									item.setCustomer(new Customer(listIdCustomer.get(0)));
+								}
+								item.setPromotion_program(promotionProgram);
+								em.persist(item);
+							}
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			res = -1;
+			e.printStackTrace();
+			logger.error("PromotionalPricingService.saveOrUpdate:Foxpro" + e.getMessage(), e);
+		}
+		return res;
+	}
+}

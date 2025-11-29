@@ -1,0 +1,243 @@
+package lixco.com.bean;
+
+import lombok.Getter;
+import lombok.Setter;
+import trong.lixco.com.bean.AbstractBean;
+import vinh.lixco.com.apiecommerce.LazadaAPIServlet;
+import vinh.lixco.com.apiecommerce.OrderDTO;
+import vinh.lixco.com.apiecommerce.OrderDetailDTO;
+
+import javax.annotation.PostConstruct;
+import javax.faces.application.FacesMessage;
+import javax.faces.bean.ManagedBean;
+import javax.faces.bean.ViewScoped;
+import javax.faces.context.FacesContext;
+import javax.inject.Inject;
+
+import lixco.com.entity.EcomOrder;
+import lixco.com.entity.EcomOrderDetail;
+import lixco.com.service.EcomOrderService;
+
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Logger;
+
+@ManagedBean
+@ViewScoped
+public class EcomOrderBean extends AbstractBean implements Serializable {
+	private static final long serialVersionUID = 1L;
+	private static final Logger LOGGER = Logger.getLogger(EcomOrderBean.class.getName());
+
+	@Getter
+	@Setter
+	private List<OrderDTO> orders = new ArrayList<>();
+	@Getter
+	@Setter
+	private OrderDTO order;
+	@Getter
+	@Setter
+	private int activeTabIndex = 0;
+
+	@Getter
+	@Setter
+	private EcomOrder ecomOrder;
+	@Getter
+	@Setter
+	private List<EcomOrder> ecomOrders = new ArrayList<>();
+	@Inject
+	private EcomOrderService EcomOrderService;
+
+	@Getter
+	@Setter
+	private List<EcomOrderDetail> ecomOrderDetails = new ArrayList<>();
+	@Getter
+	@Setter
+	private List<EcomOrder> filteredOrders;
+
+	@PostConstruct
+	protected void initItem() {
+		orders.clear();
+		ecomOrders.clear();
+//
+//		Map<String, OrderDTO> pending = LazadaAPIServlet.getPendingUpdates();
+//		for (OrderDTO dto : pending.values()) {
+//			orders.add(dto);
+////			saveOrUpdateOrder(dto);
+//		}
+
+		ecomOrders = EcomOrderService.findAll();
+		LOGGER.info("Đã load và lưu các đơn từ webhook vào DB.");
+	}
+
+	@Override
+	protected org.jboss.logging.Logger getLogger() {
+		return org.jboss.logging.Logger.getLogger(EcomOrderBean.class);
+	}
+
+	public String getStatusDisplay(EcomOrder ecom) {
+		if (ecom.getStatus() == null)
+			return "";
+		String status = ecom.getStatus().toLowerCase();
+		String label = "";
+		String color = "";
+
+		switch (status) {
+		case "pending":
+			label = "Chờ xử lý";
+			color = "#FFA500"; // cam
+			break;
+		case "delivered":
+			label = "Đã giao hàng thành công";
+			color = "#28a745"; // xanh lá
+			break;
+		case "unpaid":
+			label = "Chưa trả tiền";
+			color = "#dc3545"; // đỏ
+			break;
+		case "packed":
+			label = "Đã đóng gói";
+			color = "#17a2b8"; // xanh dương nhạt
+			break;
+		case "ready_to_ship":
+			label = "Sẵn sàng giao hàng";
+			color = "#007bff"; // xanh dương
+			break;
+		case "shipped":
+			label = "Đang giao hàng";
+			color = "#6f42c1"; // tím
+			break;
+		case "canceled":
+		case "cancelled":
+			label = "Đã hủy";
+			color = "#6c757d"; // xám
+			break;
+		case "confirmed":
+			label = "Người mua đã xác nhận đơn hàng";
+			color = "#ffc107"; // vàng
+			break;
+		default:
+			label = ecom.getStatus();
+			color = "#000000"; // đen
+			break;
+		}
+
+		// Trả về HTML có màu
+		return "<span style='color:" + color + "; font-weight:bold;'>" + label + "</span>";
+	}
+
+	public void syncSelectedOrderStatus() {
+		if (ecomOrder == null) {
+			FacesContext.getCurrentInstance().addMessage(null,
+					new FacesMessage(FacesMessage.SEVERITY_WARN, "Chưa chọn đơn hàng để đồng bộ.", ""));
+			return;
+		}
+
+		try {
+			OrderDTO dto = LazadaAPIServlet.getInstance().fetchOrderData(ecomOrder.getOrderNumber());
+			if (dto != null && dto.getOrder_status() != null) {
+				String newStatus = dto.getOrder_status();
+				if (!newStatus.equalsIgnoreCase(ecomOrder.getStatus())) {
+					ecomOrder.setStatus(newStatus);
+					ecomOrder.setUpdatedAt(dto.getUpdatedAt());
+					ecomOrder.setThoigiancapnhat(new Date());
+					EcomOrderService.update(ecomOrder);
+					ecomOrder = EcomOrderService.findById(ecomOrder.getId());
+
+					FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(FacesMessage.SEVERITY_INFO,
+							"Đã đồng bộ trạng thái đơn hàng: " + ecomOrder.getOrderNumber() + " → " + newStatus, ""));
+					LOGGER.info("✅ Đồng bộ thành công đơn hàng " + ecomOrder.getOrderNumber() + " → " + newStatus);
+				} else {
+					FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(FacesMessage.SEVERITY_INFO,
+							"Trạng thái đơn hàng không có thay đổi.", ""));
+				}
+			} else {
+				FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(FacesMessage.SEVERITY_WARN,
+						"Không lấy được trạng thái từ API cho đơn hàng: " + ecomOrder.getOrderNumber(), ""));
+			}
+		} catch (Exception ex) {
+			LOGGER.severe("❌ Lỗi đồng bộ đơn hàng " + ecomOrder.getOrderNumber() + ": " + ex.getMessage());
+			FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(FacesMessage.SEVERITY_ERROR,
+					"Lỗi khi đồng bộ đơn hàng: " + ecomOrder.getOrderNumber(), ex.getMessage()));
+		}
+	}
+
+	public void onRowSelect() {
+		try {
+			ecomOrderDetails.clear(); // Xóa chi tiết cũ đang hiển thị
+			if (ecomOrder != null && ecomOrder.getOrderNumber() != null) {
+				List<OrderDetailDTO> items = LazadaAPIServlet.getInstance().fetchOrderItems(ecomOrder.getOrderNumber());
+
+				if (items != null && !items.isEmpty()) {
+					List<EcomOrderDetail> entityDetails = new ArrayList<>();
+					for (int i = 0; i < items.size(); i++) {
+						OrderDetailDTO dto = items.get(i);
+
+						// Kiểm tra chi tiết đã tồn tại chưa (theo orderItemNumber)
+						boolean exists = false;
+						if (ecomOrder.getOrderDetails() != null) {
+							for (EcomOrderDetail existing : ecomOrder.getOrderDetails()) {
+								if (dto.getOrderItemId().equals(existing.getOrderItemNumber())) {
+									entityDetails.add(existing); // dùng lại
+									exists = true;
+									break;
+								}
+							}
+						}
+
+						if (!exists) {
+							EcomOrderDetail detail = new EcomOrderDetail();
+							detail.setStt(i + 1);
+							detail.setName(dto.getName());
+							detail.setSku(dto.getSku());
+							detail.setItemPrice(dto.getItemPrice());
+							detail.setOrderItemNumber(dto.getOrderItemId());
+							detail.setOrder(ecomOrder);
+							entityDetails.add(detail);
+						}
+					}
+
+					ecomOrder.setOrderDetails(entityDetails);
+					ecomOrderDetails.addAll(entityDetails);
+				} else {
+					LOGGER.warning("Không lấy được chi tiết đơn hàng từ API.");
+				}
+			}
+		} catch (Exception e) {
+			LOGGER.severe("Lỗi khi load chi tiết đơn hàng: " + e.getMessage());
+			e.printStackTrace();
+		}
+	}
+
+	public void onRowDblSelect() {
+		onRowSelect();
+		activeTabIndex = 1;
+	}
+
+//	public void saveOrUpdateOrder(OrderDTO dto) {
+//		EcomOrder existing = EcomOrderService.findByCode(dto.getOrderId());
+//		if (existing == null) {
+//			EcomOrder order = new EcomOrder();
+//			order.setOrderNumber(dto.getOrderId());
+//			order.setCustomerLastName(dto.getCustomerLastName());
+//			order.setCustomerFirstName(dto.getCustomerFirstName());
+//			order.setCreatedAt(dto.getCreatedAt());
+//			order.setUpdatedAt(dto.getUpdatedAt());
+//			
+//			order.setPrice(dto.getPrice());
+//			order.setStatus(dto.getOrder_status());
+//			order.setLoaitmdt(dto.geteCommerceType());
+//			order.setModifiedDate(new Date());
+//			EcomOrderService.create(order);
+//			LOGGER.info("Lưu đơn hàng mới: " + dto.getOrderId());
+//		} else {
+//			existing.setStatus(dto.getOrder_status());
+//			existing.setUpdatedAt(dto.getUpdatedAt());
+//			EcomOrderService.update(existing);
+//			LOGGER.info("Cập nhật trạng thái đơn hàng: " + dto.getOrderId());
+//		}
+//	}
+}

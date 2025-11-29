@@ -1,0 +1,166 @@
+
+package vinh.lixco.com.apiecommerce;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
+<<<<<<< .mine
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.security.GeneralSecurityException;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Logger;
+
+||||||| .r38
+=======
+>>>>>>> .r39
+@Path("lazada")
+public class LazadaAPIServlet {
+
+    // Constants
+    private static final String APP_KEY = "133487";
+    private static final String APP_SECRET = "RZTQdjz5VUdnpQ81koTwuQ0lrBJlnepC"; // Kiểm tra lại APP_SECRET
+    private static final String AUTH_URL = "https://auth.lazada.com/rest";
+    private static final String API_NAME = "/auth/token/create";
+    private static final String SIGN_METHOD = "sha256";
+    private static final String CHARSET_UTF8 = "UTF-8";
+    private static final Logger LOGGER = Logger.getLogger(LazadaAPIServlet.class.getName());
+
+    @GET
+    @Path("/auth/token/create")
+    @Produces("application/json; charset=utf-8")
+    public Response generateAccessToken(@QueryParam("code") String code) {
+        ResponseBuilder responseBuilder = Response.status(Response.Status.OK);
+        StringBuilder result = new StringBuilder();
+
+        try {
+            // Validate code
+            if (code == null || code.isEmpty()) {
+                result.append("{\"code\":\"-1\",\"message\":\"Missing or empty code parameter\"}");
+                return Response.status(Response.Status.BAD_REQUEST).entity(result.toString()).build();
+            }
+
+            // Prepare parameters
+            long timestamp = System.currentTimeMillis();
+            Map<String, String> params = new HashMap<>();
+            params.put("app_key", APP_KEY);
+            params.put("code", code);
+            params.put("sign_method", SIGN_METHOD);
+            params.put("timestamp", String.valueOf(timestamp));
+
+            // Calculate sign
+            String signatureString = buildSignatureString(params, API_NAME);
+            String sign = calculateSign(signatureString, APP_SECRET);
+            LOGGER.info("Signature String: " + signatureString);
+            LOGGER.info("Timestamp: " + timestamp);
+            LOGGER.info("Sign: " + sign);
+
+            // Build query string
+            StringBuilder query = new StringBuilder();
+            for (Map.Entry<String, String> entry : params.entrySet()) {
+                query.append(entry.getKey()).append("=")
+                     .append(URLEncoder.encode(entry.getValue(), CHARSET_UTF8)).append("&");
+            }
+            query.append("sign=").append(sign);
+
+            // Make HTTP GET request
+            String urlStr = AUTH_URL + API_NAME + "?" + query;
+            LOGGER.info("Request URL: " + urlStr);
+            URL url = new URL(urlStr);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "application/json");
+
+            // Read response
+            int responseCode = conn.getResponseCode();
+            BufferedReader in;
+            if (responseCode >= 200 && responseCode < 300) {
+                in = new BufferedReader(new InputStreamReader(conn.getInputStream(), CHARSET_UTF8));
+            } else {
+                in = new BufferedReader(new InputStreamReader(conn.getErrorStream(), CHARSET_UTF8));
+            }
+            StringBuilder responseBody = new StringBuilder();
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) {
+                responseBody.append(inputLine);
+            }
+            in.close();
+
+            // Parse response
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode responseJson = mapper.readTree(responseBody.toString());
+            result.append(responseBody.toString());
+
+            // Log tokens if successful
+            if (responseCode >= 200 && responseCode < 300) {
+                String accessToken = responseJson.get("access_token") != null ? responseJson.get("access_token").asText() : "N/A";
+                String refreshToken = responseJson.get("refresh_token") != null ? responseJson.get("refresh_token").asText() : "N/A";
+                LOGGER.info("Access Token: " + accessToken);
+                LOGGER.info("Refresh Token: " + refreshToken);
+            } else {
+                LOGGER.warning("API Error Response: " + responseBody.toString());
+                responseBuilder = Response.status(responseCode);
+            }
+
+        } catch (IOException | GeneralSecurityException e) {
+            result.append("{\"code\":\"-1\",\"message\":\"Error processing request: ").append(e.getMessage()).append("\"}");
+            responseBuilder = Response.status(Response.Status.INTERNAL_SERVER_ERROR);
+            LOGGER.severe("Error: " + e.getMessage());
+        }
+
+        return responseBuilder.entity(result.toString()).build();
+    }
+
+    private static String buildSignatureString(Map<String, String> params, String apiName) {
+        String[] keys = params.keySet().toArray(new String[0]);
+        Arrays.sort(keys);
+
+        StringBuilder query = new StringBuilder();
+        query.append(apiName);
+        for (String key : keys) {
+            String value = params.get(key);
+            if (areNotEmpty(key, value)) {
+                query.append(key).append(value);
+            }
+        }
+        return query.toString();
+    }
+
+    private static String calculateSign(String data, String appSecret) throws GeneralSecurityException, IOException {
+        SecretKeySpec secretKey = new SecretKeySpec(appSecret.getBytes(CHARSET_UTF8), "HmacSHA256");
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(secretKey);
+        byte[] bytes = mac.doFinal(data.getBytes(CHARSET_UTF8));
+        return byte2hex(bytes);
+    }
+
+    private static String byte2hex(byte[] bytes) {
+        StringBuilder sign = new StringBuilder();
+        for (byte b : bytes) {
+            String hex = Integer.toHexString(b & 0xFF);
+            if (hex.length() == 1) {
+                sign.append("0");
+            }
+            sign.append(hex.toUpperCase());
+        }
+        return sign.toString();
+    }
+
+    private static boolean areNotEmpty(String... values) {
+        return Arrays.stream(values).allMatch(s -> s != null && !s.isEmpty());
+    }
+}

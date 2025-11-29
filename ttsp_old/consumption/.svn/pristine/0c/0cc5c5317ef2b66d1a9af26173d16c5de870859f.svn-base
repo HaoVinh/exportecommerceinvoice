@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+
+	<ui:define name="content">
+		<div class="row">
+			<h3 class="titleform">Kế hoạch giao hàng</h3>
+		</div>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important; background-color: #eeeeee;">
+					<div class="row">
+						<div class="col-md-12"
+							style="padding-left: 0px !important; padding-right: 0px !important;">
+							<div class="row">
+								<div class="col-md-4" style="margin-top: 23px">
+									<div class="col-md-8">
+										<p:calendar value="#{keHoachGiaoHangBean.ngaySearch}" size="2"
+											pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+											showButtonPanel="true" />
+									</div>
+									<div class="col-md-4">
+										<p:commandLink styleClass="btn_printtt" update="idtbtheodoisl"
+											style="margin-left:5px; margin-right:5px; "
+											action="#{keHoachGiaoHangBean.search()}">
+											<i class="fa fa-search" aria-hidden="true"></i>
+											<span>Tìm</span>
+										</p:commandLink>
+									</div>
+								</div>
+								<div class="col-md-8" style="text-align: end; margin-top: 23px">
+									<p:commandButton styleClass="btn_printtt" value="In"
+										icon="fa fa-file-pdf-o"
+										onclick="target='_blank';monitorDownload( showStatus , hideStatus)"
+										action="#{keHoachGiaoHangBean.inKHGH()}" />
+									<p:commandButton styleClass="btn_primmary" value="Xuất excel"
+										icon="fa fa-file-excel-o" ajax="false" target="_blank"
+										action="#{keHoachGiaoHangBean.excelKHGH()}" />
+									<p:commandLink styleClass="btn_destroy" id="idcapnhatdulieu"
+										immediate="true" style="margin-left:5px; margin-right:5px; ">
+										<i class="fa fa-refresh" aria-hidden="true"></i>
+										<span>Cập nhật dữ liệu</span>
+									</p:commandLink>
+									<p:overlayPanel id="idfcapnhatdulieu" for="idcapnhatdulieu"
+										hideEffect="fade" dismissable="false"
+										widgetVar="panelcapnhatdulieu" style="width:250px;">
+										<div class="col-md-12" style="margin-bottom: 20px;">
+											<div class="col-md-8">
+												<label>Ngày giao hàng</label>
+												<p:calendar value="#{keHoachGiaoHangBean.ngaygh}"
+													pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+													showButtonPanel="true" />
+											</div>
+											<div class="col-md-4">
+												<p:commandLink process="idfcapnhatdulieu"
+													styleClass="btn_other" style="margin-top:20px"
+													update="menuformid"
+													oncomplete="PF('panelcapnhatdulieu').hide()"
+													action="#{keHoachGiaoHangBean.capnhatdulieu()}">Cập nhật</p:commandLink>
+											</div>
+										</div>
+									</p:overlayPanel>
+									<p:commandLink styleClass="btn_primmary" update="menuformid"
+										action="#{keHoachGiaoHangBean.saveOrUpdate()}"
+										style="margin-left:5px; margin-right:5px; ">
+										<i class="fa fa-save" aria-hidden="true"></i>
+										<span>Lưu/Cập nhật</span>
+									</p:commandLink>
+								</div>
+							</div>
+							<div class="row" style="margin: 10px 0px;">
+								<p:dataTable value="#{keHoachGiaoHangBean.keHoachGiaoHangs}"
+									var="item" rowGroupMode="subheader"
+									groupBy="#{item.kenhkhachhang}" sortBy="#{item.kenhkhachhang}"
+									styleClass="tablenhapsp tableright1 tbinputnopadding"
+									rowIndexVar="rowe" editable="true" editMode="cell"
+									id="idtbtheodoisl" resizableColumns="true">
+									<p:headerRow>
+										<p:column colspan="2">
+											<h:outputText value="#{item.kenhkhachhang}"
+												style="font-weight:bold;" />
+										</p:column>
+										<p:column style="text-align:center">
+											<h:outputText
+												value="#{keHoachGiaoHangBean.tongXe(item.kenhkhachhang)}">
+												<f:convertNumber pattern="#,##0" />
+											</h:outputText>
+										</p:column>
+										<p:column>
+										</p:column>
+										<p:column style="text-align:right">
+											<h:outputText
+												value="#{keHoachGiaoHangBean.tongKhoiLuong(item.kenhkhachhang)}">
+												<f:convertNumber pattern="#,##0" />
+											</h:outputText>
+										</p:column>
+										<p:column>
+										</p:column>
+										<p:column>
+										</p:column>
+									</p:headerRow>
+
+									<!-- DÒNG DỮ LIỆU -->
+									<p:column headerText="STT" width="50" style="text-align:center">
+										<h:outputText value="#{rowe+1}" />
+									</p:column>
+
+									<p:column headerText="Khách hàng" width="400">
+										<h:outputText
+											value="#{item.customer.customer_code}-#{item.customer.customer_name}" />
+									</p:column>
+
+									<p:column headerText="Số lượng xe" width="100"
+										style="text-align:center">
+										<p:cellEditor>
+											<f:facet name="output">
+												<h:outputText value="#{item.slxe}">
+													<f:convertNumber pattern="#,##0" />
+												</h:outputText>
+											</f:facet>
+											<f:facet name="input">
+												<p:inputNumber value="#{item.slxe}" decimalPlaces="0"
+													decimalSeparator="," thousandSeparator="." />
+											</f:facet>
+										</p:cellEditor>
+									</p:column>
+
+									<p:column headerText="Giờ dự kiến" width="100"
+										style="text-align:center">
+										<h:outputText value="#{item.ngaygioxevao}">
+											<f:convertDateTime pattern="HH:mm" />
+										</h:outputText>
+									</p:column>
+
+									<p:column headerText="Số lượng booking (kg)" width="120"
+										style="text-align:right">
+										<p:cellEditor>
+											<f:facet name="output">
+												<h:outputText value="#{item.khoiluongvc}">
+													<f:convertNumber pattern="#,##0" />
+												</h:outputText>
+											</f:facet>
+											<f:facet name="input">
+												<p:inputNumber value="#{item.khoiluongvc}" decimalPlaces="0"
+													decimalSeparator="," thousandSeparator="." />
+											</f:facet>
+										</p:cellEditor>
+									</p:column>
+
+									<p:column headerText="Đơn vị vận chuyển">
+										<h:outputText value="#{item.carrier.carrier_name}" />
+									</p:column>
+
+									<p:column headerText="Ghi chú">
+										<p:cellEditor>
+											<f:facet name="output">
+												<h:outputText value="#{item.ghichu}" />
+											</f:facet>
+											<f:facet name="input">
+												<p:inputText value="#{item.ghichu}" />
+											</f:facet>
+										</p:cellEditor>
+									</p:column>
+
+									<!-- FOOTER (TỔNG THEO NHÓM) -->
+
+								</p:dataTable>
+							</div>
+						</div>
+					</div>
+				</div>
+			</h:form>
+		</div>
+		<p:dialog header="Cách tính số liệu" styleClass="dialogcommon"
+			resizable="false"
+			style="overflow: initial;width:100%;max-width: min-content;min-width: 600px;"
+			closeOnEscape="true" widgetVar="dlcachtinhsolieu">
+			<p:panelGrid columns="1">
+				<p:outputLabel
+					value="1. Cột 'Dự kiến SL bán' được lấy từ bảng cài đặt kế hoạch bán hàng." />
+				<p:outputPanel>
+					<p:outputLabel
+						value="2. Cột 'Thực xuất' được tính bằng số lượng thực xuất trong chương trình TTSP (24.Lấy số liệu BC tổng hợp) có tách combo và cụ thể được phân nhóm như sau:." />
+					<p:outputLabel style="margin-left:20px"
+						value="- Dữ liệu nhóm hàng (BỘT GIẶT, NTRL) được phân loại theo loại sản phẩm." />
+					<p:outputLabel style="margin-left:20px"
+						value="- Kênh 'KÊNH GT' với nhóm khách hàng 'KÊNH GT'." />
+					<br />
+					<p:outputLabel style="margin-left:20px"
+						value="- Kênh  'KÊNH MT' gồm:" />
+					<p:outputLabel style="margin-left:40px"
+						value="* Nhóm khách hàng 'KÊNH SIÊU THỊ' có mã xuất nhập ('E',')','5','%')." />
+					<p:outputLabel style="margin-left:40px"
+						value="* Nhóm khách hàng 'KÊNH ONLINE', 'KÊNH HORECA'." />
+					<br />
+					<p:outputLabel style="margin-left:20px"
+						value="- Kênh  'KÊNH MT-OB' với nhóm khách hàng 'KÊNH SIÊU THỊ' có mã xuất nhập ('1', '(', '^')." />
+					<br />
+					<p:outputLabel style="margin-left:20px"
+						value="- Kênh 'KÊNH XUẤT KHẨU' với kênh khách hàng 'KÊNH XUẤT KHẨU'." />
+				</p:outputPanel>
+				<p:outputLabel
+					value="3. Cột 'Kế hoạch còn lại' được tính bằng cột 'Dự kiến SL bán' - 'Thực xuất'." />
+				<p:outputLabel
+					value="4. Cột 'Ước còn lại' được tính bằng cột 'Dự kiến SL bán' - 'Thực xuất'." />
+				<p:outputPanel>
+					<p:outputLabel
+						value="5. Cột 'Tồn kho đầu tháng' lấy số liệu tồn đầu tháng và được phân nhóm như sau:" />
+					<p:outputLabel style="margin-left:20px"
+						value="- Dữ liệu nhóm hàng (BỘT GIẶT, NTRL) được phân loại theo loại sản phẩm." />
+					<p:outputLabel style="margin-left:20px"
+						value="- Dữ kênh bán hàng (LIX, XK, KHÁC) được phân loại theo sản phẩm xuất khẩu, nhãn hàng (LIX, KHÁC) không tính nhãn 'UL'." />
+				</p:outputPanel>
+				<p:outputLabel
+					value="6. Cột 'Tồn kho cuối' được tính bằng 'Tồn kho đầu tháng' + 'Đã sản xuất' - 'Thực xuất'." />
+				<p:outputLabel
+					value="7. Cột 'Kế hoạch sản xuất' được lấy từ bảng cài đặt kế hoạch sản xuất." />
+
+				<p:outputPanel>
+					<p:outputLabel
+						value="8. Cột 'Đã sản xuất' được lấy từ bản nhập sản phẩm với mã nhập xuất 'S', mã khách hàng 'N' (bỏ mã sản phẩm 'BNI') và được phân nhóm như sau:" />
+					<p:outputLabel style="margin-left:20px"
+						value="- Dữ liệu nhóm hàng (BỘT GIẶT, NTRL) được phân loại theo loại sản phẩm." />
+					<p:outputLabel style="margin-left:20px"
+						value="- Dữ kênh bán hàng (LIX, XK, KHÁC) được phân loại theo sản phẩm xuất khẩu, nhãn hàng (LIX, KHÁC) không tính nhãn 'UL'. " />
+				</p:outputPanel>
+				<p:outputLabel
+					value="9. Cột 'Kế hoạch SX còn lại' được tính bằng 'Kế hoạch sản xuất' - 'Đã sản xuất'." />
+			</p:panelGrid>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<style>
+.ui-selectoneradio label {
+	font-weight: normal;
+}
+</style>
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Báo
+			cáo tổng hợp</h3>
+		<p:separator />
+
+		<p:fieldset style="min-width:800px;max-width:800px;margin: auto;">
+			<h:form id="menuformid">
+				<div class="col-md-12">
+					<p:fieldset>
+						<div class="col-md-12"
+							style="padding-left: 0px !important; padding-right: 0px !important;">
+							<div class="row">
+								<div class="col-md-12">
+									<div class="row">
+										<div class="col-md-6 pdnone">
+											<div class="col-md-6 pdnone">
+												<p:outputPanel id="sedate"
+													rendered="#{baoCaoTongHopBean.rdtungaydenngay}">
+													<div class="row">
+														<label>Từ ngày</label>
+														<p:calendar value="#{baoCaoTongHopBean.startDate}"
+															pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+															showButtonPanel="true">
+														</p:calendar>
+													</div>
+													<div class="row">
+														<label>Đến ngày</label>
+														<p:calendar value="#{baoCaoTongHopBean.endDate}"
+															pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+															showButtonPanel="true">
+														</p:calendar>
+													</div>
+												</p:outputPanel>
+											</div>
+											<div class="col-md-6 pdnone">
+												<p:outputPanel rendered="#{baoCaoTongHopBean.rdthangnam}">
+													<div class="row">
+														<label style="width: 100%">Tháng</label>
+														<p:spinner value="#{baoCaoTongHopBean.month}" size="4"
+															min="1" max="12">
+															<p:ajax listener="#{baoCaoTongHopBean.ajax_setDate()}"
+																update="sedate" process="@this" />
+														</p:spinner>
+													</div>
+													<div class="row">
+														<label style="width: 100%">Năm</label>
+														<p:spinner value="#{baoCaoTongHopBean.year}" size="4"
+															thousandSeparator="" min="2015" max="2050">
+															<p:ajax listener="#{baoCaoTongHopBean.ajax_setDate()}"
+																update="sedate" process="@this" />
+														</p:spinner>
+													</div>
+												</p:outputPanel>
+											</div>
+										</div>
+									</div>
+									<p:outputPanel rendered="#{baoCaoTongHopBean.rdthangthangnam}">
+										<div class="col-md-6">
+											<div class="row">
+												<div class="col-md-6">
+													<label>Từ tháng</label>
+												</div>
+												<div class="col-md-6">
+													<p:spinner value="#{baoCaoTongHopBean.startMonth}" size="4"
+														min="1" max="12" />
+												</div>
+											</div>
+											<div class="row">
+												<div class="col-md-6">
+													<label>Đến tháng</label>
+												</div>
+												<div class="col-md-6">
+													<p:spinner value="#{baoCaoTongHopBean.endMonth}" size="4"
+														min="1" max="12" />
+												</div>
+											</div>
+											<div class="row">
+												<div class="col-md-6">
+													<label>Năm</label>
+												</div>
+												<div class="col-md-6">
+													<p:spinner value="#{baoCaoTongHopBean.yearSE}" size="4"
+														thousandSeparator="" min="2015" max="2050" />
+												</div>
+											</div>
+										</div>
+									</p:outputPanel>
+								</div>
+								<div class="row">
+									<div class="col-md-6">
+										<label>Sản phẩm</label>
+										<div class="nhapdlg">
+											<span class="fa fa-search"></span>
+											<p:autoComplete style="width:100%;"
+												disabled="#{baoCaoTongHopBean.bsanpham}"
+												placeholder="Nhập mã, tên sản phẩm"
+												value="#{baoCaoTongHopBean.product}" maxResults="20"
+												converter="abstractConverter" minQueryLength="3"
+												queryDelay="900"
+												completeMethod="#{abstractAutoComplete.completeProduct}"
+												var="p" itemLabel="#{p.product_name}" itemValue="#{p}"
+												forceSelection="true" onclick="this.select();">
+												<p:column style="width:50px">
+													<h:outputText value="#{p.product_code}" />
+												</p:column>
+												<p:column style="width:150px">
+													<h:outputText value="#{p.product_name}" />
+												</p:column>
+											</p:autoComplete>
+										</div>
+										<label>Loại sản phẩm</label>
+										<p:selectOneMenu value="#{baoCaoTongHopBean.productType}"
+											disabled="#{baoCaoTongHopBean.bloaisanpham}"
+											converter="abstractConverter" effect="fade" var="t"
+											style="width:100%;">
+											<f:selectItem itemLabel="--select--" itemValue="#{null}" />
+											<f:selectItems value="#{baoCaoTongHopBean.listProductType}"
+												var="theme" itemLabel="#{theme.name}" itemValue="#{theme}" />
+											<p:column width="40">
+												<h:outputText value="#{t.code}" />
+											</p:column>
+											<p:column width="150">
+												<h:outputText style="white-space: initial;"
+													value="#{t==null ? '--select--' :t.name}" />
+											</p:column>
+										</p:selectOneMenu>
+										<label>Khách hàng</label>
+										<div class="nhapdlg">
+											<span class="fa fa-search"></span>
+											<p:autoComplete style="width:100%;"
+												placeholder="Tìm khách hàng"
+												disabled="#{baoCaoTongHopBean.bkhachhang}"
+												value="#{baoCaoTongHopBean.customer}" maxResults="100"
+												converter="abstractConverter" minQueryLength="3"
+												queryDelay="900"
+												completeMethod="#{abstractAutoComplete.completeCustomer}"
+												var="p" widgetVar="wkhachhang"
+												itemLabel="#{p.customer_name}" itemValue="#{p}"
+												moreText="true" forceSelection="true"
+												onclick="this.select();">
+												<p:column style="width:50px">
+													<h:outputText value="#{p.customer_code}" />
+												</p:column>
+												<p:column style="width:150px">
+													<h:outputText value="#{p.customer_name}" />
+												</p:column>
+											</p:autoComplete>
+										</div>
+										<label>Hợp đồng</label>
+										<div class="nhapdlg">
+											<span class="fa fa-search"></span>
+											<p:autoComplete style="width:100%;"
+												placeholder="Tìm khách hàng"
+												disabled="#{baoCaoTongHopBean.bhopdong}"
+												value="#{baoCaoTongHopBean.contract}" maxResults="100"
+												converter="abstractConverter" minQueryLength="3"
+												queryDelay="900"
+												completeMethod="#{abstractAutoComplete.completeContract}"
+												var="p" itemLabel="#{p.voucher_code}" itemValue="#{p}"
+												moreText="true" forceSelection="true"
+												onclick="this.select();">
+												<p:column>
+													<h:outputText value="#{p.voucher_code}" />
+												</p:column>
+											</p:autoComplete>
+										</div>
+									</div>
+									<div class="col-md-6">
+										<label>Mã xuất nhập</label>
+										<p:selectOneMenu value="#{baoCaoTongHopBean.ieCategories}"
+											disabled="#{baoCaoTongHopBean.bloainhapxuat}"
+											converter="abstractConverter" effect="fade" var="t"
+											style="width:100%;">
+											<f:selectItem itemLabel="--select--" itemValue="#{null}" />
+											<f:selectItems value="#{baoCaoTongHopBean.listIeCategories}"
+												var="theme" itemLabel="#{theme.content}"
+												itemValue="#{theme}" />
+											<p:column width="40">
+												<h:outputText value="#{t.code}" />
+											</p:column>
+											<p:column width="150">
+												<h:outputText style="white-space: initial;"
+													value="#{t==null ? '--select--' :t.content}" />
+											</p:column>
+										</p:selectOneMenu>
+										<div class="row">
+											<div class="col-md-6 pdright3">
+												<label>Mã khu vực</label>
+												<p:selectOneMenu value="#{baoCaoTongHopBean.area}"
+													disabled="#{baoCaoTongHopBean.bkhuvuc}"
+													converter="abstractConverter" effect="fade" var="t"
+													style="width:100%;">
+													<f:selectItem itemLabel="--select--" itemValue="#{null}" />
+													<f:selectItems value="#{baoCaoTongHopBean.listArea}"
+														var="theme" itemLabel="#{theme.area_name}"
+														itemValue="#{theme}" />
+													<p:column width="40">
+														<h:outputText value="#{t.area_code}" />
+													</p:column>
+													<p:column width="150">
+														<h:outputText style="white-space: initial;"
+															value="#{t==null ? '--select--' :t.area_name}" />
+													</p:column>
+												</p:selectOneMenu>
+											</div>
+											<div class="col-md-6 pdnone">
+												<label>Thành phố</label>
+												<p:autoComplete style="width:100%;"
+													placeholder="Nhập mã, tên sản phẩm"
+													disabled="#{baoCaoTongHopBean.bthanhpho}"
+													value="#{baoCaoTongHopBean.city}" maxResults="20"
+													converter="abstractConverter" minQueryLength="2"
+													queryDelay="900"
+													completeMethod="#{abstractAutoComplete.completeProduct}"
+													var="p" itemLabel="#{p.city_name}" itemValue="#{p}"
+													forceSelection="true" onclick="this.select();">
+													<p:column style="width:50px">
+														<h:outputText value="#{p.city_code}" />
+													</p:column>
+													<p:column style="width:150px">
+														<h:outputText value="#{p.city_name}" />
+													</p:column>
+												</p:autoComplete>
+											</div>
+										</div>
+										<div class="row">
+											<div class="col-md-6 pdright3">
+												<label>Xếp theo thứ tự</label>
+												<p:selectOneMenu value="#{baoCaoTongHopBean.xepthutu}"
+													disabled="#{baoCaoTongHopBean.bxepthutu}" effect="fade"
+													style="width:100%;">
+													<f:selectItem itemLabel="Theo tiền" itemValue="tttien" />
+													<f:selectItem itemLabel="Theo tên" itemValue="ttten" />
+													<f:selectItem itemLabel="Theo số lượng"
+														itemValue="ttsoluong" />
+												</p:selectOneMenu>
+											</div>
+											<div class="col-md-6 pdnone">
+												<label>Xem sản phẩm</label>
+												<p:selectOneMenu value="#{baoCaoTongHopBean.xemloaisp}"
+													disabled="#{baoCaoTongHopBean.bxemsanpham}" effect="fade"
+													style="width:100%;">
+													<f:selectItem itemLabel="Tất cả" itemValue="-1" />
+													<f:selectItem itemLabel="Nội địa" itemValue="1" />
+													<f:selectItem itemLabel="Xuất khẩu" itemValue="0" />
+												</p:selectOneMenu>
+											</div>
+										</div>
+										<p:selectBooleanCheckbox itemLabel="Cập nhật tồn kho"
+											disabled="#{baoCaoTongHopBean.bcapnhatton}"
+											value="#{baoCaoTongHopBean.capnhattonkho}" />
+									</div>
+								</div>
+							</div>
+
+						</div>
+					</p:fieldset>
+				</div>
+				<div class="row" style="margin-top: 20px">
+					<p:fieldset>
+						<p:selectOneRadio columns="3"
+							value="#{baoCaoTongHopBean.baocaoSelect}"
+							converter="abstractConverter" layout="responsive">
+							<f:selectItems itemDisabled="#{item.disable}"
+								value="#{baoCaoTongHopBean.listLoaiBaoCaoInSanPham}" var="item"
+								itemLabel="#{item.name}" itemValue="#{item}" />
+							<p:ajax process="@this"
+								listener="#{baoCaoTongHopBean.ajaxChonBaoCao()}"
+								update="menuformid" />
+						</p:selectOneRadio>
+					</p:fieldset>
+				</div>
+				<br />
+				<p:separator style="width:50%;margin:auto" />
+				<div class="row" style="text-align: center">
+					<p:commandLink styleClass="btn_primmary"
+						action="#{baoCaoTongHopBean.thuchienbaocao()}">
+						<i class="fa fa-bar-chart" aria-hidden="true"></i>
+						<span>Thực hiện báo cáo</span>
+					</p:commandLink>
+				</div>
+			</h:form>
+		</p:fieldset>
+
+		<p:dialog header="Báo cáo 1" styleClass="dialogcommon"
+			resizable="false" style="overflow: initial;" closeOnEscape="true"
+			widgetVar="dl1" modal="true">
+			<h:form>
+				<p:panelGrid columns="1">
+					<p:commandLink update=":messages"
+						action="#{baoCaoTongHopBean.reportTongKetXuatTheoSanPhamTongKetTieuThuLoai1()}">Tổng kết tiêu thụ loại 1</p:commandLink>
+					<p:commandLink update=":messages"
+						action="#{baoCaoTongHopBean.reportTongKetXuatTheoSanPhamTongKetTieuThuLoai2()}">Tổng kết tiêu thụ loại 2</p:commandLink>
+					<p:commandLink update=":messages"
+						action="#{baoCaoTongHopBean.reportTongKetXuatTheoSanPhamTongKetTieuThuLoai3()}">Tổng kết tiêu thụ loại 3</p:commandLink>
+					<p:commandLink target="_blank" ajax="false" update=":messages"
+						process="menuformid2"
+						action="#{baoCaoTongHopBean.reportTongKetXuatTheoSanPhamTongKetTieuThuLoai1Excel()}">Tổng kết tiêu thụ loại 1(Excel)</p:commandLink>
+					<p:commandLink target="_blank" ajax="false" update=":messages"
+						process="menuformid2"
+						action="#{baoCaoTongHopBean.reportTongKetXuatTheoSanPhamTongKetTieuThuLoai2Excel()}">Tổng kết tiêu thụ loại 2(Excel)</p:commandLink>
+					<p:commandLink target="_blank" ajax="false" update=":messages"
+						process="menuformid2"
+						action="#{baoCaoTongHopBean.reportTongKetXuatTheoSanPhamTongKetTieuThuLoai3Excel()}">Tổng kết tiêu thụ loại 3(Excel)</p:commandLink>
+				</p:panelGrid>
+			</h:form>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

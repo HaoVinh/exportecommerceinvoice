@@ -1,0 +1,2183 @@
+package lixco.com.bean;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+
+import javax.faces.context.FacesContext;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.jboss.logging.Logger;
+import org.omnifaces.cdi.ViewScoped;
+import org.primefaces.PrimeFaces;
+import org.primefaces.event.FileUploadEvent;
+import org.primefaces.event.TransferEvent;
+import org.primefaces.model.DualListModel;
+import org.primefaces.model.file.UploadedFile;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
+
+import lixco.com.commom_ejb.MyMath;
+import lixco.com.commom_ejb.MyUtilEJB;
+import lixco.com.commom_ejb.PagingInfo;
+import lixco.com.common.ApiCallClient;
+import lixco.com.common.FormatHandler;
+import lixco.com.common.HolderParser;
+import lixco.com.common.JsonParserUtil;
+import lixco.com.common.NavigationInfo;
+import lixco.com.common.SessionHelper;
+import lixco.com.common.ToolTimeCustomer;
+import lixco.com.entity.City;
+import lixco.com.entity.Customer;
+import lixco.com.entity.CustomerChannel;
+import lixco.com.entity.CustomerPricingProgram;
+import lixco.com.entity.CustomerTypes;
+import lixco.com.entity.DongBo;
+import lixco.com.entity.IEInvoice;
+import lixco.com.entity.PricingProgram;
+import lixco.com.entity.PricingProgramDetail;
+import lixco.com.entity.Product;
+import lixco.com.entity.ProductKM;
+import lixco.com.entityapi.CityDTO;
+import lixco.com.entityapi.CustomerAsyncDTO;
+import lixco.com.entityapi.CustomerChannelDTO;
+import lixco.com.entityapi.CustomerDTO;
+import lixco.com.entityapi.CustomerPricingProgramDTO;
+import lixco.com.entityapi.CustomerTypesDTO;
+import lixco.com.entityapi.DataAPI;
+import lixco.com.entityapi.PricingProgramAsyncDTO;
+import lixco.com.entityapi.PricingProgramDTO;
+import lixco.com.entityapi.PricingProgramDetailDTO;
+import lixco.com.interfaces.ICustomerChannelService;
+import lixco.com.interfaces.ICustomerPricingProgramService;
+import lixco.com.interfaces.ICustomerService;
+import lixco.com.interfaces.ICustomerTypesService;
+import lixco.com.interfaces.IPricingProgramDetailService;
+import lixco.com.interfaces.IPricingProgramService;
+import lixco.com.interfaces.IProductBrandService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.reqInfo.CustomerPricingProgramReqInfo;
+import lixco.com.reqInfo.CustomerReqInfo;
+import lixco.com.reqInfo.IEInvoiceReqInfo;
+import lixco.com.reqInfo.PricingProgramDetailReqInfo;
+import lixco.com.reqInfo.PricingProgramReqInfo;
+import lixco.com.reqInfo.ProductReqInfo;
+import lixco.com.reqfox.WrapDataPricingProgram;
+import lixco.com.service.ProductKMService;
+import lombok.Getter;
+import lombok.Setter;
+import net.sf.jasperreports.engine.JRDataSource;
+import net.sf.jasperreports.engine.JREmptyDataSource;
+import net.sf.jasperreports.engine.JRParameter;
+import net.sf.jasperreports.engine.JasperExportManager;
+import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperPrint;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import okhttp3.Call;
+import okhttp3.Response;
+import trong.lixco.com.account.servicepublics.Account;
+import trong.lixco.com.api.SecurityConfig;
+import trong.lixco.com.bean.AbstractBean;
+import trong.lixco.com.entity.AccountAPI;
+import trong.lixco.com.entity.AccountDatabase;
+import trong.lixco.com.entity.ParamReportDetail;
+import trong.lixco.com.service.AccountAPIService;
+import trong.lixco.com.service.AccountDatabaseService;
+import trong.lixco.com.service.DongBoService;
+import trong.lixco.com.service.ParamReportDetailService;
+import trong.lixco.com.util.MyUtil;
+import trong.lixco.com.util.MyUtilExcel;
+import trong.lixco.com.util.Notify;
+import trong.lixco.com.util.StaticPath;
+import trong.lixco.com.util.ToolReport;
+
+@Named
+@ViewScoped
+public class PricingProgramBean extends AbstractBean {
+	private static final long serialVersionUID = 5675661379860367168L;
+	@Inject
+	private Logger logger;
+	@Inject
+	private IPricingProgramService pricingProgramService;
+	@Inject
+	private IPricingProgramDetailService pricingProgramDetailService;
+	@Inject
+	private IProductService productService;
+	@Inject
+	private ICustomerPricingProgramService customerPricingProgramService;
+	@Inject
+	private ICustomerTypesService customerTypesService;
+	@Inject
+	private ICustomerService customerService;
+	@Inject
+	private ParamReportDetailService paramReportDetailService;
+	@Inject
+	private AccountDatabaseService accountDatabaseService;
+	private PricingProgram pricingProgramCrud;
+	private PricingProgram pricingProgramSelect;
+	private List<PricingProgram> listPricingProgram;
+	private PricingProgramDetail pricingProgramDetailCrud;
+	private PricingProgramDetail pricingProgramDetailSelect;
+	private List<PricingProgramDetail> listPricingProgramDetail;
+	@Getter
+	@Setter
+	private List<PricingProgramDetail> listPricingProgramDetailFilter;
+	private Date fromDate;
+	private Date toDate;
+	private String programCode;
+	private String mainProductCode;
+	private String voucherCode;
+	private Product product;
+	@Getter
+	@Setter
+	private CustomerTypes customerTypesSearch;
+	@Getter
+	@Setter
+	private Customer customerSearch;
+	private PricingProgram parentPricingProgram;
+
+	/* search detail */
+	private Account account;
+	private FormatHandler formatHandler;
+	/* Cài đặt chương trình đơn giá */
+	private List<CustomerTypes> listCustomerTypes;
+	private CustomerPricingProgram customerPricingProgramCrud;
+	private CustomerPricingProgram customerPricingProgramSelect;
+	private List<CustomerPricingProgram> listCustomerPricingProgram;
+
+	private CustomerTypes customerTypesSetting;
+	private DualListModel<Customer> modelCustomerSetting;
+	private PricingProgram pricingProgramSetting;
+	private String textSearch;
+	/* search 3 */
+	private CustomerTypes customerTypesSearch3;
+	private String programCodeSearch3;
+	private Customer customerSearch3;
+	private Date fromDateSearch3;
+	private Date toDateSearch3;
+	/* In báo giá */
+	private String baogiaso;
+	private String baogiasogoc;
+	private String tenkhachhang;
+	private Date ngaybaogia;
+	/* panel danh sách khách hàng đã cài đặt chương trình đơn giá */
+	private List<CustomerPricingProgram> listCustomerPricingProgramSet;
+	private List<CustomerPricingProgram> listCustomerPricingProgramSetFilter;
+	private CustomerPricingProgram customerPricingProgramSetSelect;
+	private CustomerPricingProgram customerPricingProgramSetCrud;
+	/* nạp chương trình đơn giá bằng excel */
+	private boolean rewrite;// ghi lại dữ liệu hay không
+	@Getter
+	@Setter
+	private boolean rewritechitiet;// ghi lại dữ liệu hay không
+	/* foxpro */
+	private Date fromDateFox;
+	private Date toDateFox;
+	@Getter
+	DongBo dongBo;
+	private final String NAMESYNC = "ctdongia";
+
+	@Override
+	protected void initItem() {
+		try {
+			dongBo = dongBoService.findName(NAMESYNC);
+			if (dongBo == null) {
+				dongBo = new DongBo();
+				dongBo.setName(NAMESYNC);
+			}
+			formatHandler = FormatHandler.getInstance();
+			Date currentDate = new Date();
+			fromDate = MyUtil.thembotthang(currentDate, -1);
+			fromDateSearch3 = fromDate;
+			search();
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletRequest request = (HttpServletRequest) facesContext.getExternalContext().getRequest();
+			account = SessionHelper.getInstance().getSession("account", request, Account.class);
+			createdNew();
+			/* innit setting */
+			listCustomerTypes = new ArrayList<CustomerTypes>();
+			customerTypesService.selectAll(listCustomerTypes);
+			modelCustomerSetting = new DualListModel<>(new ArrayList<Customer>(), new ArrayList<Customer>());
+			/* load danh sach cài đặt chương trình đơn giá */
+			searchCustomerPricingProgram();
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.initItem:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogFox() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			int month = ToolTimeCustomer.getMonthCurrent();
+			int year = ToolTimeCustomer.getYearCurrent();
+			fromDateFox = ToolTimeCustomer.getDateMinCustomer(month, year);
+			toDateFox = ToolTimeCustomer.getDateMaxCustomer(month, year);
+			current.executeScript("PF('dlgfox').show();");
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogFox:" + e.getMessage(), e);
+		}
+	}
+
+	public void saveOrUpdateApiFox() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			JsonObject json = new JsonObject();
+			json.addProperty("from_date", ToolTimeCustomer.convertDateToString(fromDateFox, "dd/MM/yyyy HH:mm:ss"));
+			json.addProperty("to_date", ToolTimeCustomer.convertDateToString(toDateFox, "dd/MM/yyyy HH:mm:ss"));
+			AccountDatabase accountDatabase = accountDatabaseService.findByName("foxproapi");
+			try {
+				Call call = ApiCallClient.getListObjectWithParam(accountDatabase.getAddressPublic(), "program",
+						"pricing", JsonParserUtil.getGson().toJson(json));
+				Response response = call.execute();
+				String body = response.body().string();
+				JsonObject result = JsonParserUtil.getGson().fromJson(body, JsonObject.class);
+				if (response.isSuccessful() && result.get("err").getAsInt() == 0) {
+					List<WrapDataPricingProgram> listResult = JsonParserUtil.getGson().fromJson(
+							result.get("dt").getAsJsonObject().get("list_pricing_program"),
+							new TypeToken<List<WrapDataPricingProgram>>() {
+							}.getType());
+					for (int i = 0; i < listResult.size(); i++) {
+						String code = listResult.get(i).getPricing_program().getMasoctdg();
+						long idprogram = pricingProgramService.findByCodegetId(code);
+						if (idprogram != 0) {
+							List<lixco.com.reqfox.WrapDataPricingProgram.PricingProgramDetail> list_pricing_program_detail = listResult
+									.get(i).getList_pricing_program_detail();
+							for (int j = 0; j < list_pricing_program_detail.size(); j++) {
+								long idmasp = productService.findByMaSPGetId(list_pricing_program_detail.get(j)
+										.getMasp());
+								if (idmasp != 0){
+									pricingProgramDetailService.updateLoiNhuan(idprogram, idmasp,
+											list_pricing_program_detail.get(j).getLoinhuan());
+								}
+							}
+						}
+					}
+				} else {
+					String mesages = result.get("msg").getAsString();
+					current.executeScript("swaldesignclose2('Cảnh báo!', '" + mesages + "','warning');");
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+				current.executeScript("swaldesignclose2('Cảnh báo!', 'Không thực hiện liên kết dữ liệu foxpro','warning');");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.saveOrUpdateApiFox:" + e.getMessage(), e);
+		}
+	}
+
+	public void nextOrPrev(int next) {
+		try {
+			if (listPricingProgram != null && listPricingProgram.size() > 0) {
+				int index = listPricingProgram.indexOf(pricingProgramCrud);
+				int size = listPricingProgram.size() - 1;
+				if (index == -1) {
+					pricingProgramSelect = listPricingProgram.get(0);
+					pricingProgramCrud = pricingProgramSelect.clone();
+				} else {
+					switch (next) {
+					case 1:
+						if (index == size) {
+							pricingProgramSelect = listPricingProgram.get(0);
+							pricingProgramCrud = pricingProgramSelect.clone();
+						} else {
+							pricingProgramSelect = listPricingProgram.get(index + 1);
+							pricingProgramCrud = pricingProgramSelect.clone();
+						}
+						break;
+
+					default:
+						if (index == 0) {
+							pricingProgramSelect = listPricingProgram.get(size);
+							pricingProgramCrud = pricingProgramSelect.clone();
+						} else {
+							pricingProgramSelect = listPricingProgram.get(index - 1);
+							pricingProgramCrud = pricingProgramSelect.clone();
+						}
+						break;
+					}
+				}
+				pricingProgramCrud = pricingProgramSelect.clone();
+				pricingProgramDetailCrud = new PricingProgramDetail();
+				// init detail
+				loadPricingProgramDetail();
+				// init danh sách khách hàng đã được cài đặt.
+				listCustomerPricingProgramSet = new ArrayList<>();
+				customerPricingProgramService.selectAll(pricingProgramSelect.getId(), listCustomerPricingProgramSet);
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.nextOrPrev:" + e.getMessage(), e);
+		}
+	}
+
+	@Override
+	protected Logger getLogger() {
+		return logger;
+	}
+
+	public void search() {
+		try {
+			listPricingProgram = new ArrayList<PricingProgram>();
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("from_date", ToolTimeCustomer.convertDateToString(fromDate, "dd/MM/yyyy HH:mm:ss"));
+			jsonInfo.addProperty("to_date", ToolTimeCustomer.convertDateToString(toDate, "dd/MM/yyyy HH:mm:ss"));
+			jsonInfo.addProperty("program_code", programCode);
+			jsonInfo.addProperty("parent_pricing_program_id",
+					parentPricingProgram != null ? parentPricingProgram.getId() : 0);
+			jsonInfo.addProperty("product_id", product != null ? product.getId() : 0);
+
+			jsonInfo.addProperty("customer_types_id", customerTypesSearch3 == null ? 0 : customerTypesSearch3.getId());
+			jsonInfo.addProperty("customer_id", customerSearch3 == null ? 0 : customerSearch3.getId());
+
+			JsonObject json = new JsonObject();
+			json.add("pricing_program_info", jsonInfo);
+			pricingProgramService.search(JsonParserUtil.getGson().toJson(json), listPricingProgram);
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.search:" + e.getMessage(), e);
+		}
+	}
+
+	@Inject
+	AccountAPIService accountAPIService;
+	@Inject
+	IProductBrandService productBrandService;
+	@Inject
+	DongBoService dongBoService;
+	int solandangnhap;
+
+	public void dongbo() {
+		try {
+			solandangnhap++;
+			if (solandangnhap > 4) {
+				noticeError("Token dăng nhâp lỗi, kiểm tra lại tài khoản liên kết.");
+			} else {
+				Gson gson = JsonParserUtil.getGson();
+				String[] chinhanhs = { "BD" };
+				PricingProgramAsyncDTO pricingProgramAsyncDTO = dongbodata();
+				StringBuffer message = new StringBuffer();
+				StringBuffer notice = new StringBuffer();
+				for (int i = 0; i < chinhanhs.length; i++) {
+					String token = "";
+					AccountAPI accountAPI = SecurityConfig.getTokenTime(accountAPIService, chinhanhs[i]);
+					if (accountAPI == null) {
+						noticeError("Không có tài khoản đăng nhập API.");
+						return;
+					}
+					String path = StaticPath.getPathBD();
+					if ("BD".equals(chinhanhs[i])) {
+						path = StaticPath.getPathBD();
+					} else if ("BN".equals(chinhanhs[i])) {
+						path = StaticPath.getPathBN();
+					}
+
+					String[] tokentime = new String[] { accountAPI.getToken(), accountAPI.getTimetoken() + "" };
+					if (tokentime != null
+							&& (tokentime[1] != null && new Date().getTime() < Long.parseLong(tokentime[1]) && tokentime[0] != null)) {
+						token = tokentime[0];
+					} else {
+						dangnhapAPIdongbo(gson, path, chinhanhs[i]);
+					}
+					String datajson = gson.toJson(pricingProgramAsyncDTO);
+					DataAPI dataAPI = new DataAPI(datajson);
+
+					// Goi ham dong bo
+					Call call = trong.lixco.com.api.CallAPI.getInstance(token).getMethodPost(
+							path + "/api/data/dongbo/ctdongia", gson.toJson(dataAPI));
+					Response response = call.execute();
+
+					String data = response.body().string();
+					JsonObject jdata = gson.fromJson(data, JsonObject.class);
+					String msg = jdata.get("msg").getAsString();
+					message.append(msg);
+					if (response.isSuccessful()) {
+						notice.append(chinhanhs[i]);
+						if (i == 0)
+							notice.append(", ");
+						notice("Đồng bộ " + chinhanhs[i] + " thành công.");
+					} else {
+						if (response.code() == 401) {
+							dangnhapAPIdongbo(gson, path, chinhanhs[i]);
+						} else {
+							error(msg);
+						}
+					}
+				}
+				if (!"".equals(notice.toString())) {
+					notice("Đồng bộ " + notice.toString() + " thành công.");
+					List<Long> ids = new ArrayList<Long>();
+					for (int i = 0; i < pricingProgramAsyncDTO.getPricingProgramDTOs().size(); i++) {
+						ids.add(pricingProgramAsyncDTO.getPricingProgramDTOs().get(i).getId());
+					}
+					pricingProgramService.updateCapNhat(ids);
+				} else {
+					noticeError("Kiểm tra lại dữ liệu chi nhánh.");
+				}
+				dongBo.setTime("Lần cuối: " + MyUtilEJB.chuyensangStrHH(new Date()));
+				dongBo.setUserSync(getAccount().getUserName());
+				dongBo.setMessages(message.toString());
+				dongBoService.saveOrUpdate(dongBo);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			error(e.getLocalizedMessage());
+		}
+
+	}
+
+	private void dangnhapAPIdongbo(Gson gson, String path, String chinhanh) throws IOException {
+		AccountAPI accountAPI = SecurityConfig.getTokenTime(accountAPIService, chinhanh);
+		String[] tokentime = new String[2];
+		Call call = trong.lixco.com.api.CallAPI.getInstance("").getMethodPost(path + "/api/account/login",
+				gson.toJson(accountAPI));
+		Response response = call.execute();
+		if (response.isSuccessful()) {
+			String data = response.body().string();
+			JsonObject jsonObject = gson.fromJson(data, JsonObject.class);
+			tokentime[0] = jsonObject.get("access_token").getAsString();
+			tokentime[1] = jsonObject.get("expires_in").getAsString();
+			SecurityConfig.saveToken(accountAPIService, tokentime[0], Long.parseLong(tokentime[1]), chinhanh);
+			dongbo();
+		} else {
+			noticeError("Tài khoản đăng nhập API " + chinhanh + " không đúng hoặc lỗi " + response.toString());
+			return;
+		}
+	}
+
+	@Inject
+	ICustomerChannelService customerChannelService;
+
+	private PricingProgramAsyncDTO dongbodata() {
+		List<PricingProgram> pricingPrograms = pricingProgramService.findNotSync();
+		List<PricingProgramDTO> pricingProgramDTOs = new ArrayList<PricingProgramDTO>();
+
+		for (int i = 0; i < pricingPrograms.size(); i++) {
+			PricingProgramDTO pdbDTO = new PricingProgramDTO(pricingPrograms.get(i));
+			List<PricingProgramDetail> pricingProgramDetails = pricingProgramDetailService
+					.findAllByPricingProgram(pricingPrograms.get(i).getId());
+			List<PricingProgramDetailDTO> pricingProgramDetailDTOs = new ArrayList<PricingProgramDetailDTO>();
+			for (int j = 0; j < pricingProgramDetails.size(); j++) {
+				PricingProgramDetailDTO pdbDetailDTO = new PricingProgramDetailDTO(pricingProgramDetails.get(j));
+				pricingProgramDetailDTOs.add(pdbDetailDTO);
+			}
+			pdbDTO.setPricingProgramDetailDTOs(pricingProgramDetailDTOs);
+			List<CustomerPricingProgram> customerPricingPrograms = customerPricingProgramService
+					.findAllByPricingProgram(pricingPrograms.get(i).getId());
+
+			List<CustomerPricingProgramDTO> customerPricingProgramDTOs = new ArrayList<CustomerPricingProgramDTO>();
+			for (int j = 0; j < customerPricingPrograms.size(); j++) {
+				CustomerPricingProgramDTO pdbCusProgramDTO = new CustomerPricingProgramDTO(
+						customerPricingPrograms.get(j));
+				customerPricingProgramDTOs.add(pdbCusProgramDTO);
+			}
+			pdbDTO.setCustomerPricingProgramDTOs(customerPricingProgramDTOs);
+			pricingProgramDTOs.add(pdbDTO);
+
+		}
+		PricingProgramAsyncDTO pricingProgramAsyncDTO = new PricingProgramAsyncDTO(pricingProgramDTOs);
+		return pricingProgramAsyncDTO;
+	}
+
+	public void searchCustomerPricingProgram() {
+		try {
+
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("customer_types_id", customerTypesSearch3 == null ? 0 : customerTypesSearch3.getId());
+			jsonInfo.addProperty("customer_id", customerSearch3 == null ? 0 : customerSearch3.getId());
+			jsonInfo.addProperty("program_code", programCodeSearch3);
+			jsonInfo.addProperty("from_date",
+					ToolTimeCustomer.convertDateToString(fromDateSearch3, "dd/MM/yyyy HH:mm:ss"));
+			jsonInfo.addProperty("to_date", ToolTimeCustomer.convertDateToString(toDateSearch3, "dd/MM/yyyy HH:mm:ss"));
+			jsonInfo.addProperty("disable", -1);
+			JsonObject json = new JsonObject();
+			json.add("customer_pricing_program_info", jsonInfo);
+			listCustomerPricingProgram = new ArrayList<>();
+			PagingInfo page = new PagingInfo();
+			customerPricingProgramService.search(JsonParserUtil.getGson().toJson(json), page,
+					listCustomerPricingProgram);
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.searchCustomerPricingProgram:" + e.getMessage(), e);
+		}
+	}
+
+	public void loadPricingProgramDetail() {
+		try {
+			listPricingProgramDetail = new ArrayList<PricingProgramDetail>();
+			if (pricingProgramCrud != null && pricingProgramCrud.getId() != 0) {
+				pricingProgramDetailService.selectAllByPricingProgram(
+						pricingProgramCrud != null ? pricingProgramCrud.getId() : 0, listPricingProgramDetail);
+			}
+			executeScript("PF('datatbct').clearFilters()");
+			updateform("menuformid");
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.search2:" + e.getMessage(), e);
+		}
+	}
+
+	public void saveOrUpdate() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (pricingProgramCrud != null) {
+				String programCode = pricingProgramCrud.getProgram_code();
+				Date effectiveDate = pricingProgramCrud.getEffective_date();
+				Date expiryDate = pricingProgramCrud.getExpiry_date();
+				PricingProgram mainpricingProgram = pricingProgramCrud.getParent_pricing_program();
+				if (programCode != null && programCode != "" && effectiveDate != null
+						&& (expiryDate == null || effectiveDate.getTime() <= expiryDate.getTime())) {
+					PricingProgramReqInfo t = new PricingProgramReqInfo(pricingProgramCrud);
+					if (mainpricingProgram != null) {
+						// kiểm tra ngày có phù hợp không so với chương trình
+						// cha
+						long timeMainEffectiveDate = mainpricingProgram.getEffective_date().getTime();
+						Date mainExpiryDate = mainpricingProgram.getExpiry_date();
+						if (effectiveDate.getTime() >= timeMainEffectiveDate
+								&& (mainExpiryDate == null || expiryDate == null || expiryDate.getTime() <= mainExpiryDate
+										.getTime())) {
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo', 'Ngày hiệu lực và ngày kết thúc phải nằm trong phạm vi hiệu lực của chương trình chính!','warning',2000);");
+							return;
+						}
+
+					} else if (pricingProgramCrud.getId() != 0) {
+						// kiểm tra ngày của tất cả chương trình con có hợp lệ
+						// không
+						StringBuilder result = new StringBuilder();
+						pricingProgramService.getDateMaxSubPricingProgram(pricingProgramCrud.getId(), result);
+						String str = result.toString();
+						if (str.length() > 0) {
+							JsonObject json = JsonParserUtil.getGson().fromJson(str, JsonObject.class);
+							HolderParser hCount = JsonParserUtil.getValueNumber(json, "count", null);
+							/* Ngày chương trình con */
+							HolderParser hSEffectiveDate = JsonParserUtil.getValueString(json, "effective_date", null);
+							HolderParser hSExpiryDate = JsonParserUtil.getValueString(json, "expiry_date", null);
+							int count = Integer.parseInt(Objects.toString(hCount.getValue(), "0"));
+							Date sEffectiveDate = ToolTimeCustomer.convertStringToDate(
+									Objects.toString(hSEffectiveDate.getValue(), null), "dd/MM/yyyy HH:mm:ss");
+							Date sExpiryDate = ToolTimeCustomer.convertStringToDate(
+									Objects.toString(hSExpiryDate.getValue(), null), "dd/MM/yyyy HH:mm:ss");
+							if (count == 0
+									|| (sEffectiveDate != null && sEffectiveDate.getTime() >= effectiveDate.getTime() && (expiryDate == null
+											|| sExpiryDate == null || sExpiryDate.getTime() <= expiryDate.getTime()))) {
+								// not thing
+							} else {
+								current.executeScript("swaldesigntimer('Cảnh báo', 'Chương trình này có ngày hiệu lực và ngày kết thúc không hợp lệ so với chương trình đơn giá phụ liên kết!','warning',3000);");
+								return;
+							}
+						}
+					}
+					if (pricingProgramCrud.getId() == 0) {
+						if (allowSave(new Date())) {
+							pricingProgramCrud.setCreated_date(new Date());
+							pricingProgramCrud.setCreated_by(account.getMember().getName());
+							if (pricingProgramService.insert(t) != -1) {
+								// kiểm tra thử có phải lưu dữ liệu copy hay
+								// không
+								if (listPricingProgramDetail != null && listPricingProgramDetail.size() > 0
+										&& listPricingProgramDetail.get(0).getId() == 0) {
+									for (PricingProgramDetail pd : listPricingProgramDetail) {
+										pd.setPricing_program(t.getPricing_program());
+										pricingProgramDetailService.update(new PricingProgramDetailReqInfo(pd));
+									}
+									success();
+									search();
+								} else {
+
+									// Cai dat khach hang tu chuong trinh chinh
+									if (mainpricingProgram != null) {
+										List<CustomerPricingProgram> cusPrices = new ArrayList<CustomerPricingProgram>();
+										customerPricingProgramService.selectAll(mainpricingProgram.getId(), cusPrices);
+										for (CustomerPricingProgram cus : cusPrices) {
+											CustomerPricingProgram cusnew = new CustomerPricingProgram();
+											cusnew.setPricing_program(t.getPricing_program());
+											cusnew.setEffective_date(t.getPricing_program().getEffective_date());
+											cusnew.setExpiry_date(t.getPricing_program().getExpiry_date());
+											cusnew.setCustomer(cus.getCustomer());
+											CustomerPricingProgramReqInfo tcusnew = new CustomerPricingProgramReqInfo(
+													cusnew);
+											customerPricingProgramService.insert(tcusnew);
+										}
+									}
+									listCustomerPricingProgramSet = new ArrayList<>();
+									customerPricingProgramService.selectAll(t.getPricing_program().getId(),
+											listCustomerPricingProgramSet);
+									executeScript("PF('datatb').clearFilters();PF('datatbct').clearFilters()");
+									success();
+									listPricingProgram.add(0, pricingProgramCrud);
+								}
+
+							} else {
+								current.executeScript("swaldesigntimer('Xảy ra lỗi!', 'Lưu chương trình thất bại!','error',2000);");
+							}
+
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+						}
+					} else {
+						if (allowUpdate(new Date())) {
+							pricingProgramCrud.setLast_modifed_date(new Date());
+							pricingProgramCrud.setLast_modifed_by(account.getMember().getName());
+							if (pricingProgramService.update(t) != -1) {
+								success();
+								listPricingProgram.set(listPricingProgram.indexOf(pricingProgramCrud),
+										pricingProgramCrud);
+							} else {
+								current.executeScript("swaldesigntimer('Xảy ra lỗi!', 'Cập nhật thất bại!','error',2000);");
+							}
+
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+						}
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo', 'Thông tin không đầy đủ hoặc ngày hiệu lực và ngày kết thúc không hợp lệ!','warning',2500);");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.saveOrUpdate:" + e.getMessage(), e);
+		}
+	}
+
+	public void saveOrUpdateCustomerPricingProgram() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (customerPricingProgramCrud != null) {
+				PricingProgram ct = customerPricingProgramCrud.getPricing_program();
+				Customer cs = customerPricingProgramCrud.getCustomer();
+				Date eff = customerPricingProgramCrud.getEffective_date();
+				if (ct != null && cs != null && eff != null) {
+					// wrap containner
+					CustomerPricingProgramReqInfo t = new CustomerPricingProgramReqInfo(customerPricingProgramCrud);
+					int chk = 0;
+					if (customerPricingProgramCrud.getId() == 0) {
+						if (allowSave(new Date())) {
+							customerPricingProgramCrud.setCreated_by(account.getMember().getName());
+							customerPricingProgramCrud.setCreated_date(new Date());
+							chk = customerPricingProgramService.insert(t);
+							switch (chk) {
+							case 0:
+								current.executeScript("swaldesigntimer('Thành công!', 'Thành công!','success',2000);");
+								listCustomerPricingProgram.add(0, customerPricingProgramCrud);
+								customerPricingProgramCrud = new CustomerPricingProgram();
+								break;
+							case -2:
+								current.executeScript("swaldesigntimer('Cảnh báo', 'Trùng dữ liệu, chương trình đơn giá này đã được áp dụng cho khách hàng trên!','warning',2500);");
+								break;
+
+							default:
+								current.executeScript("swaldesigntimer('Xảy ra lỗi!', 'Thêm thất bại!','error',2000);");
+								break;
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+						}
+					} else {
+						if (allowUpdate(new Date())) {
+							customerPricingProgramCrud.setLast_modifed_by(account.getMember().getName());
+							customerPricingProgramCrud.setLast_modifed_date(new Date());
+							chk = customerPricingProgramService.update(t);
+							switch (chk) {
+							case 0:
+								current.executeScript("swaldesigntimer('Thành công!', 'Cập nhật thành công!','success',2000);");
+								listCustomerPricingProgram.set(
+										listCustomerPricingProgram.indexOf(customerPricingProgramCrud),
+										customerPricingProgramCrud.clone());
+								break;
+							case -2:
+								current.executeScript("swaldesigntimer('Cảnh báo', 'Trùng dữ liệu, chương trình đơn giá này đã được áp dụng cho khách hàng trên!','warning',2500);");
+								break;
+
+							default:
+								current.executeScript("swaldesigntimer('Xảy ra lỗi!', 'Cập nhật thất bại!','error',2000);");
+								break;
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+						}
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo', 'Thông tin không đầy đủ, điền đủ đầy thông tin chứa(*)','warning',2500);");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.saveOrUpdateCustomerPricingProgram:" + e.getMessage(), e);
+		}
+	}
+
+	public void saveOrUpdateCustomerPricingProgramSet() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (customerPricingProgramSetCrud != null && pricingProgramCrud != null) {
+				customerPricingProgramSetCrud.setPricing_program(pricingProgramCrud);
+				Customer cs = customerPricingProgramSetCrud.getCustomer();
+				Date eff = customerPricingProgramSetCrud.getEffective_date();
+				if (cs != null && eff != null) {
+					// wrap containner
+					CustomerPricingProgramReqInfo t = new CustomerPricingProgramReqInfo(customerPricingProgramSetCrud);
+					if (customerPricingProgramSetCrud.getId() == 0) {
+						if (allowSave(new Date())) {
+							customerPricingProgramSetCrud.setCreated_by(account.getMember().getName());
+							customerPricingProgramSetCrud.setCreated_date(new Date());
+							int ck = customerPricingProgramService.insert(t);
+							if (ck == 0) {
+								listCustomerPricingProgramSet.add(0, t.getCustomer_pricing_program());
+								executeScript("PF('datatb').clearFilters();");
+								notify.success("Thành công!");
+							} else if (ck == -2) {
+								current.executeScript("swaldesigntimer('Cảnh báo', 'Trùng dữ liệu, chương trình đơn giá này đã được áp dụng cho khách hàng trên!','warning',2500);");
+							} else {
+								current.executeScript("swaldesigntimer('Cảnh báo!', 'Không lưu được!','warning',2000);");
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+						}
+					} else {
+						if (allowUpdate(new Date())) {
+							customerPricingProgramSetCrud.setLast_modifed_by(account.getMember().getName());
+							customerPricingProgramSetCrud.setLast_modifed_date(new Date());
+							int ck = customerPricingProgramService.update(t);
+							if (ck == 0) {
+								listCustomerPricingProgramSet.set(
+										listCustomerPricingProgramSet.indexOf(customerPricingProgramSetCrud),
+										t.getCustomer_pricing_program());
+								notify.success("Cập nhật thành công!");
+							} else if (ck == -2) {
+								current.executeScript("swaldesigntimer('Cảnh báo', 'Trùng dữ liệu, chương trình đơn giá này đã được áp dụng cho khách hàng trên!','warning',2500);");
+							} else {
+								current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+						}
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo', 'Thông tin không đầy đủ, điền đủ đầy thông tin chứa(*)!','warning',2500);");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.saveOrUpdateCustomerPricingProgramSet:" + e.getMessage(), e);
+		}
+	}
+
+	public void capnhatlaingay() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (allowUpdate(new Date())) {
+				List<Long> ids = new ArrayList<Long>();
+				for (int i = 0; i < listCustomerPricingProgramSet.size(); i++) {
+					ids.add(listCustomerPricingProgramSet.get(i).getId());
+				}
+				if (ids.size() != 0) {
+					customerPricingProgramService.caphnhatlaingay(ids, pricingProgramCrud.getEffective_date(),
+							pricingProgramCrud.getExpiry_date());
+
+					listCustomerPricingProgramSet = new ArrayList<>();
+					customerPricingProgramService
+							.selectAll(pricingProgramSelect.getId(), listCustomerPricingProgramSet);
+					executeScript("PF('datatb').clearFilters();PF('datatbct').clearFilters()");
+					success();
+
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+			}
+
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.capnhatlaingay:" + e.getMessage(), e);
+		}
+	}
+
+	public void deleteCustomerPricingProgramSet() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (customerPricingProgramSetSelect != null) {
+				// delete select;
+				if (allowDelete(new Date())) {
+					if (customerPricingProgramService.deleteById(customerPricingProgramSetSelect.getId()) > 0) {
+						notify.success("Xóa thành công!");
+						executeScript("PF('datatb').clearFilters();PF('datatbct').clearFilters()");
+						listCustomerPricingProgramSet.remove(customerPricingProgramSetSelect);
+						customerPricingProgramSetSelect = null;
+					} else {
+						current.executeScript("swaldesigntimer('Xảy ra lỗi!', 'Không xóa được!','warning',2000);");
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.deleteCustomerPricingProgramSet:" + e.getMessage(), e);
+		}
+	}
+
+	public void deleteCustomerPricingProgram() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (customerPricingProgramSelect != null) {
+				// delete select;
+				if (allowDelete(new Date())) {
+					if (customerPricingProgramService.deleteById(customerPricingProgramSelect.getId()) > 0) {
+						success();
+						executeScript("PF('datatb').clearFilters();PF('datatbct').clearFilters()");
+						listCustomerPricingProgram.remove(customerPricingProgramSelect);
+						customerPricingProgramSelect = null;
+					} else {
+						current.executeScript("swaldesigntimer('Xảy ra lỗi!', 'Không xóa được!','warning',2000);");
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.deleteCustomerPricingProgram:" + e.getMessage(), e);
+		}
+	}
+
+	public void showEdit() {
+		try {
+			pricingProgramCrud = pricingProgramSelect.clone();
+			pricingProgramDetailCrud = new PricingProgramDetail();
+			// init detail
+			loadPricingProgramDetail();
+			// init danh sách khách hàng đã được cài đặt.
+			listCustomerPricingProgramSet = new ArrayList<>();
+			customerPricingProgramService.selectAll(pricingProgramSelect.getId(), listCustomerPricingProgramSet);
+			executeScript("PF('datatb').clearFilters();PF('datatbct').clearFilters()");
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogEdit:" + e.getMessage(), e);
+		}
+	}
+
+	// khi select row
+	public void showEditCustomerPricingProgram() {
+		try {
+			customerPricingProgramCrud = customerPricingProgramSelect.clone();
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showEditCustomerPricingProgram:" + e.getMessage(), e);
+		}
+	}
+
+	// show dialog khi dùng double click
+	public void showDbClickCustomerPricingProgram() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			customerPricingProgramCrud = customerPricingProgramSelect.clone();
+			current.executeScript("PF('dlg3').show();");
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDbClickCustomerPricingProgram:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogAddSettings() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			customerPricingProgramCrud = new CustomerPricingProgram();
+			current.executeScript("PF('dlg3').show();");
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogAddSettings:" + e.getMessage(), e);
+		}
+	}
+
+	public void changeNgay() {
+		try {
+			PricingProgram pg = customerPricingProgramCrud.getPricing_program();
+			if (pg != null) {
+				customerPricingProgramCrud.setEffective_date(pg.getEffective_date());
+				customerPricingProgramCrud.setExpiry_date(pg.getExpiry_date());
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.changeNgay:" + e.getMessage(), e);
+		}
+	}
+
+	public void createdNew() {
+		try {
+			pricingProgramCrud = new PricingProgram();
+			String code = pricingProgramService.initPricingProgramCode();
+			pricingProgramCrud.setProgram_code(code);
+			pricingProgramCrud.setEffective_date(new Date());
+			pricingProgramDetailCrud = new PricingProgramDetail();
+			listPricingProgramDetail = new ArrayList<PricingProgramDetail>();
+			listCustomerPricingProgramSet = new ArrayList<>();
+			customerPricingProgramSetCrud = null;
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.createdNew:" + e.getMessage(), e);
+		}
+	}
+
+	public void delete() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (pricingProgramSelect != null) {
+				if (allowDelete(new Date())) {
+					if (pricingProgramService.deleteById(pricingProgramSelect.getId()) != -1) {
+						success();
+						listPricingProgram.remove(pricingProgramSelect);
+						pricingProgramSelect = null;
+						createdNew();
+					} else {
+						current.executeScript("swaldesigntimer('Xảy ra lỗi!', 'Lỗi hệ thống!','error',2000);");
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xóa!','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.delete:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (pricingProgramCrud != null && pricingProgramCrud.getId() != 0) {
+				pricingProgramDetailCrud = new PricingProgramDetail();
+				pricingProgramDetailCrud.setPricing_program(pricingProgramCrud);
+				current.executeScript("PF('dlg1').show();");
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chương trình đơn giá không tồn tại, vui lòng chọn một chương trình đơn giá!','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogDetail:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogEditDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (pricingProgramDetailSelect != null && pricingProgramDetailSelect.getId() != 0) {
+				pricingProgramDetailCrud = pricingProgramDetailSelect.clone();
+				pricingProgramDetailCrud.setPricing_program(pricingProgramCrud);
+				current.executeScript("PF('dlg1').show();");
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để chỉnh sửa hoặc chi tiết đơn giá copy chưa lưu!','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogEditDetail:" + e.getMessage(), e);
+		}
+	}
+
+	public void saveOrUpdateDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (pricingProgramDetailCrud != null && pricingProgramCrud != null && pricingProgramCrud.getId() != 0) {
+				Product product = pricingProgramDetailCrud.getProduct();
+				double unitPrice = pricingProgramDetailCrud.getUnit_price();
+				if (product != null && unitPrice != 0.0) {
+					PricingProgramDetailReqInfo t = new PricingProgramDetailReqInfo(pricingProgramDetailCrud);
+					if (pricingProgramDetailCrud.getId() == 0) {
+						if (allowSave(new Date())) {
+							pricingProgramDetailCrud.setCreated_date(new Date());
+							pricingProgramDetailCrud.setCreated_by(account.getMember().getName());
+							int check = pricingProgramDetailService.insert(t);
+							if (check == 0) {
+								notify.success("Thêm thành công");
+								listPricingProgramDetail.add(0, t.getPricing_program_detail());
+								createNewDetail();
+								executeScript("PF('datatbct').clearFilters();");
+							} else if (check > 0) {
+								current.executeScript("swaldesigntimer('Cảnh báo!', 'Chi tiết chương trình đơn giá đã tồn tại !','warning',2000);");
+							} else {
+								current.executeScript("swaldesigntimer('Cảnh báo!', 'Lưu thất bại!','warning',2000);");
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+						}
+					} else {
+						if (allowUpdate(new Date())) {
+							pricingProgramDetailCrud.setLast_modifed_by(account.getMember().getName());
+							pricingProgramDetailCrud.setLast_modifed_date(new Date());
+							int check = pricingProgramDetailService.update(t);
+							if (check != -1) {
+								notify.success("Cập nhật thành công");
+								listPricingProgramDetail.set(
+										listPricingProgramDetail.indexOf(pricingProgramDetailCrud),
+										t.getPricing_program_detail());
+							} else if (check > 0) {
+								current.executeScript("swaldesigntimer('Cảnh báo!', 'Chi tiết chương trình đơn giá đã tồn tại !','warning',2000);");
+							} else {
+								current.executeScript("swaldesigntimer('Cảnh báo!', 'Không cập nhật được!','warning',2000);");
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+						}
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo', 'Thông tin chi tiết chương trình đơn giá không đầy đủ, điền đủ thông tin chứa(*)!','warning',2000);");
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Thông tin không đầy đủ hoặc chương trình đơn giá không tồn tại!','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.saveOrUpdateDetail:" + e.getMessage(), e);
+		}
+	}
+
+	private void createNewDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (pricingProgramCrud != null && pricingProgramCrud.getId() != 0) {
+				pricingProgramDetailCrud = new PricingProgramDetail();
+				pricingProgramDetailCrud.setPricing_program(pricingProgramCrud);
+			} else {
+				current.executeScript("PF('dlg1').hide();");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.createNewDetail:" + e.getMessage(), e);
+		}
+	}
+
+	public void exprotExcel() {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (listPricingProgramDetail != null && listPricingProgramDetail.size() > 0) {
+				List<Object[]> results = new ArrayList<Object[]>();
+				Object[] title = { "masoctdg", "masoctdgc", "tungay", "denngay", "ghichu", "masp", "tensp", "soluong",
+						"dongia", "loinhuan" };
+				results.add(title);
+				String masoctdh = pricingProgramCrud.getProgram_code();
+				String masoctdgc = pricingProgramCrud.getParent_pricing_program() == null ? "" : pricingProgramCrud
+						.getParent_pricing_program().getProgram_code();
+				String tungay = ToolTimeCustomer.convertDateToString(pricingProgramCrud.getEffective_date(),
+						"dd/MM/yyyy");
+				String denngay = pricingProgramCrud.getExpiry_date() == null ? "" : ToolTimeCustomer
+						.convertDateToString(pricingProgramCrud.getExpiry_date(), "dd/MM/yyyy");
+				String ghichu = pricingProgramCrud.getNote() == null ? "" : pricingProgramCrud.getNote();
+				for (PricingProgramDetail it : listPricingProgramDetail) {
+					Object[] row = { masoctdh, masoctdgc, tungay, denngay, ghichu, it.getProduct().getProduct_code(),
+							it.getProduct().getProduct_name(), it.getQuantity(), it.getUnit_price(),
+							it.getRevenue_per_ton() };
+					results.add(row);
+				}
+				ToolReport.printReportExcelRaw(results, "chi_tiet_chuong_trinh_don_gia_" + masoctdh);
+			} else {
+				notify.message("Không có dữ liệu");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.exprotExcel:" + e.getMessage(), e);
+		}
+	}
+@Inject
+ProductKMService productKMService;
+	public void exportPDF() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (listPricingProgramDetail != null && listPricingProgramDetail.size() > 0) {
+				String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+						.getRealPath("/resources/reports/pinbaogia.jasper");
+				Map<String, Object> importParam = new HashMap<String, Object>();
+				Locale locale = new Locale("vi", "VI");
+				importParam.put(JRParameter.REPORT_LOCALE, locale);
+				importParam.put(
+						"logo",
+						FacesContext.getCurrentInstance().getExternalContext()
+								.getRealPath("/resources/gfx/lixco_logo.png"));
+				List<ParamReportDetail> listConfig = paramReportDetailService.findByParamReports_param_name("inbaogia");
+				for (ParamReportDetail p : listConfig) {
+					importParam.put(p.getKey(), p.getValue());
+				}
+				int day = ToolTimeCustomer.getDayM(ngaybaogia);
+				int month = ToolTimeCustomer.getMonthM(ngaybaogia);
+				int year = ToolTimeCustomer.getYearM(ngaybaogia);
+				String ngay = day == -1 ? "00" : String.format("%02d", day);
+				String thang = month == -1 ? "00" : String.format("%02d", month);
+				String nam = year == -1 ? "0000" : String.format("%04d", year);
+				importParam
+						.put("title_ngaybaogia", "TP. Hồ Chí Minh, Ngày " + ngay + " tháng " + thang + " năm " + nam);
+				String tgad = "từ " + ToolTimeCustomer.convertDateToStringShort(pricingProgramCrud.getEffective_date())
+						+ " đến khi có thông báo mới";
+				// + (pricingProgramCrud.getExpiry_date() == null ? "" :
+				// ToolTimeCustomer
+				// .convertDateToStringShort(pricingProgramCrud.getExpiry_date()));
+				importParam.put("tg_ap_dung", tgad);
+				importParam.put("baogiaso", baogiaso);
+				importParam.put("tenkhachhang", tenkhachhang);
+				 
+				for (int i = 0; i < listPricingProgramDetail.size(); i++) {
+					List<ProductKM> productKMs = productKMService.findByIdProductMain(listPricingProgramDetail.get(i).getProduct().getId());
+					if(productKMs.size()==1) {
+						listPricingProgramDetail.get(i).setNote(productKMs.get(0).getPromotion_product().getProduct_name());
+					}
+				}
+				
+				JRDataSource beanDataSource = new JRBeanCollectionDataSource(listPricingProgramDetail);
+				importParam.put("listData", beanDataSource);
+				JasperPrint jasperPrint = JasperFillManager
+						.fillReport(reportPath, importParam, new JREmptyDataSource());
+				byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+				String ba = Base64.getEncoder().encodeToString(data);
+				current.executeScript("utility.printPDF('" + ba + "')");
+			} else {
+				notify.message("Không có dữ liệu");
+			}
+		} catch (Exception e) {
+			logger.error("SupervisionBean.printPDF:" + e.getMessage(), e);
+		}
+	}
+
+	public void copyCTDG() {
+		try {
+			// sao chép chương trình đơn giá
+			if (pricingProgramCrud != null) {
+				pricingProgramCrud.setId(0);
+				pricingProgramCrud.setProgram_code(pricingProgramService.initPricingProgramCode());
+				pricingProgramCrud.setNote(null);
+				pricingProgramCrud.setCreated_by(null);
+				pricingProgramCrud.setCreated_date(null);
+				pricingProgramCrud.setLast_modifed_by(null);
+				pricingProgramCrud.setLast_modifed_date(null);
+			}
+			// sao chép chi tiết chương trình đơn giá
+			for (PricingProgramDetail t : listPricingProgramDetail) {
+				t.setId(0);
+				t.setPricing_program(null);
+				t.setCreated_by(null);
+				t.setCreated_date(null);
+				t.setLast_modifed_by(null);
+				t.setLast_modifed_date(null);
+			}
+			// reset selection tabel chương trình đơn giá
+			pricingProgramSelect = null;
+			// reset form chi tiết nhập đơn giá
+			pricingProgramDetailSelect = null;
+			pricingProgramDetailCrud = null;
+			// reset phần cài đặt khách hàng cho chương trình đơn giá
+			listCustomerPricingProgramSet = new ArrayList<>();
+			customerPricingProgramSetCrud = null;
+			customerPricingProgramSetSelect = null;
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.copyCTDG:" + e.getMessage(), e);
+		}
+	}
+
+	public void deleteDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (pricingProgramDetailSelect != null) {
+				if (allowDelete(new Date())) {
+					if (pricingProgramDetailSelect.getId() == 0) {
+						listPricingProgramDetail.remove(pricingProgramDetailSelect);
+						success();
+						executeScript("PF('datatb').clearFilters();PF('datatbct').clearFilters()");
+						pricingProgramDetailSelect = null;
+					} else {
+						if (pricingProgramDetailService.deleteById(pricingProgramDetailSelect.getId()) != -1) {
+							success();
+							executeScript("PF('datatb').clearFilters();PF('datatbct').clearFilters()");
+							listPricingProgramDetail.remove(pricingProgramDetailSelect);
+						} else {
+							warning("Không xóa được.");
+						}
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+				}
+			} else {
+				warning("Chưa chọn dòng để xóa.");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.deleteDetail:" + e.getMessage(), e);
+		}
+	}
+
+	public void viewFileExcelForm() {
+		try {
+
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.viewFileExcelForm:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogUploadChitiet() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			current.executeScript("PF('dlgup1chitiet').show();");
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogUpload:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogUploadCDKH() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			current.executeScript("PF('dlgup2').show();");
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogUpload:" + e.getMessage(), e);
+		}
+	}
+
+	public void loadExcelCTDGChitiet(FileUploadEvent event) {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			UploadedFile part = event.getFile();
+			if (part != null) {
+				Workbook workBook = getWorkbook(new ByteArrayInputStream(part.getContent()), part.getFileName());
+				Sheet firstSheet = workBook.getSheetAt(0);
+				Iterator<Row> rows = firstSheet.iterator();
+				while (rows.hasNext()) {
+					rows.next();
+					rows.remove();
+					break;
+				}
+				List<PricingProgramDetail> details = new ArrayList<PricingProgramDetail>();
+				lv1: while (rows.hasNext()) {
+					Row row = rows.next();
+					Iterator<Cell> cells = row.cellIterator();
+					PricingProgramDetail detail = new PricingProgramDetail();
+					while (cells.hasNext()) {
+						Cell cell = cells.next();
+						int columnIndex = cell.getColumnIndex();
+						switch (columnIndex) {
+						case 0:
+							try {
+								String masp = Objects.toString(MyUtilExcel.getCellValue(cell), null);
+								try {
+									double maspIsNumber = Double.parseDouble(masp);
+									masp=((int) maspIsNumber)+"";
+								} catch (Exception e) {
+								}
+								
+								if (masp != null && !"".equals(masp)) {
+									ProductReqInfo pinfo = new ProductReqInfo();
+									productService.selectByCode(masp, pinfo);
+									if (pinfo.getProduct() != null) {
+										detail.setProduct(pinfo.getProduct());
+									} else {
+										continue lv1;
+									}
+								} else {
+									continue lv1;
+								}
+							} catch (Exception e) {
+							}
+							break;
+						case 2:
+							try {
+								String dongia = Objects.toString(MyUtilExcel.getCellValue(cell), "0");
+								detail.setUnit_price(MyMath.round(Double.parseDouble(dongia)));
+							} catch (Exception e) {
+							}
+							break;
+						case 3:
+							try {
+								String soluong = Objects.toString(MyUtilExcel.getCellValue(cell), "0");
+								detail.setQuantity(MyMath.round(Double.parseDouble(soluong)));
+							} catch (Exception e) {
+							}
+							break;
+						case 4:
+							try {
+								String loinhuan = Objects.toString(MyUtilExcel.getCellValue(cell), "0");
+								detail.setRevenue_per_ton(MyMath.round(Double.parseDouble(loinhuan)));
+							} catch (Exception e) {
+							}
+							break;
+						}
+					}
+					details.add(detail);
+				}
+
+				if (rewritechitiet)
+					// xóa tất cả chi tiết chương trình đơn giá.
+					pricingProgramDetailService.deleteAll(pricingProgramCrud.getId());
+				for (PricingProgramDetail pd : details) {
+					pd.setPricing_program(pricingProgramCrud);
+					pd.setCreated_date(new Date());
+					pd.setCreated_by(account.getMember().getName());
+					// kiểm tra đã tồn tại sản phẩm trong chuong
+					// trình đơn giá đó chưa.
+					if (pricingProgramDetailService.checkExsits(pd.getProduct().getId(), 0, pricingProgramCrud.getId()) == 0) {
+						pricingProgramDetailService.insert(new PricingProgramDetailReqInfo(pd));
+					} else {
+						pricingProgramDetailService.updateByPredicate(pd.getProduct().getId(),
+								pricingProgramCrud.getId(), pd.getUnit_price(), pd.getRevenue_per_ton(),
+								pd.getQuantity());
+					}
+				}
+				loadPricingProgramDetail();
+				notify.success();
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.loadExcelCTDG:" + e.getMessage(), e);
+		}
+	}
+public static void main(String[] args) {
+	String chuoi = "B17603";
+	double so_thuc = Double.parseDouble(chuoi);
+	int so_nguyen = (int) so_thuc;
+	System.out.println(so_nguyen);
+}
+	public void loadExcelCTDG(FileUploadEvent event) {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		if (!allowSave(null) || !allowUpdate(null)) {
+			noticeError("Tài khoản không được cài đặt.");
+		} else {
+			try {
+				UploadedFile part = event.getFile();
+				if (part != null) {
+					Workbook workBook = getWorkbook(new ByteArrayInputStream(part.getContent()), part.getFileName());
+					Sheet firstSheet = workBook.getSheetAt(0);
+					Iterator<Row> rows = firstSheet.iterator();
+					Map<String, PricingProgram> map = new LinkedHashMap<String, PricingProgram>();
+					while (rows.hasNext()) {
+						rows.next();
+						rows.remove();
+						break;
+					}
+					lv1: while (rows.hasNext()) {
+						Row row = rows.next();
+						Iterator<Cell> cells = row.cellIterator();
+						String mactdg = null;
+						PricingProgramDetail detail = new PricingProgramDetail();
+						while (cells.hasNext()) {
+							Cell cell = cells.next();
+							int columnIndex = cell.getColumnIndex();
+
+							switch (columnIndex) {
+							case 0:
+								try {
+									mactdg = Objects.toString(MyUtilExcel.getCellValue(cell), null);
+									if (mactdg == null || !"".equals(mactdg)) {
+										if (!map.containsKey(mactdg)) {
+											PricingProgram program = new PricingProgram();
+											program.setList_pricing_program_detail(new ArrayList<>());
+											map.put(mactdg, program);
+										}
+										map.get(mactdg).setProgram_code(mactdg);
+									} else {
+										continue lv1;
+									}
+								} catch (Exception e) {
+								}
+								break;
+							case 1:
+								try {
+									String ngayHL = Objects.toString(MyUtilExcel.getCellValue(cell));
+									if (ngayHL != null && !"".equals(ngayHL)) {
+										map.get(mactdg).setEffective_date(
+												ToolTimeCustomer.convertStringToDate(ngayHL, "dd/MM/yyyy"));
+									} else {
+										continue lv1;
+									}
+								} catch (Exception e) {
+								}
+								break;
+							case 2:
+								try {
+									String ngayKT = Objects.toString(MyUtilExcel.getCellValue(cell), null);
+									map.get(mactdg).setExpiry_date(
+											ToolTimeCustomer.convertStringToDate(ngayKT, "dd/MM/yyyy"));
+								} catch (Exception e) {
+								}
+								break;
+							case 3:
+								try {
+									String masp = Objects.toString(MyUtilExcel.getCellValue(cell), null);
+									try {
+										double maspIsNumber = Double.parseDouble(masp);
+										masp=((int) maspIsNumber)+"";
+									} catch (Exception e) {
+									}
+									if (masp != null && !"".equals(masp)) {
+										ProductReqInfo pinfo = new ProductReqInfo();
+										productService.selectByCode(masp, pinfo);
+										if (pinfo.getProduct() != null) {
+											detail.setProduct(pinfo.getProduct());
+											map.get(mactdg).getList_pricing_program_detail().add(detail);
+										} else {
+											continue lv1;
+										}
+									} else {
+										continue lv1;
+									}
+								} catch (Exception e) {
+								}
+								break;
+							case 4:
+								try {
+									String dongia = Objects.toString(MyUtilExcel.getCellValue(cell), "0");
+									detail.setUnit_price(MyMath.round(Double.parseDouble(dongia)));
+								} catch (Exception e) {
+								}
+								break;
+							case 5:
+								try {
+									String soluong = Objects.toString(MyUtilExcel.getCellValue(cell), "0");
+									detail.setQuantity(MyMath.round(Double.parseDouble(soluong)));
+								} catch (Exception e) {
+								}
+								break;
+							case 6:
+								try {
+									String loinhuan = Objects.toString(MyUtilExcel.getCellValue(cell), "0");
+									detail.setRevenue_per_ton(MyMath.round(Double.parseDouble(loinhuan)));
+								} catch (Exception e) {
+								}
+								break;
+							}
+
+						}
+					}
+					for (Map.Entry<String, PricingProgram> entry : map.entrySet()) {
+						String key = entry.getKey();
+						PricingProgram value = entry.getValue();
+						// check key đã tồn tại chưa.
+						PricingProgramReqInfo ppr = new PricingProgramReqInfo();
+						pricingProgramService.selectByCode(key, ppr);
+						PricingProgram program = ppr.getPricing_program();
+						List<PricingProgramDetail> listDetail = value.getList_pricing_program_detail();
+						if (program != null) {
+							program.setEffective_date(value.getEffective_date());
+							program.setExpiry_date(value.getExpiry_date());
+							// cập nhật lại chương trình đơn giá.
+							pricingProgramService.update(new PricingProgramReqInfo(program));
+							if (rewrite) {
+								// xóa tất cả chi tiết chương trình đơn giá.
+								pricingProgramDetailService.deleteAll(program.getId());
+								for (PricingProgramDetail pd : listDetail) {
+									pd.setPricing_program(program);
+									pd.setCreated_date(new Date());
+									pd.setCreated_by(account.getMember().getName());
+									// kiểm tra đã tồn tại sản phẩm trong chuong
+									// trình đơn giá đó chưa.
+									if (pricingProgramDetailService.checkExsits(pd.getProduct().getId(), 0,
+											program.getId()) == 0) {
+										pricingProgramDetailService.insert(new PricingProgramDetailReqInfo(pd));
+									} else {
+										pricingProgramDetailService.updateByPredicate(pd.getProduct().getId(),
+												program.getId(), pd.getUnit_price(), pd.getRevenue_per_ton(),
+												pd.getQuantity());
+									}
+								}
+							} else {
+								for (PricingProgramDetail pd : listDetail) {
+									pd.setPricing_program(program);
+									pd.setCreated_date(new Date());
+									pd.setCreated_by(account.getMember().getName());
+									if (pricingProgramDetailService.checkExsits(pd.getProduct().getId(), 0,
+											program.getId()) == 0) {
+										pricingProgramDetailService.insert(new PricingProgramDetailReqInfo(pd));
+									} else {
+										// cập nhật lại số lượng đơn giá
+										pricingProgramDetailService.updateByPredicate(pd.getProduct().getId(),
+												program.getId(), pd.getUnit_price(), pd.getRevenue_per_ton(),
+												pd.getQuantity());
+									}
+								}
+							}
+						} else {
+							// lưu chương tình đơn giá.
+							value.setList_pricing_program_detail(null);
+							value.setCreated_date(new Date());
+							value.setCreated_by(account.getMember().getName());
+							pricingProgramService.insert(new PricingProgramReqInfo(value));
+							for (PricingProgramDetail pd : listDetail) {
+								pd.setPricing_program(value);
+								pd.setCreated_date(new Date());
+								pd.setCreated_by(account.getMember().getName());
+								if (pricingProgramDetailService.checkExsits(pd.getProduct().getId(), 0, value.getId()) == 0) {
+									pricingProgramDetailService.insert(new PricingProgramDetailReqInfo(pd));
+								} else {
+									// cập nhật lại số lượng đơn giá
+									pricingProgramDetailService.updateByPredicate(pd.getProduct().getId(),
+											value.getId(), pd.getUnit_price(), pd.getRevenue_per_ton(),
+											pd.getQuantity());
+								}
+							}
+						}
+					}
+					notify.success();
+				}
+
+			} catch (Exception e) {
+				logger.error("PricingProgramBean.loadExcelCTDG:" + e.getMessage(), e);
+			}
+		}
+	}
+
+	public void loadExcelCDCTDG(FileUploadEvent event) {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			UploadedFile part = event.getFile();
+			if (part != null) {
+				Workbook workBook = getWorkbook(new ByteArrayInputStream(part.getContent()), part.getFileName());
+				Sheet firstSheet = workBook.getSheetAt(0);
+				Iterator<Row> rows = firstSheet.iterator();
+				List<CustomerPricingProgram> listCustomerPricingProgram = new ArrayList<>();
+				while (rows.hasNext()) {
+					rows.next();
+					rows.remove();
+					break;
+				}
+				lv1: while (rows.hasNext()) {
+					Row row = rows.next();
+					Iterator<Cell> cells = row.cellIterator();
+					CustomerPricingProgram lix = new CustomerPricingProgram();
+					while (cells.hasNext()) {
+						Cell cell = cells.next();
+						int columnIndex = cell.getColumnIndex();
+
+						switch (columnIndex) {
+						case 0:
+							try {
+								// ma khach hang
+								String makh = Objects.toString(MyUtilExcel.getCellValue(cell), null);
+								if (makh == null || !"".equals(makh)) {
+									CustomerReqInfo c = new CustomerReqInfo();
+									customerService.selectByCode(makh, c);
+									if (c.getCustomer() != null) {
+										lix.setCustomer(c.getCustomer());
+									} else {
+										// Thông báo mã không hợp lệ
+										current.executeScript("swaldesigntimer('Cảnh báo!', 'Mã khách hàng:" + makh
+												+ " không tồn tại','error',2000);");
+										return;
+									}
+								} else {
+									continue lv1;
+								}
+							} catch (Exception e) {
+							}
+							break;
+						case 1:
+							try {
+								String mact = Objects.toString(MyUtilExcel.getCellValue(cell));
+								if (mact != null && !"".equals(mact)) {
+									PricingProgramReqInfo tp = new PricingProgramReqInfo();
+									pricingProgramService.selectByCode(mact, tp);
+									if (tp.getPricing_program() != null) {
+										lix.setPricing_program(tp.getPricing_program());
+									} else {
+										// Thông báo mã không hợp lệ
+										current.executeScript("swaldesigntimer('Cảnh báo!', 'Mã chương trình:" + mact
+												+ " không tồn tại','error',2000);");
+										return;
+									}
+								} else {
+									continue lv1;
+								}
+							} catch (Exception e) {
+							}
+							break;
+						case 2:
+							try {
+								Date ngayDD = null;
+								if (MyUtilExcel.getCellValue(workBook, cell).getClass().equals(Double.class)) {
+									ngayDD = DateUtil.getJavaDate((double) MyUtilExcel.getCellValue(workBook, cell));
+								} else {
+									ngayDD = (Date) MyUtilExcel.getCellValue(workBook, cell);
+								}
+								lix.setEffective_date(ngayDD);
+
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+							break;
+						case 3:
+							try {
+
+								Date ngayKT = null;
+								if (MyUtilExcel.getCellValue(workBook, cell).getClass().equals(Double.class)) {
+									ngayKT = DateUtil.getJavaDate((double) MyUtilExcel.getCellValue(workBook, cell));
+								} else {
+									ngayKT = (Date) MyUtilExcel.getCellValue(workBook, cell);
+								}
+								lix.setExpiry_date(ngayKT);
+
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+							break;
+						}
+
+					}
+					listCustomerPricingProgram.add(lix);
+				}
+				for (CustomerPricingProgram it : listCustomerPricingProgram) {
+					it.setCreated_by(account.getMember().getName());
+					it.setCreated_date(new Date());
+					if (customerPricingProgramService.insert(new CustomerPricingProgramReqInfo(it)) != -2) {
+						// silent
+					}
+				}
+				notify.success();
+
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.loadExcelCTDG:" + e.getMessage(), e);
+		}
+	}
+
+	private Workbook getWorkbook(InputStream inputStream, String nameFile) throws IOException {
+		Workbook workbook = null;
+		if (nameFile.endsWith("xlsx")) {
+			workbook = new XSSFWorkbook(inputStream);
+		} else if (nameFile.endsWith("xls")) {
+			workbook = new HSSFWorkbook(inputStream);
+		} else {
+			throw new IllegalArgumentException("The specified file is not Excel file");
+		}
+
+		return workbook;
+	}
+
+	public List<Product> completeProduct(String text) {
+		try {
+			List<Product> list = new ArrayList<Product>();
+			productService.complete(formatHandler.converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.completeProduct:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public List<PricingProgram> completePricingProgram(String text) {
+		try {
+			List<PricingProgram> list = new ArrayList<PricingProgram>();
+			pricingProgramService.complete(formatHandler.converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.completePricingProgram:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public List<CustomerTypes> completeCustomerTypes(String text) {
+		try {
+			List<CustomerTypes> list = new ArrayList<CustomerTypes>();
+			customerTypesService.findLike(FormatHandler.getInstance().converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.autoComplete:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public void showDialogSetting() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			current.executeScript("PF('dlg2').show();");
+
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogCustomerPricingProgram:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogInBaoGia() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			baogiaso = null;
+			baogiasogoc = null;
+			ngaybaogia = new Date();
+			current.executeScript("PF('dlg4').show();");
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogInBaoGia:" + e.getMessage(), e);
+		}
+	}
+
+	public void inBaoGia() {
+		try {
+
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.inBaoGia:" + e.getMessage(), e);
+		}
+	}
+
+	public void innitSourceCustomer() {
+		try {
+			if (customerTypesSetting != null) {
+				List<Customer> list = new ArrayList<Customer>();
+				customerService.selectAllByCustomerTypes(customerTypesSetting != null ? customerTypesSetting.getId()
+						: 0, list);
+				list.removeAll(modelCustomerSetting.getTarget());
+				modelCustomerSetting.setSource(list);
+			}
+
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.innitTagertCustomer:" + e.getMessage(), e);
+		}
+	}
+
+	public void onTranfer(TransferEvent event) {
+		try {
+			// if(event.isAdd()){
+			// modelCustomerSetting.getTarget().addAll((List<Customer>)
+			// event.getItems());
+			// }else{
+			// modelCustomerSetting.getSource().addAll((List<Customer>)
+			// event.getItems());
+			//
+			// }
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.onTranfer:" + e.getMessage(), e);
+		}
+	}
+
+	public void searchCustomerSetting() {
+		try {
+			List<Customer> list = new ArrayList<Customer>();
+			customerService.complete(formatHandler.converViToEn(textSearch), customerTypesSetting, list);
+			list.removeAll(modelCustomerSetting.getTarget());
+			modelCustomerSetting.setSource(list);
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.searchCustomer:" + e.getMessage(), e);
+		}
+	}
+
+	public List<Customer> completeCustomerForCustomerPricing(String text) {
+		try {
+			List<Customer> list = new ArrayList<>();
+			customerService.complete(formatHandler.converViToEn(text), customerTypesSearch3, list);
+			return list;
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.completeCustomerByType:" + e.getMessage(), e);
+		}
+		return null;
+
+	}
+
+	public List<Customer> completeCustomerForCustomerPricing1(String text) {
+		try {
+			List<Customer> list = new ArrayList<>();
+			customerService.complete(formatHandler.converViToEn(text), customerTypesSearch, list);
+			return list;
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.completeCustomerByType:" + e.getMessage(), e);
+		}
+		return null;
+
+	}
+
+	public List<Customer> completeCustomer(String text) {
+		try {
+			List<Customer> list = new ArrayList<>();
+			customerService.complete(formatHandler.converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.completeCustomer:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public void settingCustomers() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (allowSave(new Date())) {
+				List<Customer> listCustomer = modelCustomerSetting.getTarget();
+				if (listCustomer != null && listCustomer.size() > 0 && pricingProgramSetting != null) {
+					int[] a = { 0, 0, 0 };
+					for (Customer c : listCustomer) {
+						CustomerPricingProgram cp = new CustomerPricingProgram();
+						cp.setCustomer(c);
+						cp.setPricing_program(pricingProgramSetting);
+						cp.setCreated_by(account.getMember().getName());
+						cp.setCreated_date(new Date());
+						cp.setEffective_date(pricingProgramSetting.getEffective_date());
+						cp.setExpiry_date(pricingProgramSetting.getExpiry_date());
+						CustomerPricingProgramReqInfo t = new CustomerPricingProgramReqInfo();
+						t.setCustomer_pricing_program(cp);// wrap container
+						int chk = customerPricingProgramService.insert(t);
+						switch (chk) {
+						case 0:
+							a[0]++;
+							break;
+						case -2:
+							a[1]++;
+							break;
+						default:
+							a[2]++;
+							break;
+						}
+
+					}
+					searchCustomerPricingProgram();
+					StringBuilder noidung = new StringBuilder();
+					noidung.append("Thông tin cài đặt CTDG:" + pricingProgramSetting.getProgram_code());
+					noidung.append("<br/>Khách hàng cài đặt thành công: <b style=\"color:red;\">" + a[0] + "</b>");
+					noidung.append("<br/>Khách hàng đã được cài đặt trước đó(trùng): <b style=\"color:red;\">" + a[1]
+							+ "</b>");
+					noidung.append("<br/>Khách hàng cài đặt thất bại: <b style=\"color:red;\">" + a[2] + "</b>");
+					current.executeScript("swaldesignclose('Thông báo','" + noidung.toString() + "','info');");
+
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo', 'Thông tin không đầy đủ, điền thông tin chứa(*)','warning',2000);");
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không được phân quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.settingCustomers:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogUploadExcel() {
+		try {
+
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogUploadExcel:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogEditCustomerPricingProgramSet() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (customerPricingProgramSetSelect != null && pricingProgramCrud != null
+					&& pricingProgramCrud.getId() != 0) {
+				customerPricingProgramSetCrud = customerPricingProgramSetSelect.clone();
+				current.executeScript("PF('dlgset3').show();");
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo', 'Chương trình đơn giá không tồn tại hoặc chưa chọn dòng để chỉnh sửa','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogEditCustomerPricingProgramSet:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogCustomerPricingProgramSet() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (pricingProgramCrud != null && pricingProgramCrud.getId() != 0) {
+				customerPricingProgramSetCrud = new CustomerPricingProgram();
+				customerPricingProgramSetCrud.setPricing_program(pricingProgramCrud);
+				customerPricingProgramSetCrud.setEffective_date(pricingProgramCrud.getEffective_date());
+				customerPricingProgramSetCrud.setExpiry_date(pricingProgramCrud.getExpiry_date());
+				current.executeScript("PF('dlgset3').show();");
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo', 'Chương trình đơn giá không tồn tại','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("PricingProgramBean.showDialogCustomerPricingProgramSet:" + e.getMessage(), e);
+		}
+	}
+
+	public PricingProgram getPricingProgramCrud() {
+		return pricingProgramCrud;
+	}
+
+	public void setPricingProgramCrud(PricingProgram pricingProgramCrud) {
+		this.pricingProgramCrud = pricingProgramCrud;
+	}
+
+	public PricingProgram getPricingProgramSelect() {
+		return pricingProgramSelect;
+	}
+
+	public void setPricingProgramSelect(PricingProgram pricingProgramSelect) {
+		this.pricingProgramSelect = pricingProgramSelect;
+	}
+
+	public List<PricingProgram> getListPricingProgram() {
+		return listPricingProgram;
+	}
+
+	public void setListPricingProgram(List<PricingProgram> listPricingProgram) {
+		this.listPricingProgram = listPricingProgram;
+	}
+
+	public PricingProgramDetail getPricingProgramDetailCrud() {
+		return pricingProgramDetailCrud;
+	}
+
+	public void setPricingProgramDetailCrud(PricingProgramDetail pricingProgramDetailCrud) {
+		this.pricingProgramDetailCrud = pricingProgramDetailCrud;
+	}
+
+	public PricingProgramDetail getPricingProgramDetailSelect() {
+		return pricingProgramDetailSelect;
+	}
+
+	public void setPricingProgramDetailSelect(PricingProgramDetail pricingProgramDetailSelect) {
+		this.pricingProgramDetailSelect = pricingProgramDetailSelect;
+	}
+
+	public List<PricingProgramDetail> getListPricingProgramDetail() {
+		return listPricingProgramDetail;
+	}
+
+	public void setListPricingProgramDetail(List<PricingProgramDetail> listPricingProgramDetail) {
+		this.listPricingProgramDetail = listPricingProgramDetail;
+	}
+
+	public Date getFromDate() {
+		return fromDate;
+	}
+
+	public void setFromDate(Date fromDate) {
+		this.fromDate = fromDate;
+	}
+
+	public Date getToDate() {
+		return toDate;
+	}
+
+	public void setToDate(Date toDate) {
+		this.toDate = toDate;
+	}
+
+	public String getProgramCode() {
+		return programCode;
+	}
+
+	public void setProgramCode(String programCode) {
+		this.programCode = programCode;
+	}
+
+	public String getMainProductCode() {
+		return mainProductCode;
+	}
+
+	public void setMainProductCode(String mainProductCode) {
+		this.mainProductCode = mainProductCode;
+	}
+
+	public String getVoucherCode() {
+		return voucherCode;
+	}
+
+	public void setVoucherCode(String voucherCode) {
+		this.voucherCode = voucherCode;
+	}
+
+	public Product getProduct() {
+		return product;
+	}
+
+	public void setProduct(Product product) {
+		this.product = product;
+	}
+
+	public PricingProgram getParentPricingProgram() {
+		return parentPricingProgram;
+	}
+
+	public void setParentPricingProgram(PricingProgram parentPricingProgram) {
+		this.parentPricingProgram = parentPricingProgram;
+	}
+
+	public FormatHandler getFormatHandler() {
+		return formatHandler;
+	}
+
+	public void setFormatHandler(FormatHandler formatHandler) {
+		this.formatHandler = formatHandler;
+	}
+
+	public List<CustomerTypes> getListCustomerTypes() {
+		return listCustomerTypes;
+	}
+
+	public void setListCustomerTypes(List<CustomerTypes> listCustomerTypes) {
+		this.listCustomerTypes = listCustomerTypes;
+	}
+
+	public CustomerPricingProgram getCustomerPricingProgramCrud() {
+		return customerPricingProgramCrud;
+	}
+
+	public void setCustomerPricingProgramCrud(CustomerPricingProgram customerPricingProgramCrud) {
+		this.customerPricingProgramCrud = customerPricingProgramCrud;
+	}
+
+	public CustomerPricingProgram getCustomerPricingProgramSelect() {
+		return customerPricingProgramSelect;
+	}
+
+	public void setCustomerPricingProgramSelect(CustomerPricingProgram customerPricingProgramSelect) {
+		this.customerPricingProgramSelect = customerPricingProgramSelect;
+	}
+
+	public List<CustomerPricingProgram> getListCustomerPricingProgram() {
+		return listCustomerPricingProgram;
+	}
+
+	public void setListCustomerPricingProgram(List<CustomerPricingProgram> listCustomerPricingProgram) {
+		this.listCustomerPricingProgram = listCustomerPricingProgram;
+	}
+
+	public CustomerTypes getCustomerTypesSetting() {
+		return customerTypesSetting;
+	}
+
+	public void setCustomerTypesSetting(CustomerTypes customerTypesSetting) {
+		this.customerTypesSetting = customerTypesSetting;
+	}
+
+	public DualListModel<Customer> getModelCustomerSetting() {
+		return modelCustomerSetting;
+	}
+
+	public void setModelCustomerSetting(DualListModel<Customer> modelCustomerSetting) {
+		this.modelCustomerSetting = modelCustomerSetting;
+	}
+
+	public PricingProgram getPricingProgramSetting() {
+		return pricingProgramSetting;
+	}
+
+	public void setPricingProgramSetting(PricingProgram pricingProgramSetting) {
+		this.pricingProgramSetting = pricingProgramSetting;
+	}
+
+	public String getTextSearch() {
+		return textSearch;
+	}
+
+	public void setTextSearch(String textSearch) {
+		this.textSearch = textSearch;
+	}
+
+	public CustomerTypes getCustomerTypesSearch3() {
+		return customerTypesSearch3;
+	}
+
+	public void setCustomerTypesSearch3(CustomerTypes customerTypesSearch3) {
+		this.customerTypesSearch3 = customerTypesSearch3;
+	}
+
+	public String getProgramCodeSearch3() {
+		return programCodeSearch3;
+	}
+
+	public void setProgramCodeSearch3(String programCodeSearch3) {
+		this.programCodeSearch3 = programCodeSearch3;
+	}
+
+	public Customer getCustomerSearch3() {
+		return customerSearch3;
+	}
+
+	public void setCustomerSearch3(Customer customerSearch3) {
+		this.customerSearch3 = customerSearch3;
+	}
+
+	public Date getFromDateSearch3() {
+		return fromDateSearch3;
+	}
+
+	public void setFromDateSearch3(Date fromDateSearch3) {
+		this.fromDateSearch3 = fromDateSearch3;
+	}
+
+	public Date getToDateSearch3() {
+		return toDateSearch3;
+	}
+
+	public void setToDateSearch3(Date toDateSearch3) {
+		this.toDateSearch3 = toDateSearch3;
+	}
+
+	public String getBaogiaso() {
+		return baogiaso;
+	}
+
+	public void setBaogiaso(String baogiaso) {
+		this.baogiaso = baogiaso;
+	}
+
+	public String getBaogiasogoc() {
+		return baogiasogoc;
+	}
+
+	public void setBaogiasogoc(String baogiasogoc) {
+		this.baogiasogoc = baogiasogoc;
+	}
+
+	public String getTenkhachhang() {
+		return tenkhachhang;
+	}
+
+	public void setTenkhachhang(String tenkhachhang) {
+		this.tenkhachhang = tenkhachhang;
+	}
+
+	public Date getNgaybaogia() {
+		return ngaybaogia;
+	}
+
+	public void setNgaybaogia(Date ngaybaogia) {
+		this.ngaybaogia = ngaybaogia;
+	}
+
+	public boolean isRewrite() {
+		return rewrite;
+	}
+
+	public void setRewrite(boolean rewrite) {
+		this.rewrite = rewrite;
+	}
+
+	public List<CustomerPricingProgram> getListCustomerPricingProgramSet() {
+		return listCustomerPricingProgramSet;
+	}
+
+	public void setListCustomerPricingProgramSet(List<CustomerPricingProgram> listCustomerPricingProgramSet) {
+		this.listCustomerPricingProgramSet = listCustomerPricingProgramSet;
+	}
+
+	public CustomerPricingProgram getCustomerPricingProgramSetSelect() {
+		return customerPricingProgramSetSelect;
+	}
+
+	public void setCustomerPricingProgramSetSelect(CustomerPricingProgram customerPricingProgramSetSelect) {
+		this.customerPricingProgramSetSelect = customerPricingProgramSetSelect;
+	}
+
+	public CustomerPricingProgram getCustomerPricingProgramSetCrud() {
+		return customerPricingProgramSetCrud;
+	}
+
+	public void setCustomerPricingProgramSetCrud(CustomerPricingProgram customerPricingProgramSetCrud) {
+		this.customerPricingProgramSetCrud = customerPricingProgramSetCrud;
+	}
+
+	public List<CustomerPricingProgram> getListCustomerPricingProgramSetFilter() {
+		return listCustomerPricingProgramSetFilter;
+	}
+
+	public void setListCustomerPricingProgramSetFilter(List<CustomerPricingProgram> listCustomerPricingProgramSetFilter) {
+		this.listCustomerPricingProgramSetFilter = listCustomerPricingProgramSetFilter;
+	}
+
+	public Date getFromDateFox() {
+		return fromDateFox;
+	}
+
+	public void setFromDateFox(Date fromDateFox) {
+		this.fromDateFox = fromDateFox;
+	}
+
+	public Date getToDateFox() {
+		return toDateFox;
+	}
+
+	public void setToDateFox(Date toDateFox) {
+		this.toDateFox = toDateFox;
+	}
+}

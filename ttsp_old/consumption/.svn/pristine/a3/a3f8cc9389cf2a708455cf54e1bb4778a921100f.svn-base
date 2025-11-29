@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Email Yêu cầu kiểm tra hàng hóa</title>
+<style>
+.divtitleStep {
+	border: 1px solid #f3e7d5;
+	border-radius: 10px;
+	padding: 5px;
+	margin-bottom: 5px
+}
+
+.divtitleStepbgcomplete {
+	background: #f3e7d5;
+}
+
+.divtitleStepbgprocessing {
+	background: #ffdbd0;
+}
+
+.divtitleStepbgnoprocess {
+	background: white;
+}
+
+.titleStep {
+	font-size: 1.2em;
+	font-weight: bold;
+	color: #FF5722;
+}
+
+.urlprocess {
+	font-size: 1.2em;
+	font-weight: bold;
+}
+</style>
+</head>
+<body style="margin: auto; padding: 10px;">
+
+	<div
+		style="border: 1px solid; border-radius: 10px; padding: 10px; width: 850px;">
+		<h2
+			style="background: #785964; color: #d9bb84; text-align: center; padding: 5px 0px">${tieude}</h2>
+		<div class="divtitleStep">
+			<ul>
+				<li><strong>Số phiếu:</strong> ${sophieu}</li>
+				<li><strong>Ngày:</strong> ${ngay}</li>
+				<li><strong>Nhân viên tạo phiếu:</strong> ${nhanvientao}</li>
+				<li><strong>Chi tiết:</strong>
+					<table border="1"
+						style="width: 800px; border: 1px; border-collapse: collapse;">
+						<thead>
+							<tr style="background: #d5c7bc; color: #785964;">
+								<th style="width: 200px;">Sản phẩm</th>
+								<th style="width: 100px">Lô hàng</th>
+								<th style="width: 100px">Số lượng</th>
+								<th style="width: 100px;">Nguồn gốc</th>
+								<th style="width: 100px;">Tình trạng</th>
+								<th style="width: 200px;">Kết quả</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody style="background: white;">${chitiet}
+						</tbody>
+					</table></li>
+				<!-- Add more details as needed -->
+			</ul>
+			<div style="margin-left: 25px; margin-top: 20px">${hrefStep}</div>
+		</div>
+	</div>
+</body>
+</html>

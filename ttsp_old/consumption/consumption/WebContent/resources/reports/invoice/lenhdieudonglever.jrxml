@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.0.0.final using JasperReports Library version 6.0.0  -->
+<!-- 2023-01-08T10:22:45 -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="lenhdieudonglever" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="f8ca0c42-f222-42e6-82e1-ca693670cbb3">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<parameter name="car_code" class="java.lang.String"/>
+	<parameter name="voucher_code" class="java.lang.String"/>
+	<parameter name="day" class="java.lang.String"/>
+	<parameter name="month" class="java.lang.String"/>
+	<parameter name="year" class="java.lang.String"/>
+	<parameter name="Parameter6" class="java.lang.String"/>
+	<parameter name="Parameter7" class="java.lang.String"/>
+	<parameter name="cangden" class="java.lang.String"/>
+	<queryString>
+		<![CDATA[]]>
+	</queryString>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<detail>
+		<band height="401" splitType="Stretch">
+			<textField>
+				<reportElement x="237" y="95" width="288" height="13" uuid="03dfe71a-e697-4a38-a17a-92764031007d">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{car_code}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="275" y="148" width="264" height="13" uuid="65e2af9b-3673-4f69-93f1-4214d37d2566">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{voucher_code}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="187" y="186" width="363" height="20" uuid="3468533b-ba60-4a4c-b8a7-c8315179e764"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[CÔNG TY CỔ PHẦN BỘT GIẶT LIX, P. Linh Trung, TP. Thủ Đức]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="383" y="277" width="27" height="20" uuid="d3ab9e8e-d199-483b-ab4d-f28f09041e17"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{day}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="446" y="277" width="27" height="20" uuid="abd8480e-be1b-4420-b800-f97488317d79"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{month}]]></textFieldExpression>
+			</textField>
+			<textField>
+				<reportElement x="499" y="277" width="27" height="20" uuid="92e502bc-18b7-4e69-8979-3ed0c50c001f"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{year}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="237" y="118" width="288" height="20" uuid="92a421be-f5b9-4ad0-b87b-335f44b93654"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[Sản phẩm bột giặt gia công]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="390" y="372" width="160" height="20" uuid="f5e24151-9fc4-4789-b441-1125fca2749c"/>
+				<textElement textAlignment="Left" verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[NGUYỄN THỊ THÚY VÂN]]></text>
+			</staticText>
+			<textField>
+				<reportElement x="187" y="206" width="264" height="13" uuid="0166435c-a143-43ad-8195-ddea39c021c6">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{cangden}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+</jasperReport>

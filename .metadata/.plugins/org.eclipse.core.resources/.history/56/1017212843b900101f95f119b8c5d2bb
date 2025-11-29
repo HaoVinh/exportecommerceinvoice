@@ -1,0 +1,13 @@
+package vinh.lixco.com.apiecommerce;
+
+import lombok.Data;
+
+@Data
+public class PromotionDTO {
+	long promotionId;
+	long itemId;
+	String name;
+	long startTime;
+	long endTime;
+	
+}

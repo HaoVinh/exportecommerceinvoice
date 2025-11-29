@@ -1,0 +1,328 @@
+package lixco.com.service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Objects;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.ParameterExpression;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import javax.persistence.criteria.Subquery;
+
+import lixco.com.commom_ejb.HolderParser;
+import lixco.com.commom_ejb.JsonParserUtil;
+import lixco.com.commom_ejb.ToolTimeCustomer;
+import lixco.com.entity.Customer;
+import lixco.com.entity.Invoice;
+import lixco.com.entity.XacNhanKiemTra;
+import lixco.com.entity.YeuCauKiemTraHang;
+import lixco.com.entity.YeuCauKiemTraHangDetail;
+
+import org.jboss.logging.Logger;
+
+import com.google.gson.JsonObject;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.CONTAINER)
+public class YeuCauKiemTraHangService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource
+	private SessionContext ct;
+
+	public int search(String json, List<YeuCauKiemTraHang> list) {
+		int res = -1;
+		try {
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+
+			HolderParser hstextStr = JsonParserUtil.getValueString(j.get("yckiemtrahang"), "stextStr", null);
+			HolderParser hFromDate = JsonParserUtil.getValueString(j.get("yckiemtrahang"), "from_date", null);
+			HolderParser hToDate = JsonParserUtil.getValueString(j.get("yckiemtrahang"), "to_date", null);
+
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<YeuCauKiemTraHang> cq = cb.createQuery(YeuCauKiemTraHang.class);
+			Root<YeuCauKiemTraHang> root_ = cq.from(YeuCauKiemTraHang.class);
+
+			ParameterExpression<Date> pFromDate = cb.parameter(Date.class);
+			ParameterExpression<Date> pToDate = cb.parameter(Date.class);
+			List<Predicate> predicates = new ArrayList<Predicate>();
+			Predicate dis = cb.disjunction();
+			dis.getExpressions().add(cb.isNull(pFromDate));
+			dis.getExpressions().add(cb.greaterThanOrEqualTo(root_.get("requestDate"), pFromDate));
+			predicates.add(dis);
+			Predicate dis1 = cb.disjunction();
+			dis1.getExpressions().add(cb.isNull(pToDate));
+			dis1.getExpressions().add(cb.lessThanOrEqualTo(root_.get("requestDate"), pToDate));
+			predicates.add(dis1);
+
+			List<Predicate> predicatesStr = new ArrayList<Predicate>();
+
+			String stextStr = Objects.toString(hstextStr.getValue());
+			if (hstextStr.getValue() != null && !"".equals(stextStr.trim())) {
+				Predicate predicatevoucher_code = cb.like(root_.get("requestCode"), "%" + stextStr + "%");// so
+				predicatesStr.add(predicatevoucher_code);
+
+				Predicate predicatecreated_by = cb.like(root_.get("createdBy"), "%" + stextStr + "%");// nguoi
+				predicatesStr.add(predicatecreated_by);
+
+				List<Predicate> subpredicates = new LinkedList<Predicate>();
+				Subquery<YeuCauKiemTraHangDetail> sqOne = cq.subquery(YeuCauKiemTraHangDetail.class);
+				Root subroot = sqOne.from(YeuCauKiemTraHangDetail.class);
+				Predicate predicatePdCode = cb.like(subroot.get("product").get("product_code"), "%" + stextStr + "%");
+				subpredicates.add(predicatePdCode);
+				Predicate predicatePdName = cb.like(subroot.get("product").get("product_name"), "%" + stextStr + "%");
+				subpredicates.add(predicatePdName);
+				sqOne.select(subroot.get("yeuCauKiemTraHang")).where(cb.or(subpredicates.toArray(new Predicate[0])));
+				Predicate predicateSub = cb.equal(root_, cb.any(sqOne));
+				predicatesStr.add(predicateSub);// truy cap chi tiet
+			}
+			if (predicatesStr.size() != 0) {
+				cq.select(root_)
+						.where(cb.and(predicates.toArray(new Predicate[0])),
+								cb.or(predicatesStr.toArray(new Predicate[0])))
+						.orderBy(cb.desc(root_.get("requestDate")),cb.desc(root_.get("requestCode")));
+			} else {
+				cq.select(root_).where(cb.and(predicates.toArray(new Predicate[0])))
+						.orderBy(cb.desc(root_.get("requestDate")),cb.desc(root_.get("requestCode")));
+			}
+			TypedQuery<YeuCauKiemTraHang> query = em.createQuery(cq);
+			query.setParameter(pFromDate,
+					ToolTimeCustomer.convertStringToDate(Objects.toString(hFromDate.getValue(), null), "dd/MM/yyyy"));
+			query.setParameter(pToDate,
+					ToolTimeCustomer.convertStringToDate(Objects.toString(hToDate.getValue(), null), "dd/MM/yyyy"));
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	public int insert(YeuCauKiemTraHang p) {
+		int res = -1;
+		try {
+			if (p != null) {
+				em.persist(p);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	public int update(YeuCauKiemTraHang p) {
+		int res = -1;
+		try {
+			if (p != null) {
+				p = em.merge(p);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+	public int updateTPXacNhan(YeuCauKiemTraHang yc) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update YeuCauKiemTraHang set tpxacnhan=:tpxacnhan,tpxacnhanDate=:tpxacnhanDate, tpxacnhanName=:tpxacnhanName  where id=:id");
+			query.setParameter("tpxacnhan", true);
+			query.setParameter("tpxacnhanDate", yc.getTpxacnhanDate());
+			query.setParameter("tpxacnhanName", yc.getTpxacnhanName());
+			query.setParameter("id", yc.getId());
+			return query.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+	
+	public int updateTiepNhan(YeuCauKiemTraHang yc) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update YeuCauKiemTraHang set kcsdatiepnhan=:kcsdatiepnhan,ngaytiepnhan=:ngaytiepnhan, nguoitiepnhan=:nguoitiepnhan  where id=:id");
+			query.setParameter("kcsdatiepnhan", true);
+			query.setParameter("ngaytiepnhan", yc.getNgaytiepnhan());
+			query.setParameter("nguoitiepnhan", yc.getNguoitiepnhan());
+			query.setParameter("id", yc.getId());
+			return query.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+	public int updateSendMailTPKCS(long id) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update YeuCauKiemTraHang set daguimailTPKCS=:daguimailTPKCS  where id=:id");
+			query.setParameter("daguimailTPKCS", true);
+			query.setParameter("id", id);
+			return query.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+	public int updateXNKetQua(YeuCauKiemTraHang yc) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update YeuCauKiemTraHang set tpkcsxacnhankq=:tpkcsxacnhankq,tpkcsxacnhankqDate=:tpkcsxacnhankqDate, tpkcsxacnhankqName=:tpkcsxacnhankqName  where id=:id");
+			query.setParameter("tpkcsxacnhankq", true);
+			query.setParameter("tpkcsxacnhankqDate", yc.getTpkcsxacnhankqDate());
+			query.setParameter("tpkcsxacnhankqName", yc.getTpkcsxacnhankqName());
+			query.setParameter("id", yc.getId());
+			return query.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+	public int updateXNKetQuaBLD(YeuCauKiemTraHang yc) {
+		int res = -1;
+		try {
+			Query query = em
+					.createQuery("update YeuCauKiemTraHang set bldxacnhan=:bldxacnhan,bldxacnhanDate=:bldxacnhanDate  where id=:id");
+			query.setParameter("bldxacnhan", true);
+			query.setParameter("bldxacnhanDate", yc.getBldxacnhanDate());
+			query.setParameter("id", yc.getId());
+			return query.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	public YeuCauKiemTraHang findById(long id) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<YeuCauKiemTraHang> cq = cb.createQuery(YeuCauKiemTraHang.class);
+			Root<YeuCauKiemTraHang> root = cq.from(YeuCauKiemTraHang.class);
+			cq.select(root).where(cb.equal(root.get("id"), id));
+			TypedQuery<YeuCauKiemTraHang> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	public int deleteById(long id) {
+		int res = -1;
+		try {
+			YeuCauKiemTraHang t = em.find(YeuCauKiemTraHang.class, id);
+			if (t != null) {
+				em.remove(t);
+				res = 0;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	public int selectByIdToExcel(List<Long> receiptIds, List<Object[]> list) {
+		int res = -1;
+		try {
+			// Object[] title = { "ID", "Số CT", "Ngày", "Nhân viên tạo",
+			// "Ghi chú", "Đã kiểm tra", "Ngày kiểm tra",
+			// "Nhân viên kiểm tra", "IDCT", "Mã SP", "Tên SP", "Số lượng(ĐVT)",
+			// "Số lượng (thùng)",
+			// "Lô hàng", "Nguồn gốc", "Tình trạng", "Kết quả đạt",
+			// "Ngày gia hạn", "TC hóa lý vi sinh",
+			// "Nguyên nhân", "Kết luận" };
+			if (receiptIds.size() != 0) {
+				StringBuilder sql = new StringBuilder();
+				sql.append("SELECT ")
+						.append("i.id, ")
+						.append("i.requestCode, ")
+						.append("i.requestDate, i.createdBy, ")
+						.append("i.note, ")
+						.append("i.dakiemtra, ")
+						.append("DATE_FORMAT(i.ngayKiemTra, '%d/%m/%Y'), ")
+						.append("i.createdCheck, ")
+						.append("ind.id as idct, ")
+						.append("pd.product_code, ")
+						.append("pd.product_name, ")
+						.append("ind.quantity,ROUND(ind.quantity/pd.specification,2), ind.lohang, ")
+						.append("CASE WHEN nguongoc = 1 THEN 'Hàng lưu kho' WHEN nguongoc = 2 THEN 'Hàng trả về' WHEN nguongoc = 3 THEN 'Hàng đổi trả' ELSE '' END AS ket_qua,  ")
+						.append("ind.tinhtrang, ind.kiemtradat, ")
+						.append("DATE_FORMAT(ind.giahanluukho, '%d/%m/%Y'), ind.tieuchuan, ind.nguyennhan, ind.huonggiaiquyet ")
+						.append("FROM ").append("YeuCauKiemTraHang AS i ").append(" LEFT JOIN ")
+						.append("YeuCauKiemTraHangDetail AS ind ON i.id = ind.yeuCauKiemTraHang_id ")
+						.append("LEFT JOIN ").append("product AS pd ON pd.id = ind.product_id ");
+				sql.append("WHERE ").append("i.id IN :idInvs");
+
+				Query query = em.createNativeQuery(sql.toString());
+				query.setParameter("idInvs", receiptIds);
+				list.addAll(query.getResultList());
+				res = 0;
+			}
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNote.selectByIdToExcel:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	public int initCode(YeuCauKiemTraHang t) {
+		int res = -1;
+		try {
+			Date date = t.getRequestDate();
+			int year = ToolTimeCustomer.getYearM(date);
+			int month = ToolTimeCustomer.getMonthM(date);
+
+			String voucher = "/" + String.format("%02d", month) + "" + String.format("%02d", year % 2000) + "KT";
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<String> cq = cb.createQuery(String.class);
+			Root<YeuCauKiemTraHang> root = cq.from(YeuCauKiemTraHang.class);
+			cq.select(root.get("requestCode"))
+					.where(cb.equal(cb.function("MONTH", Integer.class, root.get("requestDate")), month),
+							cb.equal(cb.function("YEAR", Integer.class, root.get("requestDate")), year))
+					.orderBy(cb.desc(root.get("requestDate")), cb.desc(root.get("id")));
+			TypedQuery<String> query = em.createQuery(cq);
+			List<String> list = query.getResultList();
+			if (list.size() > 0) {
+				String temp = list.get(0);
+				if (temp != null) {
+					int last = temp.indexOf("/");
+					String sub = temp.substring(0, last);
+					voucher = String.format("%03d", Integer.parseInt(sub) + 1) + voucher;
+					t.setRequestCode(voucher);
+				}
+			} else {
+				voucher = String.format("%03d", 1)+voucher;
+				t.setRequestCode(voucher);
+			}
+			res = 0;
+		} catch (Exception e) {
+			Date date = t.getRequestDate();
+			int year = ToolTimeCustomer.getYearM(date);
+			int month = ToolTimeCustomer.getMonthM(date);
+			String voucher = "/" + String.format("%02d", month) + "" + String.format("%02d", year % 2000) + "KT";
+			voucher = String.format("%03d", 1)+voucher;
+			t.setRequestCode(voucher);
+		}
+		return res;
+	}
+}

@@ -1,0 +1,52 @@
+package lixco.com.entity;
+
+import java.io.Serializable;
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.ManyToOne;
+import javax.persistence.Table;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+
+import lixco.com.entityapi.NhanHangDTO;
+import lixco.com.entityapi.ProductComDTO;
+import lombok.Data;
+
+
+@Entity
+@Table(name="nhanhang")
+@Data
+public class NhanHang implements Serializable{
+	private static final long serialVersionUID = 1L;
+	@Id
+	private long id;
+	private String name;
+	
+	public NhanHang() {
+		super();
+	}
+	public NhanHang(NhanHangDTO nhanHangDTO) {
+		super();
+		this.id = nhanHangDTO.getId();
+		this.name = nhanHangDTO.getName();
+	}
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		NhanHang other = (NhanHang) obj;
+		if (id != other.id)
+			return false;
+		return true;
+	}
+}

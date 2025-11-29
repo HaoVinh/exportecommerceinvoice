@@ -1,0 +1,280 @@
+package lixco.com.bean_report;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import javax.faces.context.FacesContext;
+import javax.inject.Inject;
+import javax.inject.Named;
+
+import org.jboss.logging.Logger;
+import org.omnifaces.cdi.ViewScoped;
+
+import com.google.gson.JsonObject;
+
+import lixco.com.commom_ejb.MyMath;
+import lixco.com.common.JsonParserUtil;
+import lixco.com.common.ToolTimeCustomer;
+import lixco.com.entity.ContractDetail;
+import lixco.com.interfaces.IContractService;
+import lixco.com.interfaces.ICustomerPricingProgramService;
+import lixco.com.interfaces.IPricingProgramDetailService;
+import lixco.com.interfaces.IReportService;
+import lixco.com.reportInfo.SoLieuBaoCaoTongHop;
+import lixco.com.reqInfo.PricingProgramDetailReqInfo;
+import lombok.Getter;
+import lombok.Setter;
+import trong.lixco.com.bean.AbstractBean;
+import trong.lixco.com.info.InvoiceExcelMisa;
+import trong.lixco.com.util.MyUtil;
+import trong.lixco.com.util.Notify;
+import trong.lixco.com.util.ToolReport;
+
+@Named
+@ViewScoped
+public class ReportLaySoLieuBaoCaoTongHopBean extends AbstractBean {
+	private static final long serialVersionUID = 1L;
+	@Inject
+	private Logger logger;
+	@Inject
+	private IReportService reportService;
+	@Getter
+	@Setter
+	private Date fromDateSearch;
+	@Getter
+	@Setter
+	private Date toDateSearch;
+	@Getter
+	@Setter
+	private boolean tachcombo;
+	@Getter
+	@Setter
+	private boolean tinhloinhuantong;
+
+	@Override
+	protected void initItem() {
+		try {
+			int month = ToolTimeCustomer.getMonthCurrent();
+			int year = ToolTimeCustomer.getYearCurrent();
+			fromDateSearch = ToolTimeCustomer.getDateMinCustomer(month, year);
+			toDateSearch = ToolTimeCustomer.getDateMaxCustomer(month, year);
+		} catch (Exception e) {
+			logger.error("LaySoLieuBaoCaoTongHopBean.initItem:" + e.getMessage(), e);
+		}
+	}
+
+	@Override
+	protected Logger getLogger() {
+		return logger;
+	}
+
+	@Inject
+	IContractService contractService;
+
+	String[] matinhloinhuans = { "X", "E", "1", "T", "V", "8", "0" };
+
+	@Inject
+	ICustomerPricingProgramService customerPricingProgramService;
+	@Inject
+	IPricingProgramDetailService pricingProgramDetailService;
+
+	public void reportLaySoLieuBaoCaoTongHopBeanExcel() {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			JsonObject json = new JsonObject();
+			json.addProperty("from_date", ToolTimeCustomer.convertDateToString(fromDateSearch, "dd/MM/yyyy"));
+			json.addProperty("to_date", ToolTimeCustomer.convertDateToString(toDateSearch, "dd/MM/yyyy"));
+			json.addProperty("company_code", getDatabase());
+			List<SoLieuBaoCaoTongHop> list = new ArrayList<SoLieuBaoCaoTongHop>();
+			reportService.reportLaySoLieuBaoCaoTongHop(JsonParserUtil.getGson().toJson(json), list, tachcombo);
+			if (list.size() > 0) {
+				List<Object[]> listResult = new ArrayList<>();
+				Object[] title = { "MÃ KHU VỰC", "TÊN KHU VỰC", "MÃ TP", "TÊN THÀNH PHỐ", "TÊN KHÁCH HÀNG",
+						"MÃ LOẠI KH", "MÃ KH", "MÃ LOẠI SP", "TÊN LOẠI SP", "MÃ SP", "TÊN SẢN PHẨM", "SỐ LƯỢNG",
+						"SỐ TIỀN", "THÁNG NĂM", "MÃ XN", "THỊ TRƯỜNG", "LOẠI SP1", "NĂM", "MASP COM", "LỢI NHUẬN TỔNG",
+						"HSQD", "QUI CÁCH", "TÊN LOẠI KHÁCH HÀNG", "KÊNH KHÁCH HÀNG CŨ", "TÊN SẢN PHẨM COM",
+						"TÊN SẢN PHẨM BRAND", "QUÍ", "SỐ LƯỢNG TD", "SỐ LƯỢNG BD", "SỐ LƯỢNG BN", "SỐ TIỀN TD",
+						"SỐ TIỀN BD", "SỐ TIỀN BN", "MÃ SP COMBO", "SỐ TIỀN NT", "SỐ HỢP ĐỒNG", "QUỐC GIA",
+						"KÊNH KHÁCH HÀNG", "NHÓM KHÁCH HÀNG" };
+				listResult.add(title);
+
+				// X - noi dia, E - noi dia (Sieu Thi), 1 - Sieu thi gia cong, T
+				// - Xuat khau, V - Hang tra lai
+				if (tinhloinhuantong) {
+					for (int i = 0; i < list.size(); i++) {
+						boolean status = false;
+						for (int j = 0; j < matinhloinhuans.length; j++) {
+							if (matinhloinhuans[j].equals(list.get(i).getIe_categories_code())) {
+								status = true;
+								break;
+							}
+						}
+						if (status) {
+							double loinhuan = 0;
+							// Tính lại ma xuat khẩu theo hợp đồng
+							if ("T".equals(list.get(i).getIe_categories_code())
+									|| "8".equals(list.get(i).getIe_categories_code())) {
+								if (list.get(i).getIdhopdong() != 0) {
+									List<ContractDetail> contractDetails = contractService.selectDetailByContProd(list
+											.get(i).getIdhopdong(), list.get(i).getProduct_code());
+									if (contractDetails.size() != 0) {
+										loinhuan = contractDetails.get(0).getProfit();
+										list.get(i)
+												.setLoinhuantong(
+														loinhuan
+																* ((list.get(i).getQuantity() * list.get(i).getFactor()) / 1000));
+									}
+								}
+							} else {
+								if (list.get(i).getIdctdongia() != 0) {
+									Date ngaycaidongia = list.get(i).getNgayhoadon();
+									// Tính theo đơn giá phụ và ngày hóa đơn với
+									// mã X,V
+									if ("X".equals(list.get(i).getIe_categories_code())
+											|| "V".equals(list.get(i).getIe_categories_code())) {
+										ngaycaidongia = list.get(i).getNgayhoadon();
+									} else if ("E".equals(list.get(i).getIe_categories_code())
+											|| "1".equals(list.get(i).getIe_categories_code())
+											|| "T".equals(list.get(i).getIe_categories_code())) {
+										// Tính theo đơn giá phụ và ngày đơn
+										// hàng với mã
+										// 'E','1','T
+										ngaycaidongia = list.get(i).getNgaydonhang();
+									}
+
+									// Tinh loi nhuan theo don gia con
+									boolean statusPrice = true;
+									PricingProgramDetailReqInfo t1 = new PricingProgramDetailReqInfo();
+									long idPriceSub = customerPricingProgramService.selectForCustomerSub(list.get(i)
+											.getIdctdongia(), ngaycaidongia, list.get(i).getIdsp());
+									if (idPriceSub != 0) {
+										pricingProgramDetailService.findSettingPricing(idPriceSub, list.get(i)
+												.getIdsp(), t1);
+										if (t1.getPricing_program_detail() != null) {
+											if (t1.getPricing_program_detail().getUnit_price() != 0) {
+												loinhuan = t1.getPricing_program_detail().getRevenue_per_ton();
+												list.get(i)
+														.setLoinhuantong(
+																loinhuan
+																		* ((list.get(i).getQuantity() * list.get(i)
+																				.getFactor()) / 1000));
+												statusPrice = false;
+											}
+										}
+									}
+									if (statusPrice) {
+										pricingProgramDetailService.findSettingPricing(list.get(i).getIdctdongia(),
+												list.get(i).getIdsp(), t1);
+										if (t1.getPricing_program_detail() != null) {
+											if (t1.getPricing_program_detail().getUnit_price() != 0) {
+												loinhuan = t1.getPricing_program_detail().getRevenue_per_ton();
+												list.get(i)
+														.setLoinhuantong(
+																loinhuan
+																		* ((list.get(i).getQuantity() * list.get(i)
+																				.getFactor()) / 1000));
+											}
+										}
+									}
+
+								}
+							}
+
+						}
+					}
+					Map<String, List<SoLieuBaoCaoTongHop>> baocaos = list.stream().collect(
+							Collectors.groupingBy(SoLieuBaoCaoTongHop::dataGroupBy, Collectors.toList()));
+					for (String key : baocaos.keySet()) {
+						double loinhuantong = 0;
+						List<SoLieuBaoCaoTongHop> bcs = baocaos.get(key);
+						for (int i = 0; i < bcs.size(); i++) {
+							loinhuantong += bcs.get(i).getLoinhuantong();
+						}
+						for (int i = 0; i < list.size(); i++) {
+							if ("T".equals(list.get(i).getIe_categories_code())
+									|| "8".equals(list.get(i).getIe_categories_code())) {
+							} else {
+								if (key.equals(list.get(i).dataGroupBy())) {
+									list.get(i).setLoinhuantong(loinhuantong);
+								}
+							}
+						}
+					}
+				}
+				for (SoLieuBaoCaoTongHop p : list) {
+					try {
+						// Cai dat kenh kh moi
+						String kenhkh_moi = p.getCustomer_channel_name();
+						if (kenhkh_moi != null) {
+							if (kenhkh_moi.equals("KÊNH HORECA") || kenhkh_moi.equals("KÊNH ONLINE")
+									|| kenhkh_moi.equals("KÊNH SIÊU THỊ")) {
+								kenhkh_moi = "KÊNH MT";
+							}
+						}
+						// cai dat nhom kh
+						String nhomkh = "";
+						if ("KÊNH SIÊU THỊ".equals(p.getCustomer_channel_name())) {
+							String[] sieuthilix = { "E", "5", "%", ")" };
+							for (int i = 0; i < sieuthilix.length; i++) {
+								if (sieuthilix[i].equals(p.getIe_categories_code())) {
+									nhomkh = "SIÊU THỊ LIX";
+									break;
+								}
+							}
+							String[] sieuthioem = { "1", "(", "^" };
+							for (int i = 0; i < sieuthioem.length; i++) {
+								if (sieuthioem[i].equals(p.getIe_categories_code())) {
+									nhomkh = "SIÊU THỊ OEM";
+									break;
+								}
+							}
+						} else if ("KÊNH XUẤT KHẨU".equals(p.getCustomer_channel_name())) {
+							nhomkh = p.getCustomer_type_name();
+						} else {
+							nhomkh = p.getNhomkhachhang();
+						}
+
+						Object[] row = { p.getArea_code(), p.getArea_name(), p.getCity_code(), p.getCity_name(),
+								p.getCustomer_name(), p.getCustomer_type_code(), p.getCustomer_code(),
+								p.getProduct_type_code(), p.getProduct_type_name(), p.getProduct_code(),
+								p.getProduct_name(), MyMath.roundCustom(p.getQuantity() * p.getFactor(), 2),
+								MyMath.roundCustom(p.getTotal_amount(), 2), p.getMonth_and_year(),
+								p.getIe_categories_code(), p.isTypep() ? "XUẤT KHẨU" : "NỘI ĐỊA",
+								p.getTypept() == 1 ? "BỘT GIẶT" : "NTRL", p.getYear(), p.getPcom_code(),
+								p.getLoinhuantong(), p.getFactor(), p.getSpecification(), p.getCustomer_type_name(),
+								p.getCustomer_channel_name(), p.getPcom_name(), p.getPbrand_name(), p.getQuarter(),
+								MyMath.roundCustom(p.getTd_quantity() * p.getFactor(), 2),
+								MyMath.roundCustom(p.getBd_quantity() * p.getFactor(), 2),
+								MyMath.roundCustom(p.getBn_quantity() * p.getFactor(), 2),
+								MyMath.roundCustom(p.getTd_total_amount(), 2),
+								MyMath.roundCustom(p.getBd_total_amount(), 2),
+								MyMath.roundCustom(p.getBn_total_amount(), 2),
+								p.getMaspcombo() == null ? "" : p.getMaspcombo(), p.getTotal_amount_nt(), p.getSohd(),
+								p.getQuocgia(), kenhkh_moi, nhomkh };
+						listResult.add(row);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+				StringBuilder title2 = new StringBuilder();
+				title2.append("lay_so_lieu_bc_tong_hop_");
+				if (fromDateSearch != null) {
+					title2.append("tu_ngay_" + ToolTimeCustomer.convertDateToString(fromDateSearch, "dd/MM/yyyy"));
+				}
+				if (toDateSearch != null) {
+					title2.append("_den_ngay_" + ToolTimeCustomer.convertDateToString(toDateSearch, "dd/MM/yyyy"));
+				}
+				ToolReport.printReportExcelRawXLSX(listResult, title2.toString());
+			} else {
+				notify.warning("Không có dữ liệu");
+			}
+		} catch (Exception e) {
+			logger.error("LaySoLieuBaoCaoTongHopBean.reportLaySoLieuBaoCaoTongHopBean:" + e.getMessage(), e);
+		}
+	}
+
+}

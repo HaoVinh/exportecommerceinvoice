@@ -1,0 +1,52 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:h="http://java.sun.com/jsf/html"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions">
+<h:head>
+	<link type="text/css" rel="stylesheet"
+		href="#{request.contextPath}/resources/css/success.css"
+		charset="UTF-8" />
+
+</h:head>
+
+<h:body
+	style="height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;background: linear-gradient(to bottom right, #EEE, #AAA);">
+	<div style="background: white; border-radius: 20px;">
+		<div
+			style="background: #85c087; padding: 15px; border-radius: 20px 20px 0px 0px; margin-bottom: 50px;">
+			<span
+				style="font-size: 1.5em; text-align: center; color: #ffffff; margin: 0px 20px">
+				#{sessionScope.tieude}</span>
+		</div>
+		<div style="margin: 20px">
+			<div class="success-checkmark">
+				<div class="check-icon">
+					<span class="icon-line line-tip"></span> <span
+						class="icon-line line-long"></span>
+					<div class="icon-circle"></div>
+					<div class="icon-fix"></div>
+				</div>
+			</div>
+
+			<!-- partial:index.partial.html -->
+			<h2 style="color: #4caf50; text-align: center;">Xác nhận thành
+				công</h2>
+			<div
+				style="border-radius: 10px; padding: 10px 20px; border: 1px solid #85c087">
+				<h3>Số phiếu: #{sessionScope.maphieu}</h3>
+				<h3>Người xác nhận: #{sessionScope.tennvxacnhan}</h3>
+				<h3>Ngày xác nhận: #{sessionScope.ngayxacnhan}</h3>
+			</div>
+		</div>
+	</div>
+	<!-- partial -->
+</h:body>
+</html>

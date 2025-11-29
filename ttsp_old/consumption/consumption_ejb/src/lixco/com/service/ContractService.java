@@ -1,0 +1,818 @@
+package lixco.com.service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionAttribute;
+import javax.ejb.TransactionAttributeType;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Expression;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.ParameterExpression;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import javax.persistence.criteria.Subquery;
+
+import lixco.com.commom_ejb.HolderParser;
+import lixco.com.commom_ejb.JsonParserUtil;
+import lixco.com.commom_ejb.ToolTimeCustomer;
+import lixco.com.entity.Contract;
+import lixco.com.entity.ContractDetail;
+import lixco.com.entity.ContractReqInfo;
+import lixco.com.entity.Currency;
+import lixco.com.entity.Customer;
+import lixco.com.entity.Product;
+import lixco.com.interfaces.IContractService;
+import lixco.com.reqInfo.ContractDetailReqInfo;
+
+import org.jboss.logging.Logger;
+
+import com.google.gson.JsonObject;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.CONTAINER)
+public class ContractService implements IContractService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource
+	private SessionContext ct;
+
+	@Override
+	public int insert(ContractReqInfo t) {
+		int res = -1;
+		try {
+			Contract p = t.getContract();
+			if (p != null) {
+				if (checkVoucherCode(p.getVoucher_code(), p.getId()) == 0) {
+					p.setContract_code(initContractCode());
+					em.persist(p);
+					if (p.getId() > 0) {
+						res = 0;
+					}
+				} else {
+					res = -2;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("ContractService.insert:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	private int checkVoucherCode(String code, long id) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Long> cq = cb.createQuery(Long.class);
+			Root<Contract> root = cq.from(Contract.class);
+			ParameterExpression<String> pCode = cb.parameter(String.class);
+			ParameterExpression<Long> pId = cb.parameter(Long.class);
+			Predicate dis = cb.disjunction();
+			Predicate con1 = cb.conjunction();
+			Predicate con2 = cb.conjunction();
+			con1.getExpressions().add(cb.equal(pId, 0));
+			con1.getExpressions().add(cb.equal(root.get("voucher_code"), pCode));
+			dis.getExpressions().add(con1);
+			con2.getExpressions().add(cb.notEqual(pId, 0));
+			con2.getExpressions().add(cb.notEqual(root.get("id"), pId));
+			con2.getExpressions().add(cb.equal(root.get("voucher_code"), pCode));
+			dis.getExpressions().add(con2);
+			cq.select(cb.count(root.get("id"))).where(dis);
+			TypedQuery<Long> query = em.createQuery(cq);
+			query.setParameter(pId, id);
+			query.setParameter(pCode, code);
+			res = query.getSingleResult().intValue();
+		} catch (Exception e) {
+			logger.error("ContractService.checkVoucherCode:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	private String initContractCode() {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Integer> cq = cb.createQuery(Integer.class);
+			Root<Contract> root = cq.from(Contract.class);
+			// cq.multiselect(cb.coalesce(cb.max(root.get("id")),0));
+			cq.multiselect(cb.coalesce(cb.max(cb.quot((Expression) root.get("contract_code"), 1)), 0));
+			TypedQuery<Integer> query = em.createQuery(cq);
+			int max = query.getSingleResult();
+			double p = (double) max / 100000000;
+			if (p < 1) {
+				return String.format("%08d", max + 1);
+			}
+			return (max + 1) + "";
+		} catch (Exception e) {
+			logger.error("ContractService.initContractCode:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Override
+	public int update(ContractReqInfo t) {
+		int res = -1;
+		try {
+			Contract p = t.getContract();
+			if (p != null) {
+				if (checkVoucherCode(p.getVoucher_code(), p.getId()) == 0) {
+					em.merge(p);
+					if (em.merge(p) != null) {
+						res = 0;
+					}
+				} else {
+					res = -2;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("ContractService.update:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int search(String json, List<Contract> list) {
+		int res = -1;
+		try {/*
+			 * {contract:{customer_id:0,voucher_code:
+			 * '',from_date:'',to_date:'',liquidated:-1},page:{page_index:0,
+			 * page_size:0}}
+			 */
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+			HolderParser hCustomerId = JsonParserUtil.getValueNumber(j.get("contract"), "customer_id", null);
+			HolderParser hVoucherCode = JsonParserUtil.getValueString(j.get("contract"), "voucher_code", null);
+			HolderParser hFromDate = JsonParserUtil.getValueString(j.get("contract"), "from_date", null);
+			HolderParser hToDate = JsonParserUtil.getValueString(j.get("contract"), "to_date", null);
+			HolderParser hLiquidated = JsonParserUtil.getValueNumber(j.get("contract"), "liquidated", null);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			ParameterExpression<Long> pCustomerId = cb.parameter(Long.class);
+			ParameterExpression<String> pVoucherCode = cb.parameter(String.class);
+			ParameterExpression<Date> pFromDate = cb.parameter(Date.class);
+			ParameterExpression<Date> pToDate = cb.parameter(Date.class);
+			ParameterExpression<Integer> pLiquidated = cb.parameter(Integer.class);
+			CriteriaQuery<Contract> cq = cb.createQuery(Contract.class);
+			Root<Contract> root = cq.from(Contract.class);
+			root.fetch("customer", JoinType.LEFT);
+			root.fetch("currency", JoinType.LEFT);
+
+			List<Predicate> predicates = new ArrayList<>();
+			Predicate dis1 = cb.disjunction();
+			dis1.getExpressions().add(cb.equal(pCustomerId, 0));
+			dis1.getExpressions().add(cb.equal(root.get("customer").get("id"), pCustomerId));
+			predicates.add(dis1);
+			Predicate dis2 = cb.disjunction();
+			dis2.getExpressions().add(cb.equal(pVoucherCode, ""));
+			dis2.getExpressions().add(cb.equal(root.get("voucher_code"), pVoucherCode));
+			predicates.add(dis2);
+
+			Predicate dis3 = cb.disjunction();
+			dis3.getExpressions().add(cb.isNull(pFromDate));
+			dis3.getExpressions().add(cb.equal(pFromDate, ""));
+			dis3.getExpressions().add(cb.greaterThanOrEqualTo(root.get("contract_date"), pFromDate));
+			predicates.add(dis3);
+			Predicate dis14 = cb.disjunction();
+			dis14.getExpressions().add(cb.isNull(pToDate));
+			dis14.getExpressions().add(cb.equal(pToDate, ""));
+			dis14.getExpressions().add(cb.lessThanOrEqualTo(root.get("contract_date"), pToDate));
+			predicates.add(dis14);
+
+			Predicate dis5 = cb.disjunction();
+			dis5.getExpressions().add(cb.equal(pLiquidated, -1));
+			dis5.getExpressions().add(cb.equal(root.get("liquidated"), pLiquidated));
+			predicates.add(dis5);
+			cq.select(root).where(cb.and(predicates.toArray(new Predicate[0])))
+					.orderBy(cb.desc(root.get("contract_date")));
+			TypedQuery<Contract> query = em.createQuery(cq);
+			query.setParameter(pCustomerId, Long.parseLong(Objects.toString(hCustomerId.getValue(), "0")));
+			query.setParameter(pVoucherCode, Objects.toString(hVoucherCode.getValue(), ""));
+			query.setParameter(pFromDate,
+					ToolTimeCustomer.convertStringToDate(Objects.toString(hFromDate.getValue(), null), "dd/MM/yyyy"));
+			query.setParameter(pToDate,
+					ToolTimeCustomer.convertStringToDate(Objects.toString(hToDate.getValue(), null), "dd/MM/yyyy"));
+			query.setParameter(pLiquidated, Integer.parseInt(Objects.toString(hLiquidated.getValue(), "-1")));
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.insert:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int selectById(long id, ContractReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Contract> cq = cb.createQuery(Contract.class);
+			Root<Contract> root = cq.from(Contract.class);
+			root.fetch("customer", JoinType.INNER);
+			cq.select(root).where(cb.equal(root.get("id"), id));
+			TypedQuery<Contract> query = em.createQuery(cq);
+			t.setContract(query.getSingleResult());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.selectById:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public Contract findById(long id) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Contract> cq = cb.createQuery(Contract.class);
+			Root<Contract> root = cq.from(Contract.class);
+			root.fetch("customer", JoinType.LEFT);
+			cq.select(root).where(cb.equal(root.get("id"), id));
+			TypedQuery<Contract> query = em.createQuery(cq);
+			Contract ct = query.getSingleResult();
+			long idcus = ct.getCustomer().getId();
+			return ct;
+		} catch (Exception e) {
+			logger.error("ContractService.selectById:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Override
+	public int insertDetail(ContractDetailReqInfo t) {
+		int res = -1;
+		try {
+			ContractDetail p = t.getContract_detail();
+			if (p != null) {
+				em.persist(p);
+				if (p.getId() != 0) {
+					res = 0;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("ContractService.insertDetail:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateDetail(ContractDetailReqInfo t) {
+		int res = -1;
+		try {
+			ContractDetail p = t.getContract_detail();
+			if (p != null) {
+				em.merge(p);
+				if (em.merge(p) != null) {
+					selectByIdDetail(p.getId(), t);
+					res = 0;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("ContractService.updateDetail:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int selectContractDetailByContractId(long contractId, List<ContractDetail> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<ContractDetail> cq = cb.createQuery(ContractDetail.class);
+			Root<ContractDetail> root = cq.from(ContractDetail.class);
+			root.fetch("product", JoinType.INNER);
+			cq.select(root).where(cb.equal(root.get("contract").get("id"), contractId));
+			TypedQuery<ContractDetail> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.searchDetail:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public List<ContractDetail> selectDetailByContProd(long contractId, String masp) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<ContractDetail> cq = cb.createQuery(ContractDetail.class);
+			Root<ContractDetail> root = cq.from(ContractDetail.class);
+			root.fetch("product", JoinType.INNER);
+			cq.select(root).where(cb.equal(root.get("contract").get("id"), contractId),
+					cb.equal(root.get("product").get("product_code"), masp));
+			TypedQuery<ContractDetail> query = em.createQuery(cq);
+			return query.getResultList();
+		} catch (Exception e) {
+			logger.error("ContractService.searchDetail:" + e.getMessage(), e);
+		}
+		return new ArrayList<ContractDetail>();
+	}
+
+	@Override
+	public int selectContractDetailByContractIds(List<Long> contractIds, List<ContractDetail> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<ContractDetail> cq = cb.createQuery(ContractDetail.class);
+			Root<ContractDetail> root = cq.from(ContractDetail.class);
+			root.fetch("product", JoinType.INNER);
+			cq.select(root).where(cb.in(root.get("contract").get("id")).value(contractIds));
+			TypedQuery<ContractDetail> query = em.createQuery(cq);
+			List<ContractDetail> results = query.getResultList();
+			for (int i = 0; i < results.size(); i++) {
+				results.get(i).getContract().getCustomer().getId();
+			}
+			list.addAll(results);
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.searchDetail:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int findAll(List<ContractDetail> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<ContractDetail> cq = cb.createQuery(ContractDetail.class);
+			Root<ContractDetail> root = cq.from(ContractDetail.class);
+			cq.select(root);
+			TypedQuery<ContractDetail> query = em.createQuery(cq);
+			List<ContractDetail> results = query.getResultList();
+			for (int i = 0; i < results.size(); i++) {
+				results.get(i).getContract().getId();
+				results.get(i).getProduct().getId();
+			}
+			list.addAll(results);
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.findAll:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int selectByIdDetail(long id, ContractDetailReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<ContractDetail> cq = cb.createQuery(ContractDetail.class);
+			Root<ContractDetail> root = cq.from(ContractDetail.class);
+			root.fetch("product", JoinType.INNER);
+			cq.select(root).where(cb.equal(root.get("id"), id));
+			t.setContract_detail(t.getContract_detail());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.selectByIdDetail:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int deleteById(long id) {
+		int res = -1;
+		try {
+			Query queryDelDetail = em.createQuery("delete from ContractDetail as p where p.contract.id=:id");
+			queryDelDetail.setParameter("id", id);
+			if (queryDelDetail.executeUpdate() >= 0) {
+				Query queryDelContract = em.createQuery("delete from Contract where id=:id ");
+				queryDelContract.setParameter("id", id);
+				res = queryDelContract.executeUpdate();
+			} else {
+				ct.getUserTransaction().rollback();
+			}
+		} catch (Exception e) {
+			logger.error("ContractService.deleteById:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int deleteDetailById(long id) {
+		int res = -1;
+		try {
+			Query queryDelDetail = em.createQuery("delete from ContractDetail as p where p.id=:id");
+			queryDelDetail.setParameter("id", id);
+			res = queryDelDetail.executeUpdate();
+		} catch (Exception e) {
+			logger.error("ContractService.deleteDetailById:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public String initVoucherCode() {
+		String last = null;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<String> cq = cb.createQuery(String.class);
+			Root<Contract> root = cq.from(Contract.class);
+			Subquery<Long> sub1 = cq.subquery(Long.class);
+			Root<Contract> rootSub = sub1.from(Contract.class);
+			sub1.select(cb.max(rootSub.get("id")));
+			cq.select(root.get("voucher_code")).where(cb.equal(root.get("id"), sub1));
+			TypedQuery<String> query = em.createQuery(cq);
+			List<String> list = query.getResultList();
+			if (list.size() > 0) {
+				last = list.get(0);
+				if (last.contains("/")) {
+					String str = last.split("/")[0];
+					return String.format("%03d", Integer.parseInt(str) + 1) + "/" + ToolTimeCustomer.getYearCurrent();
+				}
+			}
+
+		} catch (Exception e) {
+			logger.error("ContractService.initVoucherCode:" + e.getMessage(), e);
+			return last;
+		}
+		return "001/" + ToolTimeCustomer.getYearCurrent();
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int complete(String text, List<Contract> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Contract> cq = cb.createQuery(Contract.class);
+			Root<Contract> root = cq.from(Contract.class);
+			Predicate dis = cb.disjunction();
+			dis.getExpressions().add(cb.like(root.get("contract_code"), "%" + text + "%"));
+			dis.getExpressions().add(cb.like(root.get("voucher_code"), "%" + text + "%"));
+			cq.select(
+					cb.construct(Contract.class, root.get("id"), root.get("contract_code"), root.get("voucher_code"),
+							root.get("customer"), root.get("currency"))).where(dis);
+			TypedQuery<Contract> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.complete:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int completeDate(String text, List<Contract> list, Date date) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Contract> cq = cb.createQuery(Contract.class);
+			Root<Contract> root = cq.from(Contract.class);
+			Predicate dis = cb.disjunction();
+			dis.getExpressions().add(cb.like(root.get("contract_code"), "%" + text + "%"));
+			dis.getExpressions().add(cb.like(root.get("voucher_code"), "%" + text + "%"));
+
+			Predicate dis3 = cb.disjunction();
+			dis3.getExpressions().add(cb.isNull(root.get("effective_date")));
+			dis3.getExpressions().add(cb.lessThanOrEqualTo(root.get("effective_date"), date));
+			Predicate dis4 = cb.disjunction();
+			dis4.getExpressions().add(cb.isNull(root.get("expiry_date")));
+			dis4.getExpressions().add(cb.greaterThanOrEqualTo(root.get("expiry_date"), date));
+
+			Predicate disTH = cb.conjunction();
+			disTH.getExpressions().add(dis3);
+			disTH.getExpressions().add(dis4);
+
+			cq.select(
+					cb.construct(Contract.class, root.get("id"), root.get("contract_code"), root.get("voucher_code"),
+							root.get("customer"), root.get("currency"))).where(dis, disTH);
+			TypedQuery<Contract> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.complete:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int selectContractDetail(String json, List<ContractDetail> list) {
+		int res = -1;
+		try {
+			/* {contract_id:0,product_id:0} */
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+			HolderParser hContractId = JsonParserUtil.getValueNumber(j, "contract_id", null);
+			HolderParser hProductId = JsonParserUtil.getValueNumber(j, "product_id", null);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			ParameterExpression<Long> pContractId = cb.parameter(Long.class);
+			ParameterExpression<Long> pProductId = cb.parameter(Long.class);
+			List<Predicate> predicates = new ArrayList<>();
+			CriteriaQuery<ContractDetail> cq = cb.createQuery(ContractDetail.class);
+			Root<ContractDetail> root = cq.from(ContractDetail.class);
+			root.fetch("product", JoinType.INNER);
+			Predicate dis1 = cb.disjunction();
+			dis1.getExpressions().add(cb.equal(pContractId, 0));
+			dis1.getExpressions().add(cb.equal(root.get("contract").get("id"), pContractId));
+			predicates.add(dis1);
+			Predicate dis2 = cb.disjunction();
+			dis2.getExpressions().add(cb.equal(pProductId, 0));
+			dis2.getExpressions().add(cb.equal(root.get("product"), pProductId));
+			predicates.add(dis2);
+			cq.select(root).where(cb.and(predicates.toArray(new Predicate[0])));
+			TypedQuery<ContractDetail> query = em.createQuery(cq);
+			query.setParameter(pContractId, Long.parseLong(Objects.toString(hContractId.getValue())));
+			query.setParameter(pProductId, Long.parseLong(Objects.toString(hProductId.getValue())));
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.selectContractDetail:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public Contract selectByCodeOnlyId(String contractCode) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Contract> cq = cb.createQuery(Contract.class);
+			Root<Contract> root = cq.from(Contract.class);
+			cq.select(cb.construct(Contract.class, root.get("id"))).where(
+					cb.equal(root.get("contract_code"), contractCode));
+			TypedQuery<Contract> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			logger.error("ContractService.selectByCodeOnlyId:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Override
+	public int insertLoad(ContractReqInfo t) {
+		int res = -1;
+		try {
+			Contract p = t.getContract();
+			if (p != null) {
+				if (checkVoucherCode(p.getVoucher_code(), p.getId()) == 0) {
+					em.persist(p);
+					if (p.getId() > 0) {
+						res = 0;
+					}
+				} else {
+					res = -2;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("ContractService.insertLoad:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public Contract selectByVoucherOnlyId(String voucherCode) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Contract> cq = cb.createQuery(Contract.class);
+			Root<Contract> root = cq.from(Contract.class);
+			cq.select(cb.construct(Contract.class, root.get("id"))).where(
+					cb.equal(root.get("voucher_code"), voucherCode));
+			TypedQuery<Contract> query = em.createQuery(cq);
+			List<Contract> list = query.getResultList();
+			if (list.size() > 0) {
+				return list.get(0);
+			}
+		} catch (Exception e) {
+		}
+		return null;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int processContractIEInvoice(String json, List<Object[]> list) {
+		int res = -1;
+		try {
+			/* {contract_id:0,product_id:0} */
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+			HolderParser hContractId = JsonParserUtil.getValueNumber(j, "contract_id", null);
+			HolderParser hProductId = JsonParserUtil.getValueNumber(j, "product_id", null);
+			StringBuilder sql = new StringBuilder();
+			sql.append("select t2.product_id,pr2.product_code,pr2.product_name,t2.contract_quantity,t2.contract_quantity*pr2.factor as kg_contract_quantity, ");
+			sql.append("t2.ieinvoice_quantity,t2.ieinvoice_quantity*pr2.factor as kg_ieinvoice_quantity,t2.contract_total_amount,t2.ieinvoice_total_amount from ( ");
+			sql.append("select t1.product_id,sum(contract_quantity) as contract_quantity,sum(ieinvoice_quantity) as ieinvoice_quantity,sum(contract_total_amount) as contract_total_amount,sum(ieinvoice_total_amount) as ieinvoice_total_amount ");
+			sql.append("from ( ");
+			sql.append("select dt.product_id,dt.quantity as contract_quantity, 0 as ieinvoice_quantity,dt.unit_price*dt.quantity as contract_total_amount,0 as ieinvoice_total_amount ");
+			sql.append("from contractdetail as dt ");
+			sql.append("where dt.contract_id=:c and (:p=0 or dt.product_id=:p) ");
+			sql.append("union all ");
+			sql.append("select die.product_id,0 as contract_quantity,die.quantity_export as ieinvoice_quantity,0 as contract_total_amount,die.foreign_unit_price*die.quantity_export as ieinvoice_total_amount ");
+			sql.append("from ieinvoicedetail as die ");
+			sql.append("inner join ieinvoice as ie on die.ie_invoice_id=ie.id ");
+			sql.append("where ie.contract_id=:c and (:p=0 or die.product_id=:p) ) as t1 ");
+			sql.append("group by t1.product_id ) as t2 ");
+			sql.append("inner join product as pr2 on t2.product_id = pr2.id ");
+			Query query = em.createNativeQuery(sql.toString());
+			query.setParameter("c", Long.parseLong(Objects.toString(hContractId.getValue())));
+			query.setParameter("p", Long.parseLong(Objects.toString(hProductId.getValue())));
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.processContractIEInvoice:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int processContractIEInvoice2(String json, List<Object[]> list) {
+		int res = -1;
+		try {
+			/* {contract_id:0,product_id:0} */
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+			HolderParser hContractId = JsonParserUtil.getValueNumber(j, "contract_id", null);
+			HolderParser hProductId = JsonParserUtil.getValueNumber(j, "product_id", null);
+			StringBuilder sql = new StringBuilder();
+			sql.append("select t2.product_id,t2.contract_quantity,t2.ieinvoice_quantity from ( ");
+			sql.append("select t1.product_id,sum(contract_quantity) as contract_quantity,sum(ieinvoice_quantity) as ieinvoice_quantity,sum(contract_total_amount) as contract_total_amount,sum(ieinvoice_total_amount) as ieinvoice_total_amount ");
+			sql.append("from ( ");
+			sql.append("select dt.product_id,dt.quantity as contract_quantity, 0 as ieinvoice_quantity,dt.unit_price*dt.quantity as contract_total_amount,0 as ieinvoice_total_amount ");
+			sql.append("from contractdetail as dt ");
+			sql.append("where dt.contract_id=:c and (:p=0 or dt.product_id=:p) ");
+			sql.append("union all ");
+			sql.append("select die.product_id,0 as contract_quantity,die.quantity_export as ieinvoice_quantity,0 as contract_total_amount,die.foreign_unit_price*die.quantity_export as ieinvoice_total_amount ");
+			sql.append("from ieinvoicedetail as die ");
+			sql.append("inner join ieinvoice as ie on die.ie_invoice_id=ie.id ");
+			sql.append("where ie.contract_id=:c and (:p=0 or die.product_id=:p) ) as t1 ");
+			sql.append("group by t1.product_id ) as t2 ");
+			sql.append("inner join product as pr2 on t2.product_id = pr2.id ");
+			Query query = em.createNativeQuery(sql.toString());
+			query.setParameter("c", Long.parseLong(Objects.toString(hContractId.getValue())));
+			query.setParameter("p", Long.parseLong(Objects.toString(hProductId.getValue())));
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.processContractIEInvoice:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int reportLiquidation(long id, List<Object[]> list) {
+		int res = -1;
+		try {
+			StringBuilder sql = new StringBuilder();
+			sql.append("select p.product_type_id,pt.en_name,p.id,p.en_name as en_product_name,dt.quantity/p.specification as box_quantity, ");
+			sql.append("case when p.unit = 'kg' THEN dt.quantity*p.factor/1000 else dt.quantity end as en_quantity, ");
+			/*
+			 * @22-3-2023
+			 * 
+			 * @lấy total thay vì lấy quantity * unit_price
+			 */
+			sql.append("case when p.unit = 'kg' THEN dt.unit_price*1000 else dt.unit_price end as en_unit_price,dt.total as total_amount, ");
+			sql.append("case when p.unit = 'kg' THEN 'MTS' else 'PCS' end as en_unit ");
+			sql.append("from contractdetail as dt ");
+			sql.append("inner join product as p on dt.product_id=p.id ");
+			sql.append("inner join producttype as pt on p.product_type_id=pt.id ");
+			sql.append("where dt.contract_id=:id ");
+			Query query = em.createNativeQuery(sql.toString());
+			query.setParameter("id", id);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.reportLiquidation:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.REQUIRED)
+	public int saveOrUpdateFoxpro(List<lixco.com.reqfox.Contract> list, String userName) {
+		int res = -1;
+		try {
+			for (lixco.com.reqfox.Contract d : list) {
+				// tìm kiếm hợp đồng có tồn tại chưa.
+				Query queryCK = em.createQuery("select id from Contract where contract_code=:cd");
+				queryCK.setParameter("cd", d.getId());
+				List<Long> listIDContract = queryCK.getResultList();
+				// Tìm kiếm đơn vị tiền tệ
+				Query queryFindCurrency = em.createQuery("select id from Currency where currency_type=:ct");
+				queryFindCurrency.setParameter("ct", d.getDvtien());
+				List<Long> listLongCurrency = queryFindCurrency.getResultList();
+				// tìm khách hàng
+				Query queryFindCustomer = em.createQuery("select id from Customer where customer_code=:cc");
+				queryFindCustomer.setParameter("cc", d.getMakh());
+				List<Long> listLongCustomer = queryFindCustomer.getResultList();
+				if (listIDContract.size() > 0) {
+					long idContract = listIDContract.get(0);
+					Contract contract = new Contract(idContract);
+					// thực hiện cập nhật contract
+					Query queryUpdateContract = em
+							.createQuery("update Contract set voucher_code=:vc,contract_date=:d,effective_date=:efd,expiry_date=:exd,last_modifed_by=:lmb,last_modifed_date=:lmd,liquidated=:lq,currency.id=:crr,customer.id=:cid where id=:id");
+					queryUpdateContract.setParameter("vc", d.getSohd());
+					queryUpdateContract.setParameter("d", d.getNgaynhaphd());
+					queryUpdateContract.setParameter("efd", d.getNgaymin());
+					queryUpdateContract.setParameter("exd", d.getNgaymax());
+					queryUpdateContract.setParameter("lmb", userName);
+					queryUpdateContract.setParameter("lmd", new Date());
+					queryUpdateContract.setParameter("lq", d.isThanhly());
+					if (listLongCurrency.size() > 0) {
+						queryUpdateContract.setParameter("crr", listLongCurrency.get(0));
+					} else {
+						queryUpdateContract.setParameter("crr", null);
+					}
+					if (listLongCustomer.size() > 0) {
+						queryUpdateContract.setParameter("cid", listLongCustomer.get(0));
+					} else {
+						queryUpdateContract.setParameter("cid", null);
+					}
+					queryUpdateContract.setParameter("id", idContract);
+					if (queryUpdateContract.executeUpdate() > 0) {
+						// thực hiện delete chi tiết hợp đồng
+						Query queryDelDetail = em.createQuery("delete from ContractDetail where contract_id=:id");
+						queryDelDetail.setParameter("id", idContract);
+						if (queryDelDetail.executeUpdate() >= 0) {
+							// thực hiện insert lại detail
+							List<lixco.com.reqfox.Contract.ContractDetail> listDetail = d.getList_contract_detail();
+							if (listDetail != null && listDetail.size() > 0) {
+								for (lixco.com.reqfox.Contract.ContractDetail p : listDetail) {
+									ContractDetail item = new ContractDetail();
+									item.setContract(contract);
+									item.setCreated_by(userName);
+									item.setCreated_date(new Date());
+									// tìm sản phẩm
+									Query queryFindProduct = em
+											.createQuery("select id from Product where product_code=:pc");
+									queryFindProduct.setParameter("pc", p.getMasp());
+									List<Long> listIdProduct = queryFindProduct.getResultList();
+									if (listIdProduct.size() > 0) {
+										item.setProduct(new Product(listIdProduct.get(0)));
+									}
+									item.setQuantity(p.getSoluong());
+									item.setUnit_price(p.getDongia());
+									item.setPromotion(p.isKmai());
+									item.setProfit(p.getLoinhuan());
+									em.persist(item);
+								}
+							}
+						}
+					}
+				} else {
+					// Thực hiện insert Contract
+					Contract contract = new Contract();
+					contract.setContract_code(d.getId());
+					contract.setCreated_date(new Date());
+					contract.setCreated_by(userName);
+					contract.setEffective_date(d.getNgaymin());
+					contract.setExpiry_date(d.getNgaymax());
+					contract.setContract_date(d.getNgaynhaphd());
+					contract.setVoucher_code(d.getSohd());
+					if (listLongCurrency.size() > 0) {
+						contract.setCurrency(new Currency(listLongCurrency.get(0)));
+					}
+					if (listLongCustomer.size() > 0) {
+						contract.setCustomer(new Customer(listLongCustomer.get(0)));
+					}
+					contract.setLiquidated(d.isThanhly());
+					em.persist(contract);
+					if (contract.getId() > 0) {
+						// thực hiện insert detail
+						List<lixco.com.reqfox.Contract.ContractDetail> listDetail = d.getList_contract_detail();
+						if (listDetail != null && listDetail.size() > 0) {
+							for (lixco.com.reqfox.Contract.ContractDetail p : listDetail) {
+								ContractDetail item = new ContractDetail();
+								item.setContract(contract);
+								item.setCreated_by(userName);
+								item.setCreated_date(new Date());
+								// tìm sản phẩm
+								Query queryFindProduct = em
+										.createQuery("select id from Product where product_code=:pc");
+								queryFindProduct.setParameter("pc", p.getMasp());
+								List<Long> listIdProduct = queryFindProduct.getResultList();
+								if (listIdProduct.size() > 0) {
+									item.setProduct(new Product(listIdProduct.get(0)));
+								}
+								item.setQuantity(p.getSoluong());
+								item.setUnit_price(p.getDongia());
+								item.setPromotion(p.isKmai());
+								item.setProfit(p.getLoinhuan());
+								em.persist(item);
+							}
+						}
+					}
+
+				}
+			}
+			res = 0;
+		} catch (Exception e) {
+			logger.error("ContractService.saveOrUpdateFoxpro:");
+		}
+		return res;
+	}
+
+}

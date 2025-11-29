@@ -1,0 +1,115 @@
+package lixco.com.entity;
+
+import java.io.Serializable;
+import java.util.Date;
+
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.ManyToOne;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+import javax.persistence.Transient;
+
+import lixco.com.entity.Carrier;
+import lixco.com.entity.Customer;
+import lombok.Data;
+
+@Entity
+@Data
+public class KeHoachGiaoHang implements Serializable, Cloneable {
+	private static final long serialVersionUID = 1L;
+	
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
+	@Temporal(TemporalType.TIMESTAMP)
+	private Date created_date;
+	private String created_by;
+	private Date last_modifed_date;
+	private String last_modifed_by;
+	
+	@ManyToOne(fetch=FetchType.LAZY)
+	private Customer customer;
+	private Date ngay;
+	@Temporal(TemporalType.TIMESTAMP)
+	private Date ngaygioxevao;
+	private int slxe;
+	
+	private double khoiluongvc;
+	@ManyToOne(fetch = FetchType.LAZY)
+	private Carrier carrier;
+	private String ghichu;
+	
+	private double khoiluongvctinh;
+	
+	private String maxuatnhap;
+	private String nhanhang;
+	
+	@ManyToOne(fetch=FetchType.LAZY)
+	private IECategories ieCategories;
+	
+	private String kenhkhachhang;
+	long idorder;
+	
+	
+	public KeHoachGiaoHang(Customer customer, Date ngay, Date ngaygioxevao,
+			double khoiluongvc, Carrier carrier, String ghichu) {
+		super();
+		this.customer = customer;
+		this.ngay = ngay;
+		this.ngaygioxevao = ngaygioxevao;
+		this.slxe = 1;
+		this.khoiluongvc = khoiluongvc;
+		this.carrier = carrier;
+		this.ghichu = ghichu;
+	}
+	public KeHoachGiaoHang(Customer customer, Date ngay, Date ngaygioxevao,
+			double khoiluongvc, Carrier carrier, String ghichu, double khoiluongvctinh, IECategories ieCategories,long idorder) {
+		super();
+		this.customer = customer;
+		this.ngay = ngay;
+		this.ngaygioxevao = ngaygioxevao;
+		this.slxe = 1;
+		this.khoiluongvc = khoiluongvc;
+		this.carrier = carrier;
+		this.ghichu = ghichu;
+		this.khoiluongvctinh=Math.round(khoiluongvctinh);
+		this.ieCategories=ieCategories;
+		this.idorder=idorder;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		KeHoachGiaoHang other = (KeHoachGiaoHang) obj;
+		if (id != other.id)
+			return false;
+		return true;
+	}
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + (int) (id ^ (id >>> 32));
+		return result;
+	}
+
+
+	public KeHoachGiaoHang() {
+		super();
+	}
+	
+	
+	
+	
+	
+
+}

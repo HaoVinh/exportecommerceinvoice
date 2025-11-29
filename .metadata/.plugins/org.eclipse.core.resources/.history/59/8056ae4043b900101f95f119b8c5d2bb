@@ -1,0 +1,1325 @@
+package vinh.lixco.com.apiecommerce;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import lixco.com.einvoice_service.EInvoiceService;
+import lixco.com.entity.Customer;
+import lixco.com.entity.EcomOrder;
+import lixco.com.entity.EcomOrderDetail;
+import lixco.com.entity.IECategories;
+import lixco.com.entity.Invoice;
+import lixco.com.entity.PricingProgram;
+import lixco.com.entity.PricingProgramDetail;
+import lixco.com.entity.Product;
+import lixco.com.hddt.InvoiceToJson;
+import lixco.com.hddt.MisaInvoice;
+import lixco.com.hddt.ThongBao;
+import lixco.com.interfaces.ICustomerPricingProgramService;
+import lixco.com.interfaces.ICustomerService;
+import lixco.com.interfaces.IIECategoriesService;
+import lixco.com.interfaces.IIEInvoiceService;
+import lixco.com.interfaces.IInvoiceDetailService;
+import lixco.com.interfaces.IInvoiceService;
+import lixco.com.interfaces.IPricingProgramDetailService;
+import lixco.com.interfaces.IPricingProgramService;
+import lixco.com.interfaces.IProcessLogicInvoiceService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.service.EcomOrderDetailService;
+import lixco.com.service.EcomOrderService;
+
+@Path("/shopee")
+public class ShopeeAPIServlet {
+
+	private static final long PARTNER_ID = 2012115L;
+	private static final String API_PARTNER_KEY = "shpk76694e444a51764f786775544b7a64446577784f7652476b72556b485163";
+	private static final long SHOP_ID = 779607831L;
+	private static final Logger LOGGER = Logger.getLogger(ShopeeAPIServlet.class.getName());
+	private static final ObjectMapper mapper = new ObjectMapper();
+	private static final String BASE_URL = "https://partner.shopeemobile.com";
+	private static final Object PROCESS_LOCK = new Object();
+
+	@Inject
+	private EcomOrderService ecomOrderService;
+
+	@Inject
+	private ShopeeTokenManager shopeeTokenManager;
+
+	@Inject
+	private EcomOrderDetailService ecomOrderDetailService;
+
+	@Inject
+	private IIECategoriesService iieCategoriesService;
+
+	@Inject
+	private IProcessLogicInvoiceService processLogicInvoiceService;
+
+	@Inject
+	private IInvoiceService invoiceService;
+
+	@Inject
+	private EInvoiceService eInvoiceService;
+
+	@Inject
+	private IInvoiceDetailService invoiceDetailService;
+
+	@Inject
+	private IIEInvoiceService ieInvoiceService;
+
+	@Inject
+	private ICustomerPricingProgramService customerPricingProgramService;
+
+	@Inject
+	private IProductService productService;
+
+	@Inject
+	private IPricingProgramService priceProgramService;
+
+	@Inject
+	private ICustomerService customerService;
+
+	@Inject
+	private IPricingProgramDetailService pricingProgramDetailService;
+	@POST
+	@Path("/webhook/promotion")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response webhookShopeePromotion(@Context HttpHeaders headers, String inputJson) {
+	    try {
+	        JsonNode jsonNode = mapper.readTree(inputJson);
+	        JsonNode dataNode = jsonNode.path("data");
+
+	        // === XÁC NHẬN WEBHOOK (VERIFY) ===
+	        if (dataNode.has("verify_info")) {
+	            ObjectNode verifyResp = mapper.createObjectNode();
+	            verifyResp.put("code", 0);
+	            verifyResp.put("message", "Verified OK");
+	            return Response.ok(verifyResp).build();
+	        }
+
+	        long promotionId = dataNode.path("promotion_id").asLong(0);
+	        long itemId = dataNode.path("item_id").asLong(0);
+	        String event = dataNode.path("event").asText("");
+	        String status = dataNode.path("status").asText("");
+
+	        if (promotionId == 0 || itemId == 0 || event.isEmpty()) {
+	            throw new IllegalArgumentException("Missing promotion_id, item_id or event");
+	        }
+
+	        // === TRẢ RESPONSE NGAY (để Shopee không retry) ===
+	        ObjectNode successResp = mapper.createObjectNode();
+	        successResp.put("status", "ok");
+	        successResp.put("message", "Promotion webhook received");
+	        successResp.put("promotion_id", promotionId);
+	        successResp.put("event", event);
+
+	        // === XỬ LÝ ASYNC ===
+	        new Thread(() -> processPromotionWebhook(promotionId, itemId, event, status, inputJson)).start();
+
+	        return Response.ok(successResp).build();
+
+	    } catch (Exception e) {
+	        LOGGER.severe("Promotion webhook error: " + e.getMessage());
+	        ObjectNode err = mapper.createObjectNode();
+	        err.put("error", e.getMessage());
+	        return Response.status(500).entity(err).build();
+	    }
+	}
+	private void processPromotionWebhook(long promotionId, long itemId, String event, String status, String inputJson) {
+	    synchronized (PROCESS_LOCK) {
+	        long startTime = System.currentTimeMillis();
+	        try {
+//	            LOGGER.info("Bắt đầu xử lý khuyến mãi: promotion_id=" + promotionId + ", item_id=" + itemId + ", event=" + event);
+
+//	            // === Lấy thông tin khuyến mãi chi tiết (nếu cần) ===
+//	            PromotionDTO promotionDTO = fetchPromotionDetails(promotionId);
+//	            if (promotionDTO == null) {
+//	                LOGGER.warning("Không lấy được chi tiết khuyến mãi: " + promotionId);
+//	                return;
+//	            }
+//
+//	            // === Cập nhật vào DB của bạn ===
+//	            saveOrUpdatePromotion(promotionDTO, event);
+//
+//	            // === Đồng bộ với hệ thống khác (nếu cần) ===
+//	            syncPromotionToERP(promotionDTO);
+
+	            LOGGER.info("Xử lý khuyến mãi thành công: " + promotionId + " trong " + (System.currentTimeMillis() - startTime) + "ms");
+
+	        } catch (Exception e) {
+	            LOGGER.severe("Lỗi xử lý khuyến mãi promotion_id=" + promotionId + ": " + e.getMessage());
+	        }
+	    }
+	}
+//	private PromotionDTO fetchPromotionDetails(long promotionId) {
+//	    try {
+//	        String accessToken = shopeeTokenManager.getValidAccessToken();
+//	        long shopId = shopeeTokenManager.getShopId();
+//	        long timestamp = System.currentTimeMillis() / 1000;
+//
+//	        String path = "/api/v2/promotion/get_promotion_detail";
+//	        String baseString = PARTNER_ID + path + timestamp + accessToken + shopId;
+//	        String sign = generateHmacSHA256(baseString, PARTNER_KEY);
+//
+//	        String url = BASE_URL + path +
+//	            "?partner_id=" + PARTNER_ID +
+//	            "&timestamp=" + timestamp +
+//	            "&access_token=" + accessToken +
+//	            "&shop_id=" + shopId +
+//	            "&sign=" + sign +
+//	            "&promotion_id=" + promotionId;
+//
+//	        JsonNode response = sendGetRequest(url); // Tạo hàm GET tương tự POST
+//	        JsonNode promoNode = response.path("response").path("promotion");
+//
+//	        PromotionDTO dto = new PromotionDTO();
+//	        dto.setPromotionId(promoNode.path("promotion_id").asLong());
+//	        dto.setItemId(promoNode.path("item_id").asLong());
+//	        dto.setName(promoNode.path("promotion_name").asText());
+//	        dto.setStartTime(promoNode.path("start_time").asLong());
+//	        dto.setEndTime(promoNode.path("end_time").asLong());
+//	        dto.setStatus(promoNode.path("status").asText());
+//
+//
+//	        return dto;
+//
+//	    } catch (Exception e) {
+//	        LOGGER.warning("Lỗi lấy chi tiết khuyến mãi: " + e.getMessage());
+//	        return null;
+//	    }
+//	}
+	@POST
+	@Path("/webhook/order")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response webhookShopee(@Context HttpHeaders headers, String inputJson) {
+		try {
+			JsonNode jsonNode = mapper.readTree(inputJson);
+			JsonNode dataNode = jsonNode.path("data");
+
+			// Nếu là verify webhook
+			if (dataNode.has("verify_info")) {
+				ObjectNode verifyResp = mapper.createObjectNode();
+				verifyResp.put("code", 0);
+				verifyResp.put("message", "Verified OK");
+				return Response.ok(verifyResp).build();
+			}
+
+			String orderSn = dataNode.path("ordersn").asText(null);
+			String status = dataNode.path("status").asText(null);
+			long updateTime = dataNode.path("update_time").asLong(0);
+
+			if (orderSn == null || orderSn.trim().isEmpty() || status == null || status.trim().isEmpty()) {
+				throw new IllegalArgumentException("Missing or invalid ordersn or status in Shopee webhook");
+			}
+
+			// ✅ Trả response ngay cho Shopee để tránh timeout
+			ObjectNode successResp = mapper.createObjectNode();
+			successResp.put("status", "ok");
+			successResp.put("message", "Webhook received");
+			successResp.put("ordersn", orderSn);
+			successResp.put("order_status", status);
+
+			// ✅ Xử lý trong background thread (không block request chính)
+			new Thread(() -> processShopeeWebhook(orderSn, status, updateTime, inputJson)).start();
+
+			return Response.ok(successResp).build();
+
+		} catch (Exception e) {
+			LOGGER.severe("Webhook Shopee error: " + e.getMessage());
+			ObjectNode err = mapper.createObjectNode();
+			err.put("error", e.getMessage());
+			return Response.status(500).entity(err).build();
+		}
+	}
+
+	/**
+	 * Xử lý logic Shopee webhook (chạy async)
+	 */
+	private void processShopeeWebhook(String orderSn, String status, long updateTime, String inputJson) {
+		synchronized (PROCESS_LOCK) {
+			long startTime = System.currentTimeMillis();
+			try {
+//				LOGGER.info("Bắt đầu xử lý async cho Shopee orderSn: " + orderSn + " trên thread: "
+//						+ Thread.currentThread().getName());
+
+				List<EcomOrder> existingOrders = ecomOrderService.findByOrderSn(orderSn);
+				if (!existingOrders.isEmpty()) {
+					for (EcomOrder order : existingOrders) {
+						order.setStatus(status);
+						order.setUpdatedAt(updateTime > 0 ? new Date(updateTime * 1000) : new Date());
+						order.setThoigiancapnhat(new Date());
+						EcomOrderUtils.setMyStatus(order);
+						ecomOrderService.update(order);
+
+//						LOGGER.info("Updated status for existing orderSn: " + orderSn + ", orderType: "
+//								+ order.getOrderType() + ", new status: " + status);
+
+						if ("DELIVERED".equalsIgnoreCase(order.getStatus())
+								|| "Đã giao".equalsIgnoreCase(order.getMyStatus())
+								|| "COMPLETED".equalsIgnoreCase(order.getStatus())
+								|| "Đã nhận được hàng/Đã hoàn thành".equalsIgnoreCase(order.getMyStatus())) {
+
+							if (order.isDaxuathddt()) {
+//								LOGGER.info("Shopee id: " + orderSn + ", orderType: " + order.getOrderType()
+//										+ " đã xuất HDDT, bỏ qua xử lý.");
+								continue;
+							}
+
+							StringBuilder messages = new StringBuilder();
+							int result = processLogicInvoiceService.createInvoiceByOrderEcom(order, messages, false);
+
+							if (result == 0 && order.isAutoExported()) {
+								List<Invoice> invoices = invoiceService.selectByOrderCode(order.getOrderId(),
+										order.getId());
+								if (invoices != null && !invoices.isEmpty()) {
+									ThongBao thongbao = InvoiceToJson.toJsonHoaDon2(invoices.get(0), eInvoiceService,
+											invoiceService, invoiceDetailService, ieInvoiceService, true, "HO CHI MINH",
+											"SYSTEM", productService);
+
+									if (!thongbao.isLoi()) {
+										String jsonInputString = thongbao.getDulieu();
+										LOGGER.info("JSON hóa đơn tạo thành công cho orderSn: " + orderSn);
+
+										String resultInvoice = MisaInvoice.insertInvoiceTest(jsonInputString,
+												eInvoiceService);
+										LOGGER.info("Kết quả gửi e-Invoice cho orderSn: " + orderSn + ", result: "
+												+ resultInvoice);
+
+										if (resultInvoice != null && !resultInvoice.contains("\"success\":\"error\"")) {
+											LOGGER.info("Xuất hóa đơn điện tử thành công cho orderSn: " + orderSn);
+										} else {
+											LOGGER.warning("Xuất hóa đơn điện tử thất bại cho orderSn: " + orderSn
+													+ ", result: " + resultInvoice);
+										}
+									} else {
+										LOGGER.warning("Tạo JSON hóa đơn thất bại cho orderSn: " + orderSn + ", error: "
+												+ thongbao.getThongtinloi());
+									}
+								} else {
+									LOGGER.warning("Không tìm thấy Invoice cho orderSn: " + orderSn);
+								}
+							} else {
+//								LOGGER.warning(
+//										"Tạo hóa đơn Shopee chưa xuất HDDT: " + orderSn + ", messages: " + messages);
+							}
+						}
+					}
+
+//					LOGGER.info("Kết thúc xử lý async cho Shopee orderSn: " + orderSn + ", thời gian: "
+//							+ (System.currentTimeMillis() - startTime) + "ms");
+					return;
+				}
+
+				OrderDTO orderDTO = new OrderDTO();
+				orderDTO.setOrderId(orderSn);
+				orderDTO.setOrder_status(status);
+				orderDTO.setUpdatedAt(updateTime > 0 ? new Date(updateTime * 1000) : new Date());
+				orderDTO.seteCommerceType("Shopee");
+
+				try {
+					OrderDTO fetchedDTO = fetchOrder(orderSn);
+					if (fetchedDTO != null) {
+						orderDTO = fetchedDTO;
+						orderDTO.setOrder_status(status);
+						orderDTO.setUpdatedAt(updateTime > 0 ? new Date(updateTime * 1000) : new Date());
+						orderDTO.setDataJson(inputJson);
+					}
+				} catch (Exception e) {
+					LOGGER.warning("Failed to fetch order or escrow details for orderSn: " + orderSn + ", error: "
+							+ e.getMessage());
+				}
+
+				saveOrUpdateOrder(orderDTO);
+				LOGGER.info("Lưu đơn hàng Shopee mới thành công: " + orderSn);
+
+			} catch (Exception e) {
+				LOGGER.severe("Lỗi khi xử lý async Shopee orderSn: " + orderSn + " - " + e.getMessage());
+			}
+		}
+	}
+
+	public OrderDTO fetchOrder(String orderSn) throws Exception {
+		if (orderSn == null || orderSn.trim().isEmpty()) {
+			throw new IllegalArgumentException("orderSn cannot be null or empty");
+		}
+
+		String accessToken = shopeeTokenManager.getAccessToken();
+		long timestamp = System.currentTimeMillis() / 1000L;
+		String path = "/api/v2/order/get_order_detail";
+		String baseString = PARTNER_ID + path + timestamp + accessToken + SHOP_ID;
+		String sign = generateHmacSHA256(baseString, API_PARTNER_KEY);
+
+		String url = BASE_URL + path + "?partner_id=" + PARTNER_ID + "&timestamp=" + timestamp + "&access_token="
+				+ accessToken + "&shop_id=" + SHOP_ID + "&sign=" + sign + "&order_sn_list=" + orderSn
+				+ "&response_optional_fields=buyer_user_id,buyer_username,recipient_address,item_list,order_status,create_time,update_time,total_amount,payment_method,shipping_carrier";
+
+		System.out.println(url);
+		int maxRetries = 5;
+		long delayMillis = 5000;
+		IOException lastException = null;
+
+		for (int attempt = 1; attempt <= maxRetries; attempt++) {
+			HttpURLConnection conn = null;
+			try {
+				conn = (HttpURLConnection) new URL(url).openConnection();
+				conn.setRequestMethod("GET");
+				conn.setConnectTimeout(30000);
+				conn.setReadTimeout(10000);
+				conn.setRequestProperty("Accept", "application/json");
+
+				int responseCode = conn.getResponseCode();
+				InputStream inputStream = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
+
+				StringBuilder responseBuilder = new StringBuilder();
+				try (BufferedReader in = new BufferedReader(new InputStreamReader(inputStream))) {
+					String line;
+					while ((line = in.readLine()) != null) {
+						responseBuilder.append(line);
+					}
+				}
+
+				String jsonResponse = responseBuilder.toString();
+				if (responseCode != 200) {
+					throw new IOException("HTTP error code: " + responseCode + ", Response: " + jsonResponse);
+				}
+
+				JsonNode root = mapper.readTree(jsonResponse);
+				JsonNode orderList = root.path("response").path("order_list");
+
+				if (orderList.isArray() && orderList.size() > 0) {
+					JsonNode orderData = orderList.get(0);
+					String responseOrderSn = orderData.path("order_sn").asText(null);
+					if (responseOrderSn == null || responseOrderSn.isEmpty()) {
+						throw new RuntimeException("Order SN missing in response for order_sn: " + orderSn);
+					}
+					if (!orderSn.equals(responseOrderSn)) {
+						throw new RuntimeException("Order SN from response (" + responseOrderSn
+								+ ") does not match requested order SN (" + orderSn + ")");
+					}
+					return parseOrderDTO(orderData, orderSn, jsonResponse);
+				} else {
+					throw new RuntimeException("Không có đơn hàng nào trả về từ Shopee cho order_sn: " + orderSn);
+				}
+
+			} catch (IOException ex) {
+				lastException = ex;
+				LOGGER.warning("Attempt " + attempt + " failed for orderSn " + orderSn + ": " + ex.getMessage());
+				if (attempt < maxRetries) {
+					Thread.sleep(delayMillis);
+				}
+			} finally {
+				if (conn != null) {
+					conn.disconnect();
+				}
+			}
+		}
+
+		throw new IOException("Failed to fetch order details after " + maxRetries + " attempts.", lastException);
+	}
+
+	private void fetchEscrowDetails(OrderDTO dto, List<OrderDetailDTO> details) throws Exception {
+		if (dto == null || dto.getOrderId() == null) {
+			throw new IllegalArgumentException("OrderDTO or orderId cannot be null");
+		}
+
+		String orderSn = dto.getOrderId();
+		String accessToken = shopeeTokenManager.getAccessToken();
+		long timestamp = System.currentTimeMillis() / 1000L;
+		String path = "/api/v2/payment/get_escrow_detail";
+		String baseString = PARTNER_ID + path + timestamp + accessToken + SHOP_ID;
+		String sign = generateHmacSHA256(baseString, API_PARTNER_KEY);
+
+		String url = BASE_URL + path + "?partner_id=" + PARTNER_ID + "&timestamp=" + timestamp + "&access_token="
+				+ accessToken + "&shop_id=" + SHOP_ID + "&sign=" + sign + "&order_sn=" + orderSn;
+
+		int maxRetries = 5;
+		long delayMillis = 5000;
+		IOException lastException = null;
+
+		for (int attempt = 1; attempt <= maxRetries; attempt++) {
+			HttpURLConnection conn = null;
+			try {
+				conn = (HttpURLConnection) new URL(url).openConnection();
+				conn.setRequestMethod("GET");
+				conn.setConnectTimeout(30000);
+				conn.setReadTimeout(10000);
+				conn.setRequestProperty("Accept", "application/json");
+
+				int responseCode = conn.getResponseCode();
+				InputStream inputStream = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
+
+				StringBuilder responseBuilder = new StringBuilder();
+				try (BufferedReader in = new BufferedReader(new InputStreamReader(inputStream))) {
+					String line;
+					while ((line = in.readLine()) != null) {
+						responseBuilder.append(line);
+					}
+				}
+
+				String jsonResponse = responseBuilder.toString();
+				LOGGER.info("Escrow API Response for orderSn " + orderSn + ": " + jsonResponse);
+
+				if (responseCode != 200) {
+					throw new IOException("HTTP error code: " + responseCode + ", Response: " + jsonResponse);
+				}
+
+				JsonNode root = mapper.readTree(jsonResponse);
+				JsonNode orderIncome = root.path("response").path("order_income");
+				JsonNode buyerInfo = root.path("response").path("buyer_payment_info");
+				JsonNode items = orderIncome.path("items");
+
+				if (items.isArray() && items.size() > 0) {
+//					double totalShopeeDiscount = 0.0;
+//					for (JsonNode item : items) {
+//						totalShopeeDiscount += item.path("shopee_discount").asDouble(0.0);
+//					}
+					double sellerVoucher = buyerInfo.path("seller_voucher").asDouble(0.0);
+					dto.setSellerDiscount(sellerVoucher);
+					double discountPrice = orderIncome.path("order_selling_price").asDouble(0.0);
+
+					double lastPrice = discountPrice / 1.08;
+					dto.setLastPrice(lastPrice);
+
+				} else {
+					LOGGER.warning("No items found in escrow details for orderSn: " + orderSn);
+					dto.setShopeeDiscount(0.0);
+					dto.setSellerDiscount(0.0);
+					dto.setComboDiscount(0.0);
+					dto.setLastPrice(dto.getPrice() != null ? dto.getPrice() / 1.08 : 0.0);
+				}
+
+				return;
+
+			} catch (IOException ex) {
+				lastException = ex;
+				LOGGER.warning("Attempt " + attempt + " failed for escrow details of orderSn " + orderSn + ": "
+						+ ex.getMessage());
+				if (attempt < maxRetries) {
+					Thread.sleep(delayMillis);
+				}
+			} finally {
+				if (conn != null) {
+					conn.disconnect();
+				}
+			}
+		}
+
+		if (lastException != null) {
+			throw new IOException("Failed to fetch escrow details after " + maxRetries + " attempts.", lastException);
+		}
+	}
+//	private void fetchItemBaseInfo(List<OrderDetailDTO> details) throws Exception {
+//	    if (details == null || details.isEmpty()) {
+//	        throw new IllegalArgumentException("OrderDetailDTO list cannot be null or empty");
+//	    }
+//
+//	    // Lấy danh sách item_id từ details và chuyển đổi từ String sang Long
+//	    List<Long> itemIds = new ArrayList<>();
+//	    for (OrderDetailDTO detail : details) {
+//	        String orderItemId = detail.getOrderItemId();
+//	        if (orderItemId != null && !orderItemId.trim().isEmpty()) {
+//	            try {
+//	                Long itemId = Long.parseLong(orderItemId.trim());
+//	                itemIds.add(itemId);
+//	            } catch (NumberFormatException e) {
+//	                LOGGER.warning("Invalid orderItemId format for detail: " + orderItemId + ", skipping.");
+//	            }
+//	        }
+//	    }
+//
+//	    if (itemIds.isEmpty()) {
+//	        throw new IllegalArgumentException("No valid item IDs found in OrderDetailDTO list after conversion");
+//	    }
+//
+//	    String accessToken = shopeeTokenManager.getAccessToken();
+//	    long timestamp = System.currentTimeMillis() / 1000L;
+//	    String path = "/api/v2/product/get_item_base_info";
+//	    String baseString = PARTNER_ID + path + timestamp + accessToken + SHOP_ID;
+//	    String sign = generateHmacSHA256(baseString, API_PARTNER_KEY);
+//
+//	    // Chuyển danh sách item_id thành chuỗi phân cách bằng dấu phẩy
+//	    String itemIdList = itemIds.stream()
+//	            .map(String::valueOf)
+//	            .collect(Collectors.joining(","));
+//
+//	    String url = BASE_URL + path + "?partner_id=" + PARTNER_ID +
+//	            "&timestamp=" + timestamp +
+//	            "&access_token=" + accessToken +
+//	            "&shop_id=" + SHOP_ID +
+//	            "&sign=" + sign +
+//	            "&item_id_list=" + itemIdList;
+//
+//	    int maxRetries = 5;
+//	    long delayMillis = 5000;
+//	    IOException lastException = null;
+//
+//	    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+//	        HttpURLConnection conn = null;
+//	        try {
+//	            conn = (HttpURLConnection) new URL(url).openConnection();
+//	            conn.setRequestMethod("GET");
+//	            conn.setConnectTimeout(30000);
+//	            conn.setReadTimeout(10000);
+//	            conn.setRequestProperty("Accept", "application/json");
+//
+//	            int responseCode = conn.getResponseCode();
+//	            InputStream inputStream = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
+//
+//	            StringBuilder responseBuilder = new StringBuilder();
+//	            try (BufferedReader in = new BufferedReader(new InputStreamReader(inputStream))) {
+//	                String line;
+//	                while ((line = in.readLine()) != null) {
+//	                    responseBuilder.append(line);
+//	                }
+//	            }
+//
+//	            String jsonResponse = responseBuilder.toString();
+//	            LOGGER.info("Item Base Info API Response for item_ids " + itemIdList + ": " + jsonResponse);
+//
+//	            if (responseCode != 200) {
+//	                throw new IOException("HTTP error code: " + responseCode + ", Response: " + jsonResponse);
+//	            }
+//
+//	            JsonNode root = mapper.readTree(jsonResponse);
+//	            JsonNode responseNode = root.path("response");
+//	            JsonNode itemList = responseNode.path("item_list");
+//
+//	            if (!itemList.isArray() || itemList.size() == 0) {
+//	                LOGGER.warning("No items found in item base info for item_ids: " + itemIdList);
+//	                return;
+//	            }
+//
+//	            // Cập nhật thông tin cho OrderDetailDTO
+//	            for (JsonNode item : itemList) {
+//	                Long itemId = item.path("item_id").asLong();
+//	                String itemName = item.path("item_name").asText(null);
+//	                String itemSku = item.path("item_sku").asText(null);
+//	                String image = item.path("image").path("image_url").asText(null);
+//	                double price = item.path("price").asDouble(0.0);
+//
+//	                for (OrderDetailDTO detail : details) {
+//	                    String orderItemId = detail.getOrderItemId();
+//	                    // So sánh item_id (Long) với orderItemId (String)
+//	                    if (orderItemId != null && orderItemId.trim().equals(String.valueOf(itemId))) {
+//	                        if (itemName != null) {
+//	                            detail.setName(itemName);
+//	                        }
+//	                        if (itemSku != null) {
+//	                            detail.setSku(itemSku);
+//	                        }
+//	                        if (image != null) {
+//	                            detail.setImageURL(image);
+//	                        }
+//	                        detail.setItemPrice(price);
+//	                        LOGGER.info("Updated OrderDetailDTO: item_id=" + itemId +
+//	                                ", name=" + itemName +
+//	                                ", sku=" + itemSku +
+//	                                ", image=" + image +
+//	                                ", price=" + price);
+//	                    }
+//	                }
+//	            }
+//
+//	            return;
+//
+//	        } catch (IOException ex) {
+//	            lastException = ex;
+//	            LOGGER.warning("Attempt " + attempt + " failed for item base info of item_ids " + itemIdList + ": " +
+//	                    ex.getMessage());
+//	            if (attempt < maxRetries) {
+//	                Thread.sleep(delayMillis);
+//	            }
+//	        } finally {
+//	            if (conn != null) {
+//	                conn.disconnect();
+//	            }
+//	        }
+//	    }
+//
+//	    if (lastException != null) {
+//	        throw new IOException("Failed to fetch item base info after " + maxRetries + " attempts.", lastException);
+//	    }
+//	}
+	
+//	private void fetchItemLimit() throws Exception {
+//	    String accessToken = shopeeTokenManager.getAccessToken();
+//	    long timestamp = System.currentTimeMillis() / 1000L;
+//	    String path = "/api/v2/product/get_item_limit";
+//	    String baseString = PARTNER_ID + path + timestamp + accessToken + SHOP_ID;
+//	    String sign = generateHmacSHA256(baseString, API_PARTNER_KEY);
+//
+//	    String url = BASE_URL + path + "?partner_id=" + PARTNER_ID +
+//	            "&timestamp=" + timestamp +
+//	            "&access_token=" + accessToken +
+//	            "&shop_id=" + SHOP_ID +
+//	            "&sign=" + sign;
+//
+//	    int maxRetries = 5;
+//	    long delayMillis = 5000;
+//	    IOException lastException = null;
+//
+//	    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+//	        HttpURLConnection conn = null;
+//	        try {
+//	            conn = (HttpURLConnection) new URL(url).openConnection();
+//	            conn.setRequestMethod("GET");
+//	            conn.setConnectTimeout(30000);
+//	            conn.setReadTimeout(10000);
+//	            conn.setRequestProperty("Accept", "application/json");
+//
+//	            int responseCode = conn.getResponseCode();
+//	            InputStream inputStream = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
+//
+//	            StringBuilder responseBuilder = new StringBuilder();
+//	            try (BufferedReader in = new BufferedReader(new InputStreamReader(inputStream))) {
+//	                String line;
+//	                while ((line = in.readLine()) != null) {
+//	                    responseBuilder.append(line);
+//	                }
+//	            }
+//
+//	            String jsonResponse = responseBuilder.toString();
+//
+//	            if (responseCode != 200) {
+//	                throw new IOException("HTTP error code: " + responseCode + ", Response: " + jsonResponse);
+//	            }
+//
+//	            JsonNode root = mapper.readTree(jsonResponse);
+//	            JsonNode errorNode = root.path("error");
+//	            if (!errorNode.asText().isEmpty()) {
+//	                throw new IOException("Shopee API error: " + errorNode.asText());
+//	            }
+//
+//	            JsonNode responseNode = root.path("response");
+//	            int addItemLimit = responseNode.path("add_item_limit").asInt(0);
+//	            int updateItemLimit = responseNode.path("update_item_limit").asInt(0);
+//	            int totalItemLimit = responseNode.path("total_item_limit").asInt(0);
+//	            int remainingAddItem = responseNode.path("remaining_add_item").asInt(0);
+//	            int remainingUpdateItem = responseNode.path("remaining_update_item").asInt(0);
+//	            int remainingTotalItem = responseNode.path("remaining_total_item").asInt(0);
+//
+//	            LOGGER.info("Item Limit Info: " +
+//	                    "add_item_limit=" + addItemLimit +
+//	                    ", update_item_limit=" + updateItemLimit +
+//	                    ", total_item_limit=" + totalItemLimit +
+//	                    ", remaining_add_item=" + remainingAddItem +
+//	                    ", remaining_update_item=" + remainingUpdateItem +
+//	                    ", remaining_total_item=" + remainingTotalItem);
+//
+//
+//	            return;
+//
+//	        } catch (IOException ex) {
+//	            lastException = ex;
+//	            LOGGER.warning("Attempt " + attempt + " failed for item limit: " + ex.getMessage());
+//	            if (attempt < maxRetries) {
+//	                Thread.sleep(delayMillis);
+//	            }
+//	        } finally {
+//	            if (conn != null) {
+//	                conn.disconnect();
+//	            }
+//	        }
+//	    }
+//
+//	    if (lastException != null) {
+//	        throw new IOException("Failed to fetch item limit after " + maxRetries + " attempts.", lastException);
+//	    }
+//	}
+	private OrderDTO parseOrderDTO(JsonNode data, String orderSn, String jsonResponse) throws Exception {
+		OrderDTO saleDTO = new OrderDTO();
+		saleDTO.setOrderId(orderSn);
+
+		saleDTO.setOrder_status(data.path("order_status").asText());
+		saleDTO.setCreatedAt(new Date(data.path("create_time").asLong(0) * 1000));
+		saleDTO.setUpdatedAt(new Date(data.path("update_time").asLong(0) * 1000));
+		saleDTO.setPrice(data.path("total_amount").asDouble(0.0));
+		saleDTO.seteCommerceType("Shopee");
+		saleDTO.setOrderType("SALE");
+		saleDTO.setCustomerFirstName(data.path("recipient_address").path("name").asText(""));
+		saleDTO.setCustomerLastName("");
+		saleDTO.setDataJson(jsonResponse);
+
+		List<OrderDetailDTO> saleDetails = new ArrayList<>();
+		List<OrderDetailDTO> promoDetails = new ArrayList<>();
+		JsonNode itemList = data.path("item_list");
+		int index = 1;
+
+		for (JsonNode item : itemList) {
+			double apiItemPrice = item.path("model_discounted_price").asDouble(0.0);
+			String itemName = item.path("item_name").asText("");
+			String modelName = item.path("model_name").asText("");
+			if (!modelName.isEmpty()) {
+				itemName += " (" + modelName + ")";
+			}
+
+			boolean isPromoByPrice = apiItemPrice == 0.0;
+
+			OrderDetailDTO detail = new OrderDetailDTO();
+			detail.setOrderItemId(item.path("order_item_id").asText(""));
+			detail.setName(itemName);
+			String sku = item.path("model_sku").asText();
+			if (sku == null || sku.trim().isEmpty()) {
+				sku = item.path("item_sku").asText("");
+			}
+			detail.setSku(sku);
+			detail.setStt(index++);
+			detail.setQuantity(item.path("model_quantity_purchased").asInt(0));
+			detail.setOrderId(orderSn);
+			boolean isVariant = !item.path("main_item").asBoolean(true) && !item.path("model_sku").asText("").isEmpty();
+			detail.setVariant(isVariant);
+			detail.setLoaitmdt("Shopee");
+			detail.setPromotionType(item.path("promotion_type").asText(""));
+			detail.setItemPrice(apiItemPrice);
+			detail.setImageURL(item.path("image_info").path("image_url").asText());
+			// Xác định loại chi tiết
+			boolean isBundleDeal = itemName.toUpperCase().contains("MUA 2 GIẢM 50%");
+			boolean isPromo = isPromoByPrice || sku.toUpperCase().contains("QT");
+			detail.setOrderDetailType(isPromo ? "PROMO" : "SALE");
+
+			if (isBundleDeal) {
+				saleDetails.add(detail);
+			} else if (isPromo) {
+				detail.setLastItemPrice(0.0);
+				detail.setUnitPrice(0.0);
+				detail.setItemPrice(0.0);
+				promoDetails.add(detail);
+			} else {
+				saleDetails.add(detail);
+			}
+		}
+
+		fetchEscrowDetails(saleDTO, saleDetails);
+//		fetchItemBaseInfo(saleDetails);
+//		fetchItemLimit();
+		List<OrderDetailDTO> allSaleSplitDetails = new ArrayList<>();
+		boolean hasCombo = false;
+		for (OrderDetailDTO detail : saleDetails) {
+			List<OrderDetailDTO> splitDetails = splitSku(detail);
+			for (OrderDetailDTO splitDetail : splitDetails) {
+				if (splitDetail.isCombo()) {
+					hasCombo = true;
+				}
+			}
+			allSaleSplitDetails.addAll(splitDetails);
+		}
+
+		saleDTO.setOrderDetails(allSaleSplitDetails);
+
+		for (OrderDetailDTO detail : saleDTO.getOrderDetails()) {
+			if (detail.getName() != null && detail.getName().toUpperCase().contains("MUA 2 GIẢM 50%")) {
+				Double escrowDiscounted = detail.getDiscountedPrice();
+				if (escrowDiscounted != null && escrowDiscounted > 0) {
+					detail.setItemPrice(escrowDiscounted / 1.08);
+					detail.setLastItemPrice(detail.getItemPrice());
+					detail.setUnitPrice(
+							detail.getQuantity() > 0 ? detail.getLastItemPrice() / detail.getQuantity() : 0.0);
+				} else {
+					detail.setItemPrice(0.0);
+					detail.setLastItemPrice(0.0);
+					detail.setUnitPrice(0.0);
+				}
+			}
+		}
+
+		double totalLastPrice = saleDTO.getLastPrice() != null ? saleDTO.getLastPrice() : 0.0;
+		double sellerDiscount = saleDTO.getSellerDiscount() != null ? saleDTO.getSellerDiscount() / 1.08 : 0.0;
+		double priceToAllocate = totalLastPrice + sellerDiscount;
+		saleDTO.setLastPrice(priceToAllocate);
+		if (!allSaleSplitDetails.isEmpty() && priceToAllocate > 0) {
+			if (hasCombo) {
+				List<OrderDetailDTO> comboDetails = allSaleSplitDetails.stream().filter(detail -> detail.isCombo()
+						&& detail.getItemPrice() > 0 && "SALE".equals(detail.getOrderDetailType()))
+						.collect(Collectors.toList());
+
+				if (!comboDetails.isEmpty()) {
+					double comboPriceFromApi = 0.0;
+					for (OrderDetailDTO comboDetail : comboDetails) {
+						for (JsonNode item : itemList) {
+							String itemOrderItemId = item.path("order_item_id").asText("");
+							String itemSku = item.path("model_sku").asText("");
+							if (itemSku.isEmpty()) {
+								itemSku = item.path("item_sku").asText("");
+							}
+							if (comboDetail.getOrderItemId().equals(itemOrderItemId)
+									|| comboDetail.getSku().equals(itemSku)) {
+								comboPriceFromApi = item.path("model_discounted_price").asDouble(0.0) / 1.08; // Giá
+																												// combo
+																												// sau
+																												// thuế
+								break;
+							}
+						}
+						if (comboPriceFromApi > 0) {
+							break;
+						}
+					}
+
+					if (comboPriceFromApi <= 0) {
+						LOGGER.warning("Không tìm thấy giá combo từ API cho orderSn " + orderSn
+								+ ", sử dụng priceToAllocate làm fallback");
+						comboPriceFromApi = priceToAllocate;
+					}
+
+					PricingProgram pricingProgram = priceProgramService.findByCode("DG027968");
+					List<PricingProgramDetail> pricingProgramDetails = pricingProgram != null
+							? pricingProgramDetailService.findAllByPricingProgram(pricingProgram.getId())
+							: new ArrayList<>();
+
+					double[] itemPricesArray = comboDetails.stream().mapToDouble(item -> {
+						double price = findItemPriceForSku(item.getSku(), pricingProgramDetails);
+						return price > 0 ? price * item.getQuantity() : item.getItemPrice() * item.getQuantity();
+					}).toArray();
+					double[] ratios = calculateAllocationRatios(itemPricesArray);
+
+					// Phân bổ giá dựa trên comboPriceFromApi thay vì priceToAllocate
+					for (int i = 0; i < comboDetails.size(); i++) {
+						OrderDetailDTO detail = comboDetails.get(i);
+						double allocatedPrice = ratios[i] * comboPriceFromApi; // Sử dụng comboPriceFromApi
+						detail.setLastItemPrice(allocatedPrice);
+						detail.setUnitPrice(
+								detail.getQuantity() > 0 ? detail.getLastItemPrice() / detail.getQuantity() : 0.0);
+						detail.setItemPrice(detail.getUnitPrice());
+
+					}
+				} else {
+					LOGGER.warning("Không có chi tiết combo hợp lệ để phân bổ giá cho orderSn " + orderSn);
+				}
+
+				// Xử lý sản phẩm đơn: Sử dụng giá từ API (giữ nguyên logic gốc)
+				for (OrderDetailDTO detail : allSaleSplitDetails) {
+					if (!detail.isCombo() && "SALE".equals(detail.getOrderDetailType())) {
+						for (JsonNode item : itemList) {
+							String itemOrderItemId = item.path("order_item_id").asText("");
+							String itemSku = item.path("model_sku").asText("");
+							if (itemSku.isEmpty()) {
+								itemSku = item.path("item_sku").asText("");
+							}
+							if (detail.getOrderItemId().equals(itemOrderItemId) || detail.getSku().equals(itemSku)) {
+								double modelDiscountedPrice = item.path("model_discounted_price").asDouble(0.0);
+								double quantityPurchased = item.path("model_quantity_purchased").asDouble(0.0);
+								if (quantityPurchased > 1) {
+									modelDiscountedPrice = modelDiscountedPrice * quantityPurchased;
+								}
+								double lastItemPrice = modelDiscountedPrice / 1.08;
+								detail.setLastItemPrice(lastItemPrice);
+								detail.setUnitPrice(
+										detail.getQuantity() > 0 ? lastItemPrice / detail.getQuantity() : 0.0);
+								detail.setItemPrice(detail.getUnitPrice());
+								LOGGER.info("Single product, orderId: " + orderSn + ", sku: " + detail.getSku()
+										+ ", lastItemPrice: " + lastItemPrice + ", unitPrice: " + detail.getUnitPrice()
+										+ ", quantity: " + detail.getQuantity());
+								break;
+							}
+						}
+					}
+				}
+
+				// Đặt giá 0 cho chi tiết không hợp lệ
+				for (OrderDetailDTO detail : allSaleSplitDetails) {
+					if (detail.getItemPrice() <= 0 || !"SALE".equals(detail.getOrderDetailType())) {
+						detail.setLastItemPrice(0.0);
+						detail.setUnitPrice(0.0);
+						detail.setItemPrice(0.0);
+						LOGGER.info(
+								"Set invalid item " + detail.getOrderItemId() + " lastItemPrice and unitPrice to 0");
+					}
+				}
+			} else {
+				// Sản phẩm đơn (giữ nguyên logic gốc)
+				for (OrderDetailDTO detail : allSaleSplitDetails) {
+					if ("SALE".equals(detail.getOrderDetailType())) {
+						for (JsonNode item : itemList) {
+							String itemOrderItemId = item.path("order_item_id").asText("");
+							String itemSku = item.path("model_sku").asText("");
+							if (itemSku.isEmpty()) {
+								itemSku = item.path("item_sku").asText("");
+							}
+							if (detail.getOrderItemId().equals(itemOrderItemId) || detail.getSku().equals(itemSku)) {
+								double modelDiscountedPrice = item.path("model_discounted_price").asDouble(0.0)
+										* item.path("model_quantity_purchased").asDouble(0.0);
+								double lastItemPrice = modelDiscountedPrice / 1.08;
+								detail.setLastItemPrice(lastItemPrice);
+								detail.setUnitPrice(
+										detail.getQuantity() > 0 ? lastItemPrice / detail.getQuantity() : 0.0);
+								detail.setItemPrice(detail.getUnitPrice());
+								LOGGER.info("Single: orderId=" + orderSn + ", sku=" + detail.getSku() + ", itemPrice="
+										+ detail.getItemPrice() + ", lastItemPrice=" + detail.getLastItemPrice()
+										+ ", unitPrice=" + detail.getUnitPrice() + ", quantity="
+										+ detail.getQuantity());
+								break;
+							}
+						}
+					} else {
+						detail.setLastItemPrice(0.0);
+						detail.setUnitPrice(0.0);
+						detail.setItemPrice(0.0);
+					}
+				}
+			}
+		}
+		// Xử lý promoDetails
+		OrderDTO promoDTO = null;
+		if (!promoDetails.isEmpty()) {
+			promoDTO = new OrderDTO();
+			promoDTO.setOrderId(orderSn);
+			promoDTO.setOrder_status(data.path("order_status").asText());
+			promoDTO.setCreatedAt(new Date(data.path("create_time").asLong(0) * 1000));
+			promoDTO.setUpdatedAt(new Date(data.path("update_time").asLong(0) * 1000));
+			promoDTO.setPrice(0.0);
+			promoDTO.seteCommerceType("Shopee");
+			promoDTO.setOrderType("PROMO");
+			promoDTO.setCustomerFirstName(data.path("recipient_address").path("name").asText(""));
+			promoDTO.setCustomerLastName("");
+			promoDTO.setOrderDetails(promoDetails);
+			promoDTO.setLastPrice(0.0);
+			promoDTO.setShopeeDiscount(0.0);
+			promoDTO.setSellerDiscount(0.0);
+			promoDTO.setComboDiscount(0.0);
+			promoDTO.setDiscountedPrice(0.0);
+			promoDTO.setDataJson(jsonResponse);
+		}
+
+		saveOrUpdateOrder(saleDTO);
+		if (promoDTO != null) {
+			saveOrUpdateOrder(promoDTO);
+		}
+
+		return saleDTO;
+	}
+
+	public void saveOrUpdateOrder(OrderDTO dto) {
+		String orderNumber = dto.getOrderId();
+		String platform = dto.geteCommerceType();
+		String orderType = dto.getOrderType();
+		String dataJSON = dto.getDataJson();
+		EcomOrder existing = ecomOrderService.findByCodeAndPlatformAndOrderType(orderNumber, platform, orderType);
+		EcomOrder order;
+
+		if (existing == null) {
+			order = new EcomOrder();
+			String orderId = dto.getOrderId() + dto.getOrderType();
+			order.setOrderId(orderId);
+			order.setOrderNumber(orderNumber);
+			order.setOrderType(orderType);
+			order.setCustomerFirstName(dto.getCustomerFirstName());
+			order.setCustomerLastName(dto.getCustomerLastName());
+			order.setCreatedAt(dto.getCreatedAt());
+			order.setLoaitmdt(platform);
+			if (dataJSON != null) {
+				order.setDataJson(dataJSON);
+			} else {
+				LOGGER.severe("Không thể lưu JSON:" + dataJSON);
+			}
+		} else {
+			order = existing;
+		}
+
+		order.setUpdatedAt(dto.getUpdatedAt());
+		order.setPrice(dto.getPrice());
+		order.setStatus(dto.getOrder_status());
+		order.setThoigiancapnhat(new Date());
+		order.setComboDiscount(dto.getComboDiscount());
+		order.setShopeeDiscount(dto.getShopeeDiscount());
+		order.setSellerDiscount(dto.getSellerDiscount());
+		order.setDiscountedPrice(dto.getDiscountedPrice());
+		order.setLastPrice(dto.getLastPrice());
+		EcomOrderUtils.setMyStatus(order);
+		Customer customer = customerService.selectByCode("OL248");
+		order.setCustomer(customer);
+		if (order.getOrderType() == "SALE") {
+			IECategories ieCategories = iieCategoriesService.selectByCode("$");
+			order.setIeCategories(ieCategories);
+		} else if (order.getOrderType() == "PROMO") {
+			IECategories ieCategories = iieCategoriesService.selectByCode("&");
+			order.setIeCategories(ieCategories);
+		}
+		if (existing == null) {
+			ecomOrderService.create(order);
+		}
+		List<EcomOrderDetail> newDetails = new ArrayList<>();
+		List<EcomOrderDetail> oldDetails = ecomOrderDetailService.findByCodeAndPlatformAndOrderType(orderNumber,
+				platform, orderType);
+		for (EcomOrderDetail old : oldDetails) {
+			ecomOrderDetailService.delete(old);
+		}
+
+		for (OrderDetailDTO splitDetail : dto.getOrderDetails()) {
+			EcomOrderDetail orddetail = new EcomOrderDetail();
+			orddetail.setOrder(order);
+			orddetail.setOrderItemNumber(splitDetail.getOrderItemId());
+			orddetail.setName(splitDetail.getName());
+			orddetail.setSku(splitDetail.getSku());
+			Product product = productService.selectByCode(orddetail.getSku());
+			orddetail.setProduct(product);
+			orddetail.setLoaitmdt(platform);
+			orddetail.setVariant(splitDetail.isVariant());
+			orddetail.setQuantity(splitDetail.getQuantity());
+			orddetail.setItemPrice(splitDetail.getItemPrice());
+			orddetail.setSplitPrice(splitDetail.getLastItemPrice());
+			orddetail.setUnitPrice(splitDetail.getUnitPrice());
+			orddetail.setOrderId(orderNumber);
+			orddetail.setOrderType(splitDetail.getOrderDetailType());
+			orddetail.setImageURL(splitDetail.getImageURL());
+			ecomOrderDetailService.create(orddetail);
+			newDetails.add(orddetail);
+		}
+
+		if ("SALE".equals(order.getOrderType()) && order.getSellerDiscount() != null
+				&& order.getSellerDiscount() != 0) {
+			EcomOrderDetail discountDetail = new EcomOrderDetail();
+			discountDetail.setOrder(order);
+			discountDetail.setOrderItemNumber("");
+			Product discountProduct = productService.selectByCode("CKDH");
+			if (discountProduct == null) {
+				LOGGER.warning("Không tìm thấy sản phẩm CKDH cho chiết khấu đơn hàng: " + orderNumber);
+			}
+			discountDetail.setProduct(discountProduct);
+			discountDetail.setName(discountProduct.getProduct_name());
+			discountDetail.setLoaitmdt(platform);
+			discountDetail.setVariant(false);
+			discountDetail.setQuantity(0);
+			discountDetail.setItemPrice(order.getSellerDiscount() / 1.08);
+			discountDetail.setSplitPrice(order.getSellerDiscount() / 1.08);
+			discountDetail.setUnitPrice(0.0);
+			discountDetail.setOrderId(orderNumber);
+			discountDetail.setOrderType("SALE");
+			ecomOrderDetailService.create(discountDetail);
+			newDetails.add(discountDetail);
+			LOGGER.info("Lưu chi tiết chiết khấu: orderType=SALE, sku=CKDH, itemPrice=" + discountDetail.getItemPrice()
+					+ ", lastItemPrice=" + discountDetail.getSplitPrice() + ", unitPrice="
+					+ discountDetail.getUnitPrice() + ", quantity=" + discountDetail.getQuantity());
+		}
+		order.setOrderDetails(newDetails);
+		ecomOrderService.update(order);
+	}
+
+	private List<OrderDetailDTO> splitSku(OrderDetailDTO detail) {
+		if (customerService == null) {
+			List<OrderDetailDTO> result = new ArrayList<>();
+			result.add(detail);
+			return result;
+		}
+
+		Customer customer = null;
+		try {
+			customer = customerService.selectByCode("CO648");
+		} catch (Exception e) {
+			LOGGER.warning("Error fetching customer CO648: " + e.getMessage());
+			List<OrderDetailDTO> result = new ArrayList<>();
+			result.add(detail);
+			return result;
+		}
+		if (customer == null) {
+			LOGGER.warning("Không thấy mã KH CO648");
+			List<OrderDetailDTO> result = new ArrayList<>();
+			result.add(detail);
+			return result;
+		}
+
+		PricingProgram pricingProgram = priceProgramService.findByCode("DG027968");
+		if (pricingProgram == null) {
+			LOGGER.warning("Pricing program DG027968 not found");
+			List<OrderDetailDTO> result = new ArrayList<>();
+			result.add(detail);
+			return result;
+		}
+
+		List<PricingProgramDetail> pricingProgramDetails = pricingProgramDetailService
+				.findAllByPricingProgram(pricingProgram.getId());
+
+		List<OrderDetailDTO> result = new ArrayList<>();
+		String skuString = detail.getSku();
+
+		if (skuString == null || skuString.trim().isEmpty()) {
+			result.add(detail);
+			return result;
+		}
+
+		skuString = skuString.trim();
+		int originalQuantity = detail.getQuantity();
+
+		Pattern pattern = Pattern.compile("^(\\d+)C\\s*(?:\\+|\\-)\\s*(.+)$");
+		Matcher matcher = pattern.matcher(skuString);
+
+		if (matcher.matches()) {
+			int prefixNumber = Integer.parseInt(matcher.group(1));
+			String remainingSku = matcher.group(2).trim();
+			String[] skuParts = remainingSku.split("\\s*\\+\\s*");
+
+			if (skuParts.length >= 1) {
+				if (skuParts.length == 1) {
+					OrderDetailDTO newDetail = createDetailWithPricing(detail, skuParts[0].trim(),
+							prefixNumber * originalQuantity, pricingProgramDetails);
+					result.add(newDetail);
+				} else if (skuParts.length == 2) {
+					OrderDetailDTO detailA = createDetailWithPricing(detail, skuParts[0].trim(),
+							prefixNumber * originalQuantity, pricingProgramDetails);
+					detailA.setCombo(true);
+					OrderDetailDTO detailB = createDetailWithPricing(detail, skuParts[1].trim(), 1 * originalQuantity,
+							pricingProgramDetails);
+					detailB.setCombo(true);
+					result.add(detailA);
+					result.add(detailB);
+				} else if (skuParts.length >= 3) {
+					OrderDetailDTO detailA = createDetailWithPricing(detail, skuParts[0].trim(),
+							prefixNumber * originalQuantity, pricingProgramDetails);
+					detailA.setCombo(true);
+					result.add(detailA);
+					for (int i = 1; i < skuParts.length; i++) {
+						OrderDetailDTO newDetail = createDetailWithPricing(detail, skuParts[i].trim(),
+								1 * originalQuantity, pricingProgramDetails);
+						newDetail.setCombo(true);
+						result.add(newDetail);
+					}
+				}
+			}
+		} else {
+			String[] skuParts = skuString.split("\\s*\\+\\s*");
+			if (skuParts.length > 1) {
+				if (skuParts.length == 2) {
+					OrderDetailDTO detailA = createDetailWithPricing(detail, skuParts[0].trim(), 1 * originalQuantity,
+							pricingProgramDetails);
+					OrderDetailDTO detailB = createDetailWithPricing(detail, skuParts[1].trim(), 1 * originalQuantity,
+							pricingProgramDetails);
+					detailA.setCombo(true);
+					detailB.setCombo(true);
+					result.add(detailA);
+					result.add(detailB);
+				} else {
+					for (String part : skuParts) {
+						if (!part.trim().isEmpty()) {
+							OrderDetailDTO newDetail = createDetailWithPricing(detail, part.trim(),
+									1 * originalQuantity, pricingProgramDetails);
+							result.add(newDetail);
+						}
+					}
+				}
+			} else {
+				OrderDetailDTO newDetail = createDetailWithPricing(detail, skuString, originalQuantity,
+						pricingProgramDetails);
+				result.add(newDetail);
+			}
+		}
+
+		return result;
+	}
+
+	private OrderDetailDTO createDetailWithPricing(OrderDetailDTO originalDetail, String sku, int quantity,
+			List<PricingProgramDetail> pricingDetails) {
+		if (productService == null) {
+			LOGGER.severe("productService is null, injection failed");
+			return new OrderDetailDTO();
+		}
+
+		OrderDetailDTO newDetail = new OrderDetailDTO();
+		newDetail.setOrderItemId(originalDetail.getOrderItemId());
+		newDetail.setSku(sku);
+		newDetail.setStt(originalDetail.getStt());
+		newDetail.setQuantity(quantity);
+		newDetail.setOrderId(originalDetail.getOrderId());
+		newDetail.setVariant(originalDetail.isVariant());
+		newDetail.setLoaitmdt(originalDetail.getLoaitmdt());
+		newDetail.setPromotionType(originalDetail.getPromotionType());
+		newDetail.setDiscountedPrice(originalDetail.getDiscountedPrice());
+		newDetail.setImageURL(originalDetail.getImageURL());
+		boolean isPromo = sku.toUpperCase().contains("QT");
+		newDetail.setOrderDetailType(isPromo ? "PROMO" : "SALE");
+
+		Product product = productService.selectByCode(sku);
+		if (product != null && product.getProduct_name() != null) {
+			newDetail.setName(product.getProduct_name());
+		} else {
+			LOGGER.warning("Không tìm thấy sản phẩm: " + sku + ", trong chương trình TTSP");
+			newDetail.setName(originalDetail.getName());
+		}
+
+		double itemPrice = findItemPriceForSku(sku, pricingDetails);
+		newDetail.setItemPrice(itemPrice);
+
+		newDetail.setLastItemPrice(isPromo ? 0.0 : 0.0);
+		newDetail.setUnitPrice(isPromo ? 0.0 : 0.0);
+
+		return newDetail;
+	}
+
+	private double findItemPriceForSku(String sku, List<PricingProgramDetail> pricingDetails) {
+		Product product = productService.selectByCode(sku);
+		if (product == null || product.getProduct_code() == null) {
+			LOGGER.warning("Product not found for SKU: " + sku);
+			return 0.0;
+		}
+
+		return pricingDetails.stream().filter(item -> item.getProduct() != null)
+				.filter(item -> product.getProduct_code().equals(item.getProduct().getProduct_code()))
+				.mapToDouble(item -> item.getUnit_price()).findFirst().orElse(0.0);
+	}
+
+	private double[] calculateAllocationRatios(double[] itemPrices) {
+		double totalPrice = Arrays.stream(itemPrices).sum();
+		double[] ratios = new double[itemPrices.length];
+
+		if (totalPrice <= 0) {
+			Arrays.fill(ratios, 1.0 / itemPrices.length);
+			return ratios;
+		}
+
+		for (int i = 0; i < itemPrices.length; i++) {
+			ratios[i] = itemPrices[i] / totalPrice;
+		}
+
+		return ratios;
+	}
+
+	private String generateHmacSHA256(String data, String key) throws Exception {
+		Mac mac = Mac.getInstance("HmacSHA256");
+		SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+		mac.init(secretKey);
+		byte[] hashBytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+		StringBuilder sb = new StringBuilder();
+		for (byte b : hashBytes) {
+			sb.append(String.format("%02x", b));
+		}
+		return sb.toString();
+	}
+
+	private static ShopeeAPIServlet instance = new ShopeeAPIServlet();
+
+	public static ShopeeAPIServlet getInstance() {
+		return instance;
+	}
+
+	public void setShopeeTokenManager(ShopeeTokenManager manager) {
+		this.shopeeTokenManager = manager;
+	}
+}

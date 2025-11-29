@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Loại
+			sản phẩm</h3>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<div class="col-md-4">
+					<p:panel header="Thông tin" styleClass="panelw100">
+						<h:panelGrid id="info">
+							<label>Mã loại<span style="color: red;">*</span></label>
+							<p:inputText value="#{productTypeBean.produtTypeCrud.code}" />
+							<label>Tên loại sản phẩm<span style="color: red;">*</span></label>
+							<p:inputText value="#{productTypeBean.produtTypeCrud.name}" />
+							<label>Tên loại sản phẩm(en)<span style="color: red;">*</span></label>
+							<p:inputText value="#{productTypeBean.produtTypeCrud.en_name}" />
+						</h:panelGrid>
+						<p:separator />
+
+						<p:commandLink process="@this,info"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							action="#{productTypeBean.saveOrUpdate()}"
+							styleClass="btn_primmary" update="menuformid:tableid">
+							<i class="fa fa-floppy-o" aria-hidden="true"></i>
+							<span>Lưu/Cập nhật</span>
+						</p:commandLink>
+						<p:commandLink process="@this,info"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							action="#{productTypeBean.createNew()}" styleClass="btn_new"
+							update="menuformid:info">
+							<i class="fa fa-file-o" aria-hidden="true"></i>
+							<span>Tạo mới</span>
+						</p:commandLink>
+						<p:commandLink process="@this" id="xoact"
+							action="#{productTypeBean.delete()}"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							styleClass="btn_destroy" update=":messages,:menuformid"
+							icon="fa fa-trash">
+							<p:confirm icon="ui-icon-alert" />
+							<i class="fa fa-trash" aria-hidden="true"></i>
+							<span>Xóa</span>
+						</p:commandLink>
+
+
+					</p:panel>
+				</div>
+				<div class="col-md-8">
+					<p:panel header="Danh sách" id="preview" styleClass="clearfix">
+						<h:panelGrid id="mainGrid" columns="6"
+							style="float:left; margin-bottom:5px">
+							<p:commandLink id="idorder" style="padding:4px !important;"
+								styleClass="btn_primmary" icon="fa fa-search">
+								<i class="fa fa-search" aria-hidden="true"></i>
+								<span>Tìm kiếm</span>
+							</p:commandLink>
+							<p:commandLink action="#{productTypeBean.showDialogUpload()}"
+								style="padding:4px !important;" styleClass="btn_upload"
+								icon="fa fa-file-excel-o">
+								<i class="fa fa-upload" aria-hidden="true"></i>
+								<span>Nạp từ excel</span>
+							</p:commandLink>
+							<p:commandLink process="@this" ajax="false" target="blank_"
+								action="#{productTypeBean.exportExcel()}"
+								styleClass="btn_printtt"
+								style=" margin-right:5px;height:29px !important;line-height:29px !important;">
+								<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+								<span>Xuất excel</span>
+							</p:commandLink>
+							<p:overlayPanel id="imagePanel" for="idorder" hideEffect="fade"
+								dismissable="false" widgetVar="panelsearch" style="width:300px;">
+								<div class="col-md-12" style="padding: 5px">
+									<div class="row">
+										<div class="col-md-12"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<label>Mã loại sp</label>
+											<p:inputText value="#{productTypeBean.code}"
+												style="width:100%" />
+										</div>
+										<div class="col-md-12"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<label>Tên loại sản phẩm</label>
+											<p:inputText value="#{productTypeBean.name}"
+												style="width:100%" />
+										</div>
+									</div>
+									<div class="row" style="text-align: right">
+										<p:separator />
+										<p:commandLink process="menuformid:imagePanel"
+											oncomplete="PF('panelsearch').hide()"
+											styleClass="btn_primmary"
+											actionListener="#{productTypeBean.search()}"
+											update="menuformid:tableid">
+											<span>Tìm</span>
+										</p:commandLink>
+									</div>
+								</div>
+							</p:overlayPanel>
+						</h:panelGrid>
+						<div style="clear: both" />
+						<p:dataTable value="#{productTypeBean.listProductType}"
+							paginatorPosition="bottom" rowsPerPageTemplate="20,40,60"
+							style="width:100%;" paginator="true" rowKey="#{item.id}"
+							styleClass="tablenhapsp tableright1"
+							selection="#{productTypeBean.productTypeSelect}"
+							scrollable="true" selectionMode="single" scrollWidth=""
+							id="tableid" scrollHeight="370" widgetVar="datatb"
+							resizableColumns="true" var="item">
+							<p:ajax event="rowSelect"
+								listener="#{productTypeBean.showEdit()}"
+								update="menuformid:info" />
+							<p:column headerText="ID" width="30">
+								<h:outputText value="#{item.id}" />
+							</p:column>
+							<p:column headerText="Mã loại" width="80">
+								<h:outputText value="#{item.code}" />
+							</p:column>
+							<p:column headerText="Tên loại sản phẩm" width="150">
+								<h:outputText value="#{item.name}" />
+							</p:column>
+							<p:column headerText="Tên loại sản phẩm(en)" width="150">
+								<h:outputText value="#{item.en_name}" />
+							</p:column>
+						</p:dataTable>
+					</p:panel>
+				</div>
+			</h:form>
+		</div>
+		<p:dialog widgetVar="uploadpdffile" resizable="false" height="400"
+			styleClass="dislogUpload" header="Tải File">
+			<h:form id="mm" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ"
+					update=":messages,menuformid:tableid" uploadLabel="Tải lên"
+					multiple="false" listener="#{productTypeBean.loadExcel}"
+					mode="advanced" process="@this,mm,menuformid:tableid" />
+			</h:form>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

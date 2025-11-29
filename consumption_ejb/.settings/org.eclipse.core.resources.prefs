@@ -1,0 +1,9 @@
+eclipse.preferences.version=1
+encoding//src/lixco/com/einvoice_service=UTF-8
+encoding//src/lixco/com/service/ContractService.java=UTF-8
+encoding//src/lixco/com/service/IEInvoiceService.java=UTF-8
+encoding//src/lixco/com/service/InvoiceService.java=UTF-8
+encoding//src/lixco/com/service/ProcessLogicGoodsReceiptNoteService.java=UTF-8
+encoding//src/lixco/com/service/ProcessLogicIEInvoiceService.java=UTF-8
+encoding//src/lixco/com/service/ProcessLogicInvoiceService.java=UTF-8
+encoding/<project>=UTF-8

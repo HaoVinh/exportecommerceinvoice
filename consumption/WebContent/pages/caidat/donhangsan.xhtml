@@ -1,0 +1,577 @@
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<style>
+.custom-order-table {
+	width: 100%;
+	font-size: 14px;
+}
+
+.custom-order-table .ui-datatable-header {
+	background: #f4f6f9;
+	font-weight: bold;
+}
+
+.custom-order-table .ui-datatable-data tr.ui-state-highlight {
+	background-color: #d9edf7 !important;
+	color: #31708f !important;
+}
+</style>
+	<ui:define name="content">
+		<div class="p-grid">
+			<div class="p-col-12">
+				<h3 class="titleform">📦Đơn hàng sàn thương mại điện tử</h3>
+
+
+				<h:form id="orderForm">
+					<p:messages id="messages" showDetail="true" autoUpdate="true"
+						closable="true" />
+					<p:tabView id="tabView"
+						activeIndex="#{ecomOrderBean.activeTabIndex}" dynamic="true">
+						<p:tab title="Danh sách đơn hàng">
+							<div class="col-md-12">
+								<p:fieldset id="searchform" style="margin-bottom:10px">
+									<div class="row">
+										<div class="ui-g">
+											<div class="ui-md-6 ui-sm-12 ">
+												<div style="display: flex; align-items: center; gap: 10px;">
+
+													<p:commandLink id="idorder" styleClass="btn_primmary"
+														immediate="true"
+														style="margin-left:5px; margin-right:0px;height:28px !important;line-height:28px !important;width:75px;">
+														<i class="fa fa-search" aria-hidden="true"></i>
+														<span>Lọc</span>
+													</p:commandLink>
+
+													<h:graphicImage
+														value="#{resource['logoecommerce/shopee.jpg']}"
+														style="width: 30px; height: 30px;" />
+													<h:outputText value="#{ecomOrderBean.shopeeOrderCount}"
+														style="color: orange;" />
+
+													<h:graphicImage
+														value="#{resource['logoecommerce/lazada.jpg']}"
+														style="width: 40px; height: 30px; " />
+													<h:outputText value="#{ecomOrderBean.lazadaOrderCount}"
+														style="color: deeppink;" />
+
+													<h:graphicImage
+														value="#{resource['logoecommerce/tiktok.jpg']}"
+														style="width: 30px; height: 30px; " />
+													<h:outputText value="#{ecomOrderBean.tikTokOrderCount}"
+														style="color: black;" />
+
+
+													<p:overlayPanel id="imagePanel" for="idorder"
+														hideEffect="fade" dismissable="false"
+														widgetVar="panelsearch" style="width:500px;">
+														<div class="col-md-12"
+															style="border: 1px solid #ccc; border-radius: 6px; margin-bottom: 5px !important;">
+															<div class="col-md-12"
+																style="padding: 10px 0px !important; padding-left: 0px !important; padding-right: 0px !important;">
+																<div class="row">
+																	<div class="col-md-6">
+																		<label>Từ ngày</label>
+																		<p:calendar showButtonPanel="true" navigator="true"
+																			style="flex: 1;" showOn="button"
+																			styleClass="mb-2-for-calendar"
+																			value="#{ecomOrderBean.fromDateSearch}"
+																			id="cld_startdate" yearRange="1945:2100" locale="vi"
+																			pattern="dd/MM/yyyy" mask="99/99/9999">
+																			<p:ajax event="dateSelect" process="@this"
+																				update="@this" />
+																		</p:calendar>
+																	</div>
+																	<div class="col-md-6">
+																		<label>Đến ngày</label>
+																		<p:calendar showButtonPanel="true" navigator="true"
+																			style="flex: 1;" showOn="button"
+																			styleClass="mb-2-for-calendar"
+																			value="#{ecomOrderBean.toDateSearch}"
+																			id="cld_enddate" yearRange="1945:2100" locale="vi"
+																			pattern="dd/MM/yyyy" mask="99/99/9999">
+																			<p:ajax event="dateSelect" process="@this"
+																				update="@this" />
+																		</p:calendar>
+																	</div>
+
+																</div>
+																<div class="row">
+																	<div class="col-md-6" style="margin-top: 8px;">
+																		<p:outputLabel value="Sàn:" for="ecomFilter"
+																			style="margin-right:5px;" />
+																		<h:graphicImage id="platformLogo"
+																			value="#{ecomOrderBean.selectedPlatform eq 'Lazada' ? resource['logoecommerce/lazada.jpg'] :
+                ecomOrderBean.selectedPlatform eq 'Shopee' ? resource['logoecommerce/shopee.jpg'] :
+                ecomOrderBean.selectedPlatform eq 'Tiktok' ? resource['logoecommerce/tiktok.jpg'] : resource['logoecommerce/all.jpg']}"
+																			style="width: 30px; height: 30px; margin-right: 8px;" />
+																		<p:selectOneMenu id="ecomFilter"
+																			value="#{ecomOrderBean.selectedPlatform}"
+																			style="width:150px" var="p">
+																			<f:selectItem itemLabel="Tất cả" itemValue="Tất cả" />
+																			<f:selectItem itemLabel="Lazada" itemValue="Lazada" />
+																			<f:selectItem itemLabel="Shopee" itemValue="Shopee" />
+																			<f:selectItem itemLabel="TikTok" itemValue="Tiktok" />
+																			<p:column>
+																				<h:graphicImage
+																					value="#{
+                    p eq 'Lazada' ? resource['logoecommerce/lazada.jpg'] :
+                    p eq 'Shopee' ? resource['logoecommerce/shopee.jpg'] :
+                    p eq 'Tiktok' ? resource['logoecommerce/tiktok.jpg'] : resource['logoecommerce/all.jpg']
+                }"
+																					style="width: 30px; height: 30px; margin-right: 10px;" />
+            #{p}
+        </p:column>
+																			<p:ajax process="@this"
+																				update="platformLogo orderForm:tabView:ordersTable" />
+																		</p:selectOneMenu>
+																	</div>
+																	<div class="col-md-6" style="margin-top: 10px;">
+																		<p:outputLabel value="Loại hóa đơn" for="typeFilter"
+																			style="margin-right:5px;margin-top: 6px;" />
+																		<p:selectOneMenu id="typeFilter"
+																			value="#{ecomOrderBean.orderType}"
+																			style="width:150px">
+																			<f:selectItem itemLabel="Tất cả" itemValue="Tất cả" />
+																			<f:selectItem itemLabel="Đơn hàng bán"
+																				itemValue="SALE" />
+																			<f:selectItem itemLabel="Đơn hàng khuyến mãi"
+																				itemValue="PROMO" />
+
+																			<p:ajax process="@this"
+																				update="orderForm:tabView:ordersTable" />
+																		</p:selectOneMenu>
+																	</div>
+																</div>
+
+															</div>
+
+														</div>
+
+														<div class="col-md-12"
+															style="padding-left: 0px !important; padding-right: 0px !important; margin-bottom: 5px;">
+															<div class="pull-right">
+																<p:commandButton value="Tìm" styleClass="btn_primmary"
+																	process="orderForm:tabView:imagePanel" immediate="true"
+																	style="background:orange;color:white;margin-left:5px; margin-right:0px;height:28px !important;line-height:28px !important;"
+																	icon="fa fa-search"
+																	oncomplete="PF('panelsearch').hide()"
+																	actionListener="#{ecomOrderBean.search()}"
+																	update="ordersTable,orderForm:tabView:imagePanel" />
+
+															</div>
+														</div>
+													</p:overlayPanel>
+
+												</div>
+
+
+
+											</div>
+
+											<div class="ui-md-6 ui-sm-12">
+												<div style="float: right;">
+													<p:selectBooleanCheckbox
+														value="#{ecomOrderBean.globalAutoExported}"
+														itemLabel="Tự động xuất HDDT cho tất cả">
+														<p:ajax
+															listener="#{ecomOrderBean.updateAutoExportedGlobal}"
+															update="orderForm:messages" />
+													</p:selectBooleanCheckbox>
+													<p:commandButton value="Đồng bộ trạng thái"
+														action="#{ecomOrderBean.syncSelectedOrderStatus}"
+														styleClass="btn_primmary" icon="fa fa-sync" iconPos="left"
+														update=":orderForm:messages orderForm:tabView:ordersTable" />
+													<p:commandButton value="Cập nhật thành tiền"
+														styleClass="btn_primmary" icon="fa fa-sync" iconPos="left"
+														action="#{ecomOrderBean.dongbothanhtien}"
+														update=":orderForm:messages orderForm:tabView:ordersTable" />
+												</div>
+											</div>
+										</div>
+									</div>
+								</p:fieldset>
+
+
+
+								<p:dataTable id="ordersTable"
+									value="#{ecomOrderBean.ecomOrders}" var="eOrder"
+									selection="#{ecomOrderBean.ecomOrder}" selectionMode="single"
+									rowKey="#{eOrder.id}" rowIndexVar="rowIndex" scrollable="true"
+									scrollHeight="400" paginator="true" rows="10"
+									filteredValue="#{ecomOrderBean.filteredOrders}"
+									sortMode="single"
+									paginatorTemplate="{CurrentPageReport} {FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}"
+									rowsPerPageTemplate="5,10,20,50" sortOrder="descending"
+									styleClass="tablenhapsp p-mt-2" widgetVar="ordersTableWidget">
+
+									<p:ajax event="rowSelect"
+										listener="#{ecomOrderBean.onRowSelect}"
+										update="orderForm:tabView" />
+									<p:ajax event="rowDblselect" process="@this"
+										listener="#{ecomOrderBean.onRowDblSelect}"
+										update="orderForm:tabView" />
+
+
+									<p:column style="width:30px" styleClass="textcenter"
+										toggleable="false">
+										<f:facet name="header">
+											<p:selectBooleanCheckbox value="#{ecomOrderBean.selectAll}">
+												<p:ajax update="@(.stchoose)" process="@this"
+													listener="#{ecomOrderBean.onSelectAllChange2()}" />
+											</p:selectBooleanCheckbox>
+										</f:facet>
+										<p:selectBooleanCheckbox value="#{eOrder.select}"
+											styleClass="stchoose">
+											<p:ajax process="@this" />
+										</p:selectBooleanCheckbox>
+									</p:column>
+
+									<p:column headerText="STT" width="50"
+										style="text-align:center;">
+										<h:outputText value="#{rowIndex + 1}" />
+									</p:column>
+									<p:column headerText="Ngày tạo" width="100"
+										sortBy="#{eOrder.createdAt}">
+										<h:outputText value="#{eOrder.createdAt}">
+											<f:convertDateTime pattern="yyyy-MM-dd HH:mm:ss" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="Mã đơn hàng" width="100"
+										sortBy="#{eOrder.orderNumber}"
+										filterBy="#{eOrder.orderNumber}">
+										<h:outputText value="#{eOrder.orderNumber}" />
+									</p:column>
+
+									<p:column headerText="Khách hàng" width="370"
+										sortBy="#{eOrder.customer.customer_name}">
+										<h:outputText
+											value=" #{eOrder.customer.customer_code} - #{eOrder.customer.customer_name}" />
+									</p:column>
+
+									<p:column headerText="Thành tiền" width="100"
+										style="text-align:right;" sortBy="#{eOrder.lastPrice}">
+										<h:outputText value="#{eOrder.lastPrice}">
+											<f:convertNumber pattern="#,###,##0 VNĐ" />
+										</h:outputText>
+									</p:column>
+
+									<p:column headerText="Trạng thái" width="150"
+										filterBy="#{eOrder.myStatus}" sortBy="#{eOrder.status}">
+										<h:outputText
+											value="#{ecomOrderBean.getStatusDisplay(eOrder)}"
+											escape="false" />
+									</p:column>
+
+									<p:column headerText="Ngày cập nhật trạng thái sàn" width="170"
+										sortBy="#{eOrder.updatedAt}">
+										<h:outputText value="#{eOrder.updatedAt}">
+											<f:convertDateTime pattern="yyyy-MM-dd HH:mm:ss" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="Ngày cập nhật trạng thái HT" width="170"
+										sortBy="#{eOrder.thoigiancapnhat}">
+										<h:outputText value="#{eOrder.thoigiancapnhat}">
+											<f:convertDateTime pattern="yyyy-MM-dd HH:mm:ss" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="Sàn" sortBy="#{eOrder.loaitmdt}"
+										width="50">
+										<h:panelGroup layout="inline"
+											style="display:flex; align-items:center; gap:5px;">
+											<h:graphicImage
+												value="#{
+                eOrder.loaitmdt eq 'Lazada' ? resource['logoecommerce/lazada.jpg'] :
+                eOrder.loaitmdt eq 'Shopee' ? resource['logoecommerce/shopee.jpg'] :
+                eOrder.loaitmdt eq 'TikTok' ? resource['logoecommerce/tiktok.jpg'] : ''
+            }"
+												style="width: 25px; height: 20px;" />
+
+										</h:panelGroup>
+									</p:column>
+								</p:dataTable>
+							</div>
+						</p:tab>
+
+						<p:tab title="Chi tiết đơn hàng">
+							<p:panel>
+								<div class="wrapdetail"
+									style="background-color: #eeeeee; width: 100%; height: auto;">
+									<div class="col-md-12"
+										style="padding-left: 0px !important; padding-right: 0px !important; background-color: white; padding-top: 15px;">
+										<div class="col-md-12"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<div class="row">
+												<div class="col-md-4">
+													<div class="row">
+														<div class="col-md-6 pdright3">
+															<label class="text-ellipsis"
+																title="Số
+																hóa đơn">Số hóa đơn</label>
+															<p:inputText readonly="true"
+																value="#{ecomOrderBean.ecomOrder.orderNumber}"
+																style="width:100%;" />
+														</div>
+
+														<div class="col-md-6 pdnone">
+															<label>ID<span style="color: red;"></span></label>
+															<p:inputText disabled="true"
+																value="#{ecomOrderBean.ecomOrder.id}"
+																style="width:100%;" />
+														</div>
+
+													</div>
+													<div class="row">
+														<div class="col-md-6 pdright3">
+															<label>Ngày ĐH<span style="color: red;">*</span></label>
+															<p:calendar value="#{ecomOrderBean.ecomOrder.createdAt}"
+																pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+																showButtonPanel="true">
+															</p:calendar>
+														</div>
+														<div class="col-md-6 pdnone">
+															<label>Ngày cập nhật trạng thái sàn<span
+																style="color: red;">*</span></label>
+															<p:calendar value="#{ecomOrderBean.ecomOrder.updatedAt}"
+																pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+																showButtonPanel="true">
+															</p:calendar>
+														</div>
+													</div>
+
+
+
+
+												</div>
+												<div class="col-md-4">
+													<div class="row">
+														<label>Khách hàng<span style="color: red;">*</span></label>
+														<div class="nhapdlg">
+															<span class="fa fa-search"></span>
+															<p:autoComplete style="width:100%;"
+																placeholder="Tìm khách hàng"
+																value="#{ecomOrderBean.ecomOrder.customer}"
+																maxResults="100" converter="abstractConverter"
+																minQueryLength="2" queryDelay="900"
+																completeMethod="#{abstractAutoComplete.completeCustomer}"
+																var="p" widgetVar="wkhachhang"
+																itemLabel="#{p.customer_code}-#{p.customer_name}"
+																itemValue="#{p}" moreText="true" forceSelection="true"
+																onclick="this.select();">
+																<p:column style="width:50px">
+																	<h:outputText value="#{p.customer_code}" />
+																</p:column>
+																<p:column style="width:150px">
+																	<h:outputText value="#{p.customer_name}" />
+																</p:column>
+
+															</p:autoComplete>
+														</div>
+													</div>
+
+													<div class="row">
+														<label>Ghi chú</label>
+														<p:inputTextarea styleClass="textarea45"
+															value="#{ecomOrderBean.ecomOrder.ghichu}" rows="2" />
+													</div>
+
+												</div>
+												<div class="col-md-4">
+													<div class="row">
+														<div class="col-md-6 pdright3">
+															<label>Đơn giá</label>
+															<p:inputNumber onclick="this.select()"
+																value="#{ecomOrderBean.ecomOrder.lastPrice}"
+																styleClass="intputnumcc" style="width:100%;"
+																minValue="0" decimalPlaces="2" decimalSeparator=","
+																maxValue="1000000" emptyValue="0" thousandSeparator="." />
+														</div>
+														<div class="col-md-6 pdnone">
+															<label>Loại hóa đơn</label>
+															<p:inputText
+																value="#{ecomOrderBean.ecomOrder.orderType == 'PROMO' ? 'Hóa đơn hàng khuyến mãi/quà tặng' : 'Hóa đơn hàng bán'}"
+																style="width:100%;" readonly="true" />
+														</div>
+														<div class="row">
+															<label>Lưu ý</label>
+															<p:inputTextarea id="luuykh" rows="2"
+																styleClass="textarea45" />
+														</div>
+													</div>
+
+
+												</div>
+
+
+											</div>
+										</div>
+										<div class="col-md-12"
+											style="margin-top: 5px; padding-left: 0px !important; padding-right: 0px !important;">
+											<div class="row"></div>
+										</div>
+									</div>
+								</div>
+								<p:commandButton value="Cập nhật sản phẩm"
+									action="#{ecomOrderBean.dongbodongia}" icon="fa fa-sync"
+									styleClass="btn_primmary"
+									update=":orderForm:messages orderForm:tabView:detailTable" />
+								<p:dataTable id="detailTable"
+									value="#{ecomOrderBean.ecomOrderDetails}" var="detail"
+									paginator="true" rows="5" rowIndexVar="idx"
+									rowKey="#{detail.id}" rowsPerPageTemplate="5,10"
+									styleClass="tablenhapsp p-mt-2"
+									selection="#{ecomOrderBean.ecomOrderDetailSelect}"
+									emptyMessage="Không có chi tiết đơn hàng" scrollable="true"
+									selectionMode="single"
+									paginatorTemplate="{CurrentPageReport}  {FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}">
+									<p:ajax event="rowDblselect"
+										listener="#{ecomOrderBean.showEditInvoiceDetail()}"
+										update="dlgc1" />
+
+									<p:column headerText="STT" width="50"
+										style="text-align:center;">
+										<h:outputText value="#{idx + 1}" />
+									</p:column>
+									<p:column headerText="Mã chi tiết" width="150">
+										<h:outputText value="#{detail.orderItemNumber}" />
+									</p:column>
+									<p:column headerText="Tên sản phẩm" width="300">
+										<h:outputText value="#{detail.name}" />
+									</p:column>
+									<p:column headerText="Hình ảnh" width="100"
+										style="text-align:center;">
+										<h:outputLink value="#{detail.imageURL}" target="_blank"
+											rendered="#{not empty detail.imageURL}">
+											<h:graphicImage value="#{detail.imageURL}" width="70"
+												height="70"
+												style="object-fit: contain; border-radius: 8px; cursor: pointer;" />
+										</h:outputLink>
+										<h:outputText value="Không có hình ảnh"
+											rendered="#{empty detail.imageURL}" />
+									</p:column>
+									<p:column headerText="SKU" width="50">
+										<h:outputText value="#{detail.sku}" />
+									</p:column>
+
+									<p:column headerText="Đơn giá" width="150"
+										style="text-align:right;">
+										<h:outputText value="#{detail.unitPrice}">
+											<f:convertNumber pattern="#,###,##0 VNĐ" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="Số lượng" width="50">
+										<h:outputText value="#{detail.quantity}" />
+									</p:column>
+
+									<p:column headerText="Thành tiền" width="150"
+										style="text-align:right;">
+										<h:outputText value="#{detail.splitPrice}">
+											<f:convertNumber pattern="#,###,##0 VNĐ" />
+										</h:outputText>
+									</p:column>
+								</p:dataTable>
+							</p:panel>
+						</p:tab>
+
+					</p:tabView>
+				</h:form>
+
+				<p:dialog header="Chi tiết hóa đơn" styleClass="dialogcommon"
+					resizable="false" width="450" style="oveFrflow: initial;"
+					closeOnEscape="true" widgetVar="dlgc1">
+					<h:form id="dlgc1">
+						<div class="col-md-12"
+							style="padding-left: 0px !important; padding-right: 0px !important;">
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important;">
+								<div class="row">
+									<div class="col-md-9"
+										style="padding-left: 0px !important; padding-right: 5px !important;">
+										<label>Sản phẩm<span style="color: red;">*</span></label>
+										<p:inputText styleClass="fix_width100"
+											value="#{ecomOrderBean.ecomOrderDetail.sku}-#{ecomOrderBean.ecomOrderDetail.name}">
+										</p:inputText>
+									</div>
+									<div class="col-md-3"
+										style="padding-left: 0px !important; padding-right: 5px !important;">
+										<label>Số lượng</label>
+										<p:inputNumber
+											value="#{ecomOrderBean.ecomOrderDetail.quantity}"
+											styleClass="fix_width100" decimalPlaces="2" readonly="true"
+											decimalSeparator="," thousandSeparator=".">
+										</p:inputNumber>
+
+
+									</div>
+								</div>
+							</div>
+							<div class="col-md-12"
+								style="padding-left: 0px !important; padding-right: 0px !important; margin-top: 10px;">
+								<div class="row">
+									<div class="col-md-6"
+										style="padding-left: 0px !important; padding-right: 5px !important;">
+										<label>Số tiền</label>
+										<p:inputNumber id="thanhtien"
+											readonly="#{ecomOrderBean.ecomOrderDetail.quantity!=0 || ecomOrderBean.ecomOrderDetail.unitPrice!=0}"
+											value="#{ecomOrderBean.ecomOrderDetail.splitPrice}"
+											styleClass="fix_width100" decimalPlaces="2"
+											decimalSeparator="," thousandSeparator=".">
+										</p:inputNumber>
+									</div>
+									<div class="col-md-6"
+										style="padding-left: 0px !important; padding-right: 5px !important;">
+										<label>Đơn giá</label>
+										<p:inputNumber readonly="true" id="dongia"
+											value="#{ecomOrderBean.ecomOrderDetail.unitPrice}"
+											styleClass="fix_width100" decimalPlaces="3"
+											decimalSeparator="," thousandSeparator=".">
+										</p:inputNumber>
+									</div>
+
+								</div>
+
+								<div class="row">
+									<div class="col-md-12"
+										style="padding-left: 0px !important; padding-right: 0px !important;">
+										<div class="col-md-6"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<label>Loại chi tiết</label>
+											<p:inputText
+												value="#{ecomOrderBean.ecomOrderDetail.orderType == 'PROMO' ? 'Hàng khuyến mãi/quà tặng' : 'Hàng bán'}"
+												style="width:100%;" readonly="true" />
+										</div>
+										<div class="col-md-6"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<label>Mã chi tiết</label>
+											<p:inputText readonly="true"
+												value="#{ecomOrderBean.ecomOrderDetail.orderItemNumber}" />
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="col-md-12"
+							style="padding-left: 0px !important; padding-right: 0px !important; margin-top: 10px;">
+
+							<p:separator />
+							<div class="row">
+								<div class="col-md-12">
+									<label>1. Shopee: (Giá ưu đãi + trợ giá shopee - Mã
+										giảm giá của shop - Mã giảm giá combo) / 1.08</label> <label>2.
+										Lazada: (Đơn giá sàn của từng sp - Giảm giá của shop + Giá vận
+										chuyển) / 1.08</label> <label>3. TikTok:(Đơn giá sau giảm giá
+										+ phí vận chuyển(trừ các giảm giá của sàn và người bán, giảm
+										giá người bán mới phát sinh từ tháng 8 xem lại nếu có sàn có
+										xuất HĐ thì tính vào phí VC, không thì chỉ trừ phí sàn) / 1.08</label>
+								</div>
+
+							</div>
+						</div>
+					</h:form>
+				</p:dialog>
+			</div>
+		</div>
+	</ui:define>
+</ui:composition>

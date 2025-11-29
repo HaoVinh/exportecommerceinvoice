@@ -1,0 +1,839 @@
+package lixco.com.service;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.jboss.logging.Logger;
+import javax.annotation.Resource;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Expression;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.Root;
+import javax.sql.DataSource;
+import javax.transaction.SystemException;
+import javax.transaction.UserTransaction;
+
+import lixco.com.commom_ejb.JsonParserUtil;
+import lixco.com.commom_ejb.MyMath;
+import lixco.com.commom_ejb.MyUtilEJB;
+import lixco.com.commom_ejb.ToolTimeCustomer;
+import lixco.com.entity.Car;
+import lixco.com.entity.Customer;
+import lixco.com.entity.DeliveryPricing;
+import lixco.com.entity.IECategories;
+import lixco.com.entity.Invoice;
+import lixco.com.entity.InvoiceDetail;
+import lixco.com.entity.InvoiceDetailTemp;
+import lixco.com.entity.InvoiceTemp;
+import lixco.com.entity.OrderDetail;
+import lixco.com.entity.OrderLix;
+import lixco.com.entity.PaymentMethod;
+import lixco.com.entity.PricingProgram;
+import lixco.com.entity.Product;
+import lixco.com.entity.PromotionOrderDetail;
+import lixco.com.entity.PromotionProgram;
+import lixco.com.entity.Warehouse;
+import lixco.com.entityapi.InvoiceAsyncDTO;
+import lixco.com.entityapi.InvoiceDTO;
+import lixco.com.entityapi.InvoiceDetailDTO;
+import lixco.com.entityapi.InvoiceDetailTempDTO;
+import lixco.com.entityapi.InvoiceTempAsyncDTO;
+import lixco.com.entityapi.InvoiceTempDTO;
+import lixco.com.interfaces.ICarService;
+import lixco.com.interfaces.ICustomerPricingProgramService;
+import lixco.com.interfaces.ICustomerPromotionProgramService;
+import lixco.com.interfaces.ICustomerService;
+import lixco.com.interfaces.IDeliveryPricingService;
+import lixco.com.interfaces.IIECategoriesService;
+import lixco.com.interfaces.IInvoiceService;
+import lixco.com.interfaces.IPaymentMethodService;
+import lixco.com.interfaces.IPricingProgramDetailService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.interfaces.IStockerService;
+import lixco.com.interfaces.IWarehouseService;
+import lixco.com.reqInfo.CustomerPricingProgramReqInfo;
+import lixco.com.reqInfo.CustomerPromotionProgramReqInfo;
+import lixco.com.reqInfo.PricingProgramDetailReqInfo;
+import com.google.gson.JsonObject;
+import trong.lixco.com.entity.AccountAPI;
+@Stateless
+@TransactionManagement(value = TransactionManagementType.BEAN)
+public class InvoiceAPIService {
+	@Inject
+	private EntityManager em;
+	@Resource(lookup = "java:/consumption")
+	DataSource datasource;
+	@Resource
+	private UserTransaction ut;
+	@Inject
+	private Logger logger;
+	@Inject
+	ICustomerService customerService;
+	@Inject
+	IPaymentMethodService paymentMethodService;
+	@Inject
+	ICarService carService;
+	@Inject
+	IDeliveryPricingService deliveryPricingService;
+	@Inject
+	IIECategoriesService ieCategoriesService;
+	@Inject
+	IWarehouseService warehouseService;
+	@Inject
+	IStockerService stockerService;
+	@Inject
+	IInvoiceService invoiceService;
+	@Inject
+	ICustomerPricingProgramService customerPricingProgramService;
+	@Inject
+	ICustomerPromotionProgramService customerPromotionProgramService;
+	@Inject
+	IProductService productService;
+	@Inject
+	TonKhoThucTeService tonKhoThucTeService;
+
+	public int taoHoaDonAPI(InvoiceAsyncDTO invoiceAsyncDTO, StringBuilder errors, boolean kiemton) {
+		InvoiceDTO invoiceDTO = invoiceAsyncDTO.getInvoiceDTO();
+		List<InvoiceDetailDTO> invoiceDetailDTOs = invoiceDTO.getInvoiceDetailDTOs();
+		int res = 1;
+		Connection con = null;
+		try {
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+			ut.begin();
+			Date now = MyUtilEJB.loaibogio(new Date());
+			// tạo hóa đơn thứ nhất
+			Invoice invoice = new Invoice();
+			invoice.setCreated_date(new Date());
+			Customer cus = customerService.selectByCode(invoiceDTO.getMakhachhang());
+			invoice.setCustomer(cus);
+			invoice.setInvoice_date(now);
+			invoice.setDelivery_date(now);
+			// Chuyen khoan
+			PaymentMethod payment = paymentMethodService.selectByCode("CK");
+			invoice.setPayment_method(payment);
+			Car car = carService.selectByCode(invoiceDTO.getSoxe());
+			invoice.setCar(car);
+			DeliveryPricing deliv = deliveryPricingService.selectByPlaceCode(invoiceDTO.getManoiden());
+			invoice.setDelivery_pricing(deliv);
+			// Xuat noi bo
+			IECategories iecate = ieCategoriesService.selectByCode("Y");
+			invoice.setIe_categories(iecate);
+			// Kho san pham
+			Warehouse warehouse = warehouseService.selectByCode("F");
+			invoice.setWarehouse(warehouse);
+			invoice.setTax_value(0.1);// Cai dat mac dinh 10%
+			if (!"".equals(invoiceDTO.getMathukho()))
+				invoice.setStocker(stockerService.selectByCode(invoiceDTO.getMathukho()));
+
+			/*
+			 * Chuong trinh don gia, khuyen mai
+			 */
+			JsonObject json = new JsonObject();
+			json.addProperty("date", ToolTimeCustomer.convertDateToString(invoice.getInvoice_date(), "dd/MM/yyyy"));
+			json.addProperty("customer_id", invoice.getCustomer().getId());
+			CustomerPricingProgramReqInfo t = new CustomerPricingProgramReqInfo();
+			customerPricingProgramService.selectForCustomer(JsonParserUtil.getGson().toJson(json), t);
+			PricingProgram pricingProgramTrans = t.getCustomer_pricing_program() == null ? null
+					: t.getCustomer_pricing_program().getPricing_program();
+			CustomerPromotionProgramReqInfo t1 = new CustomerPromotionProgramReqInfo();
+			customerPromotionProgramService.selectForCustomer(JsonParserUtil.getGson().toJson(json), t1);
+			PromotionProgram promotionProgramTrans = t1.getCustomer_promotion_program() == null ? null
+					: t1.getCustomer_promotion_program().getPromotion_program();
+
+			invoice.setPricing_program(pricingProgramTrans);
+			invoice.setPromotion_program(promotionProgramTrans);
+
+			/*
+			 * Cai dat don gia cho chi tiet
+			 */
+			for (int i = 0; i < invoiceDetailDTOs.size(); i++) {
+				Product pd = productService.selectByCode(invoiceDetailDTOs.get(i).getProductCode());
+				if (pd != null) {
+					invoiceDetailDTOs.get(i).setProduct(pd);
+					invoiceDetailDTOs.get(i)
+							.setDongia(caidatdongia(pricingProgramTrans, invoice.getInvoice_date(), pd.getId()));
+					invoiceDetailDTOs.get(i).setThanhtien(MyMath.roundCustom(
+							invoiceDetailDTOs.get(i).getQuantity() * invoiceDetailDTOs.get(i).getDongia(), 0));
+				} else {
+					errors.append("Không tìm thấy mã sản phẩm: " + invoiceDetailDTOs.get(i).getProductCode());
+					res = -1;
+					ut.rollback();
+					return res;
+				}
+			}
+
+			invoice.setPo_no(invoiceDTO.getPo());
+			invoice.setExported(true);
+			initCodeVoucher(invoice);
+
+			double totalevent = invoiceDetailDTOs.stream().mapToDouble(f -> f.getThanhtien()).sum();
+			invoice.setTongtien(MyMath.round(totalevent));
+			invoice.setThue(MyMath.round(totalevent * invoice.getTax_value()));
+
+			em.persist(invoice);
+			if (invoice.getId() == 0) {
+				res = -1;
+				ut.rollback();
+				errors.append("Tạo hóa đơn thất bại!");
+				return res;
+			}
+			// tạo chi tiết cho đơn hàng thứ nhất
+			for (InvoiceDetailDTO p : invoiceDetailDTOs) {
+				InvoiceDetail detail = new InvoiceDetail();
+				detail.setInvoice(invoice);
+				detail.setCreated_date(new Date());
+				detail.setProduct(p.getProduct());
+				detail.setQuantity(p.getQuantity());
+				detail.setReal_quantity(detail.getQuantity());
+				detail.setUnit_price(p.getDongia());
+				detail.setTotal(MyMath.round(detail.getQuantity() * detail.getUnit_price()));
+				detail.setNote_batch_code(p.getNote_batch_code());
+				boolean dutonkho = true;
+				double tonkho = 0;
+				if (kiemton) {
+					tonkho = tonKhoThucTeService.kiemton(detail.getProduct().getId());
+					if (tonkho < detail.getQuantity()) {
+						dutonkho = false;
+					}
+				}
+				if (dutonkho) {
+					if (detail.getQuantity() != 0) {
+						em.persist(detail);
+						if (detail.getId() == 0) {
+							res = -1;
+							errors.append("Tạo chi tiết hóa đơn thất bại!");
+							ut.rollback();
+							return res;
+						}
+					}
+				} else {
+					errors.append("Mã SP: " + detail.getProduct().getProduct_code() + " không đủ tồn kho ("
+							+ MyUtilEJB.dinhdangso(tonkho / detail.getProduct().getSpecification()) + " thùng)");
+					res = -1;
+					ut.rollback();
+					return res;
+				}
+
+			}
+			ut.commit();
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			if (con != null) {
+				try {
+					con.close();
+				} catch (SQLException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		return res;
+	}
+
+	private IECategories selectIECategoriesByCode(String code) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<IECategories> cq = cb.createQuery(IECategories.class);
+			Root<IECategories> root = cq.from(IECategories.class);
+			cq.select(root).where(cb.equal(root.get("code"), code));
+			TypedQuery<IECategories> query = em.createQuery(cq);
+			List<IECategories> list = query.getResultList();
+			if (list.size() > 0) {
+				return list.get(0);
+			}
+		} catch (Exception e) {
+			logger.error("ProcessLogicInvoiceService.selectBindIECategories:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public int taoHoaDonTempAPI(InvoiceTempAsyncDTO invoiceTempAsyncDTO, StringBuilder errors)
+			throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		Date now = MyUtilEJB.loaibogio(new Date());
+		List<Long> listIdResult = new ArrayList<>();
+
+		try {
+			// Kiểm tra dữ liệu đầu vào
+			if (invoiceTempAsyncDTO == null || invoiceTempAsyncDTO.getInvoiceTempDTO() == null
+					|| invoiceTempAsyncDTO.getInvoiceTempDTO().getInvoiceDetailTemps() == null) {
+				errors.append("Dữ liệu đầu vào không hợp lệ!");
+				return res;
+			}
+
+			InvoiceTempDTO invoiceTempDTO = invoiceTempAsyncDTO.getInvoiceTempDTO();
+			List<InvoiceDetailTempDTO> invoiceDetailTemps = invoiceTempDTO.getInvoiceDetailTemps();
+
+			// Bắt đầu giao dịch
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+
+			// Truy vấn OrderLix
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			long orderId = invoiceTempDTO.getOrderId();
+			CriteriaQuery<OrderLix> cqOrderLix = cb.createQuery(OrderLix.class);
+			Root<OrderLix> rootOrder = cqOrderLix.from(OrderLix.class);
+			rootOrder.fetch("customer", JoinType.INNER);
+			rootOrder.fetch("promotion_program", JoinType.LEFT);
+			rootOrder.fetch("pricing_program", JoinType.LEFT);
+			rootOrder.fetch("payment_method", JoinType.LEFT);
+			rootOrder.fetch("car", JoinType.LEFT);
+			rootOrder.fetch("warehouse", JoinType.LEFT);
+			rootOrder.fetch("ie_categories", JoinType.LEFT);
+			rootOrder.fetch("delivery_pricing", JoinType.LEFT);
+			rootOrder.fetch("freight_contract", JoinType.LEFT);
+			cqOrderLix.select(rootOrder).where(cb.equal(rootOrder.get("id"), orderId));
+			TypedQuery<OrderLix> queryOrder = em.createQuery(cqOrderLix);
+			List<OrderLix> listOrderTrans = queryOrder.getResultList();
+			if (listOrderTrans.isEmpty()) {
+				res = -1;
+				errors.append("Đơn hàng không tồn tại!");
+				ut.rollback();
+				return res;
+			}
+			OrderLix orderLixTrans = listOrderTrans.get(0);
+
+			Customer cus = orderLixTrans.getCustomer();
+			Warehouse wh = orderLixTrans.getWarehouse();
+			PricingProgram pricingProgram = orderLixTrans.getPricing_program();
+			PromotionProgram promotionProgram = orderLixTrans.getPromotion_program();
+
+			// Kiểm tra khách hàng và kho
+			if (cus == null) {
+				errors.append("Không tìm thấy khách hàng trong đơn hàng ID: " + orderId);
+				ut.rollback();
+				return res;
+			}
+			if (wh == null) {
+				errors.append("Không tìm thấy kho trong đơn hàng ID: " + orderId);
+				ut.rollback();
+				return res;
+			}
+			// Phân loại sản phẩm chính và khuyến mãi
+			List<InvoiceDetailTempDTO> mainProducts = new ArrayList<>();
+			List<InvoiceDetailTempDTO> promoProducts = new ArrayList<>();
+			for (InvoiceDetailTempDTO dto : invoiceDetailTemps) {
+				if (dto.isSpchinh()) {
+					mainProducts.add(dto);
+				} else {
+					promoProducts.add(dto);
+				}
+			}
+			mainProducts.removeIf(dto -> dto.getQuantity() == 0 || dto.getRealQuantity() == 0);
+
+			Set<String> mainProductCodes = mainProducts.stream().map(InvoiceDetailTempDTO::getProductCode)
+					.collect(Collectors.toSet());
+			promoProducts.removeIf(dto -> !mainProductCodes.contains(dto.getProductDHCode()));
+
+			// Chuẩn bị danh sách chi tiết hóa đơn chính
+			List<InvoiceDetail> listInvoiceDetail = new ArrayList<>();
+			Map<InvoiceDetailTempDTO, InvoiceDetail> map = new LinkedHashMap<>();
+
+			// Tạo chi tiết hóa đơn chính
+			for (InvoiceDetailTempDTO dto : mainProducts) {
+				Product pd = productService.selectByCode(dto.getProductCode());
+				if (pd == null) {
+					errors.append("Không tìm thấy mã sản phẩm: " + dto.getProductCode() + "; ");
+					ut.rollback();
+					return res;
+				}
+
+				double dongia = dto.getUnit_price();
+				double thanhtien = MyMath.roundCustom(dto.getRealQuantityDVT() * dongia, 0);
+
+				InvoiceDetail detail = new InvoiceDetail();
+				detail.setEx_order(true);
+				detail.setProduct(pd);
+				detail.setQuantity(dto.getRealQuantityDVT() != 0 ? dto.getRealQuantityDVT() : dto.getQuantity());
+				detail.setReal_quantity(
+						dto.getRealQuantityDVT() != 0 ? dto.getRealQuantityDVT() : dto.getRealQuantity());
+				detail.setUnit_price(dongia);
+				detail.setTotal(thanhtien);
+				detail.setIdchitietdonhang(dto.getInvoiceDetailId());
+
+				if (detail.getQuantity() != 0) {
+					listInvoiceDetail.add(detail);
+					map.put(dto, detail);
+				}
+			}
+
+			// Tạo hóa đơn chính
+			Invoice invoice = new Invoice();
+			invoice.setOrder_lix(orderLixTrans);
+			invoice.setIdorderlix(orderLixTrans.getId());
+			invoice.setOrder_code(invoiceTempDTO.getOrderCode());
+			invoice.setOrder_voucher(invoiceTempDTO.getOrderVoucher());
+			invoice.setCreated_by(orderLixTrans.getCreated_by());
+			invoice.setCreated_by_id(orderLixTrans.getCreated_by_id());
+			invoice.setCreated_date(new Date());
+			invoice.setCustomer(cus);
+			invoice.setInvoice_date(now);
+			invoice.setDelivery_date(invoiceTempDTO.getDelivery_date());
+			invoice.setWarehouse(wh);
+			invoice.setTax_value(invoiceTempDTO.getTaxValue());
+			invoice.setVoucher_code(invoiceTempDTO.getVoucher_code());
+			invoice.setPricing_program(pricingProgram);
+			invoice.setPromotion_program(promotionProgram);
+			invoice.setPo_no(invoiceTempDTO.getPoNo());
+			invoice.setExported(true);
+			invoice.setContent_qd(invoiceTempDTO.getContent());
+			invoice.setNote(invoiceTempDTO.getNote());
+			invoice.setLookup_code(invoiceTempDTO.getLookupCode());
+			invoice.setInvoice_code(initInvoiceCode());
+			invoice.setDelivery_pricing(orderLixTrans.getDelivery_pricing());
+			invoice.setPayment_method(orderLixTrans.getPayment_method());
+
+			String codeiec = "";
+			if (orderLixTrans.getIe_categories() != null) {
+				if ("1".equals(orderLixTrans.getIe_categories().getCode())) {
+					codeiec = "1";
+				} else if ("E".equals(orderLixTrans.getIe_categories().getCode())) {
+					codeiec = "E";
+				} else if ("X".equals(orderLixTrans.getIe_categories().getCode())) {
+					codeiec = "X";
+				} else if ("-".equals(orderLixTrans.getIe_categories().getCode())) {
+					codeiec = "-";
+				}
+			}
+			invoice.setIe_categories(selectIECategoriesByCode(codeiec));
+
+			double totalevent = listInvoiceDetail.stream().mapToDouble(InvoiceDetail::getTotal).sum();
+			invoice.setTongtien(MyMath.round(totalevent));
+			invoice.setThue(MyMath.round(totalevent * invoice.getTax_value()));
+			initCodeVoucher(invoice);
+
+			em.persist(invoice);
+			if (invoice.getId() == 0) {
+				errors.append("Tạo hóa đơn thất bại!");
+				ut.rollback();
+				return res;
+			}
+			listIdResult.add(invoice.getId());
+
+			// Lưu chi tiết hóa đơn chính
+			for (InvoiceDetail detail : listInvoiceDetail) {
+				detail.setInvoice(invoice);
+				detail.setCreated_by("System");
+				detail.setCreated_by_id(0L);
+				detail.setCreated_date(new Date());
+				em.persist(detail);
+				if (detail.getId() == 0) {
+					errors.append("Tạo chi tiết hóa đơn thất bại!");
+					ut.rollback();
+					return res;
+				}
+			}
+
+			// Xử lý hóa đơn khuyến mãi
+			if (!promoProducts.isEmpty()) {
+				// Tạo hóa đơn khuyến mãi
+				Invoice invoicePromo = new Invoice();
+				invoicePromo.setIpromotion(true);
+				invoicePromo.setOrder_lix(orderLixTrans);
+				invoicePromo.setIdorderlix(orderLixTrans.getId());
+				invoicePromo.setOrder_code(invoiceTempDTO.getOrderCode());
+				invoicePromo.setOrder_voucher(invoiceTempDTO.getOrderVoucher());
+				invoicePromo.setCreated_by(orderLixTrans.getCreated_by());
+				invoicePromo.setCreated_by_id(orderLixTrans.getCreated_by_id());
+				invoicePromo.setCreated_date(new Date());
+				invoicePromo.setCustomer(cus);
+				invoicePromo.setInvoice_date(now);
+				invoicePromo.setDelivery_date(invoiceTempDTO.getDelivery_date());
+				invoicePromo.setWarehouse(wh);
+				invoicePromo.setTax_value(0);
+				invoicePromo.setVoucher_code(invoiceTempDTO.getVoucher_code());
+				invoicePromo.setPricing_program(pricingProgram);
+				invoicePromo.setPromotion_program(promotionProgram);
+				invoicePromo.setPo_no(invoiceTempDTO.getPoNo());
+				invoicePromo.setExported(true);
+				invoicePromo.setInvoice_own(invoiceService.findByIdSafe(invoice.getId()));
+				invoicePromo.setDelivery_pricing(orderLixTrans.getDelivery_pricing());
+				invoicePromo.setPayment_method(orderLixTrans.getPayment_method());
+				invoicePromo.setCar(orderLixTrans.getCar());
+				String codeieckm = "";
+				if (orderLixTrans.getIe_categories() != null) {
+					if ("1".equals(orderLixTrans.getIe_categories().getCode())) {
+						codeieckm = "(";
+					} else if ("E".equals(orderLixTrans.getIe_categories().getCode())) {
+						codeieckm = "5";
+					} else if ("X".equals(orderLixTrans.getIe_categories().getCode())) {
+						codeieckm = "A";
+					} else if ("-".equals(orderLixTrans.getIe_categories().getCode())) {
+						codeieckm = "+";
+					}
+				}
+				invoicePromo.setIe_categories(selectIECategoriesByCode(codeieckm));
+				initCodeVoucher(invoicePromo);
+
+				em.persist(invoicePromo);
+				if (invoicePromo.getId() == 0) {
+					errors.append("Tạo hóa đơn khuyến mãi thất bại!");
+					ut.rollback();
+					return res;
+				}
+				listIdResult.add(invoicePromo.getId());
+
+				// Tạo chi tiết hóa đơn khuyến mãi
+				double totaleventPromo = 0;
+				for (InvoiceDetailTempDTO dto : promoProducts) {
+					Product pd = productService.selectByCode(dto.getProductCode());
+					if (pd == null) {
+						errors.append("Không tìm thấy mã sản phẩm: " + dto.getProductCode() + "; ");
+						ut.rollback();
+						return res;
+					}
+
+					double dongia = dto.getUnit_price();
+					double thanhtien = MyMath.roundCustom(dto.getRealQuantityDVT() * dongia, 0);
+
+					InvoiceDetail detail = new InvoiceDetail();
+					detail.setEx_order(true);
+					detail.setProductdh_code(dto.getProductDHCode());
+					detail.setInvoice(invoicePromo);
+					detail.setCreated_by(orderLixTrans.getCreated_by());
+					detail.setCreated_by_id(orderLixTrans.getCreated_by_id());
+					detail.setCreated_date(new Date());
+					detail.setProduct(pd);
+					detail.setQuantity(dto.getRealQuantityDVT() != 0 ? dto.getRealQuantityDVT() : dto.getQuantity());
+					detail.setReal_quantity(
+							dto.getRealQuantityDVT() != 0 ? dto.getRealQuantityDVT() : dto.getRealQuantity());
+					detail.setUnit_price(dongia);
+					detail.setTotal(thanhtien);
+					detail.setIdchitietdonhangkm(dto.getInvoiceDetailId());
+
+					// Liên kết với chi tiết hóa đơn chính
+					InvoiceDetail invoiceDetailMain = map.get(dto);
+					if (invoiceDetailMain != null) {
+						detail.setInvoice_detail_own(invoiceDetailMain);
+					}
+
+					if (detail.getQuantity() != 0) {
+						em.persist(detail);
+						if (detail.getId() == 0) {
+							errors.append("Tạo chi tiết hóa đơn khuyến mãi thất bại!");
+							ut.rollback();
+							return res;
+						}
+						totaleventPromo += thanhtien;
+					}
+				}
+
+				// C CORRECTION: initInvoiceCode was removed from the previous version, so we
+				// need to add it back
+				invoicePromo.setInvoice_code(initInvoiceCode());
+
+				// Cập nhật tổng tiền hóa đơn khuyến mãi
+				invoiceService.updateTongTienKM(invoicePromo.getId(), MyMath.round(totaleventPromo), "System");
+			}
+
+			// Commit giao dịch
+			ut.commit();
+			res = 0;
+
+		} catch (Exception e) {
+			res = -1;
+			errors.append("ProcessLogicInvoicePosService.taoHoaDonTempAPI: " + e.getMessage());
+			logger.error("ProcessLogicInvoicePosService.taoHoaDonTempAPI: " + e.getMessage(), e);
+			try {
+				ut.rollback();
+			} catch (SystemException ex) {
+				errors.append("Lỗi khi rollback: " + ex.getMessage());
+			}
+		} finally {
+			if (con != null) {
+				try {
+					con.close();
+				} catch (SQLException e) {
+					errors.append("Lỗi khi đóng kết nối cơ sở dữ liệu: " + e.getMessage());
+				}
+			}
+		}
+		return res;
+	}
+
+	public int luuChiTietHoaDonTam(List<InvoiceDetailTempDTO> invoiceDetailTempDTOs, StringBuilder errors)
+			throws IllegalStateException, SystemException, SQLException {
+		int res = -1;
+		Connection con = null;
+		Date now = MyUtilEJB.loaibogio(new Date());
+		List<Long> listIdResult = new ArrayList<>();
+
+		try {
+			// Kiểm tra dữ liệu đầu vào
+			if (invoiceDetailTempDTOs == null) {
+				errors.append("Dữ liệu đầu vào không hợp lệ!");
+				return res;
+			}
+
+			// Bắt đầu giao dịch
+			ut.begin();
+			con = datasource.getConnection();
+			con.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+
+			for (InvoiceDetailTempDTO dto : invoiceDetailTempDTOs) {
+				// Kiểm tra productCode
+				Product pd = productService.selectByCode(dto.getProductCode());
+				if (pd == null) {
+					errors.append("Không tìm thấy mã sản phẩm: " + dto.getProductCode() + "; ");
+					ut.rollback();
+					return res;
+				}
+
+				// Tìm bản ghi hiện có
+				InvoiceDetailTemp detailTemp = null;
+				if (dto.getInvoiceDetailId() != null) {
+					detailTemp = em.find(InvoiceDetailTemp.class, dto.getInvoiceDetailId());
+				}
+				InvoiceTemp invoiceTemp = null;
+				if(dto.getInvoiceTempId() != null) {
+					invoiceTemp = em.find(InvoiceTemp.class, dto.getInvoiceTempId());
+				}
+				// Cập nhật thông tin
+				detailTemp.setProduct(pd);
+				detailTemp.setProductdh_code(dto.getProductDHCode());
+				detailTemp.setQuantity(dto.getQuantity());
+				detailTemp.setReal_quantity_box(dto.getRealQuantity() != 0 ? dto.getRealQuantity() : 0);
+				detailTemp.setReal_quantity(dto.getRealQuantityDVT() != 0 ? dto.getRealQuantityDVT() : 0);
+				detailTemp.setUnit_price(dto.getUnit_price() != 0 ? dto.getUnit_price() : 0);
+				detailTemp.setTotal(MyMath.roundCustom((dto.getRealQuantityDVT() != 0 ? dto.getRealQuantityDVT() : 0)
+						* (dto.getUnit_price() != 0 ? dto.getUnit_price() : 0), 0));
+				invoiceTemp.setSaved(true);
+				
+				// Lưu hoặc cập nhật
+				if (detailTemp.getQuantity() != 0) {
+
+					if (detailTemp.getId() == 0) {
+						em.persist(detailTemp);
+					} else {
+						em.merge(detailTemp);
+					}
+					if (detailTemp.getId() == 0) {
+						errors.append("Lưu/cập nhật chi tiết hóa đơn tạm thất bại cho invoiceDetailId: "
+								+ dto.getInvoiceDetailId() + "; ");
+						ut.rollback();
+						return res;
+					}
+					listIdResult.add(detailTemp.getId());
+				}
+			}
+
+			// Commit giao dịch
+			ut.commit();
+			res = 0;
+
+		} catch (Exception e) {
+			res = -1;
+			errors.append("ProcessLogicInvoicePosService.luuChiTietHoaDonTam: " + e.getMessage());
+			logger.error("ProcessLogicInvoicePosService.luuChiTietHoaDonTam: " + e.getMessage(), e);
+			try {
+				ut.rollback();
+			} catch (SystemException ex) {
+				errors.append("Lỗi khi rollback: " + ex.getMessage());
+			}
+		} finally {
+			if (con != null) {
+				try {
+					con.close();
+				} catch (SQLException e) {
+					errors.append("Lỗi khi đóng kết nối cơ sở dữ liệu: " + e.getMessage());
+				}
+			}
+		}
+		return res;
+	}
+
+	@Inject
+	IPricingProgramDetailService pricingProgramDetailService;
+
+	private String initInvoiceCode() {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Integer> cq = cb.createQuery(Integer.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			// cq.multiselect(cb.coalesce(cb.max(root.get("id")),0));
+			cq.multiselect(cb.coalesce(cb.max(cb.quot((Expression) root.get("invoice_code"), 1)), 0));
+			TypedQuery<Integer> query = em.createQuery(cq);
+			int max = query.getSingleResult();
+			double p = (double) max / 10000000;
+			if (p < 1) {
+				return String.format("%08d", max + 1);
+			}
+			return (max + 1) + "";
+		} catch (Exception e) {
+			logger.error("ProcessLogicInvoiceService.initReceiptNoteCode:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	private double caidatdongia(PricingProgram pricingProgram, Date ngayhoadon, long idsanpham) {
+		if (pricingProgram != null) {
+			// Tải và cài đặt chương trình đơn giá
+			boolean statusPrice = true;
+			PricingProgramDetailReqInfo t1 = new PricingProgramDetailReqInfo();
+			// Tìm cài đặt chương trình đơn giá con
+			long idPriceSub = customerPricingProgramService.selectForCustomerSub(pricingProgram.getId(), ngayhoadon,
+					idsanpham);
+			if (idPriceSub != 0) {
+				pricingProgramDetailService.findSettingPricing(idPriceSub, idsanpham, t1);
+
+				if (t1.getPricing_program_detail() != null) {
+					if (t1.getPricing_program_detail().getUnit_price() != 0) {
+						return t1.getPricing_program_detail().getUnit_price();
+					}
+				}
+			}
+			// Nếu không có ct đơn giá con -> lấy chương trình đơn giá
+			// cha
+			if (statusPrice) {
+				pricingProgramDetailService.findSettingPricing(pricingProgram.getId(), idsanpham, t1);
+				if (t1.getPricing_program_detail() != null) {
+					if (t1.getPricing_program_detail().getUnit_price() != 0) {
+						return t1.getPricing_program_detail().getUnit_price();
+					}
+				}
+			}
+		}
+		return 0.0;
+	}
+
+	private int initCodeVoucher(Invoice t) {
+		int res = -1;
+		try {
+			Date date = t.getInvoice_date();
+			int year = ToolTimeCustomer.getYearM(date);
+			int month = ToolTimeCustomer.getMonthM(date);
+			int day = ToolTimeCustomer.getDayM(date);
+
+			String voucher = day + "" + month + "" + year + "/";
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<String> cq = cb.createQuery(String.class);
+			Root<Invoice> root = cq.from(Invoice.class);
+			cq.select(root.get("voucher_code"))
+					.where(cb.equal(root.get("invoice_date"), ToolTimeCustomer.getFirstDateOfDay(date)))
+					.orderBy(cb.desc(root.get("id")));
+			TypedQuery<String> query = em.createQuery(cq);
+			List<String> list = query.setMaxResults(1).getResultList();
+
+			if (list.size() > 0) {
+				String temp = list.get(0);
+				if (temp != null) {
+					int last = temp.lastIndexOf("/");
+					String sub = temp.substring(last + 1);
+					voucher = voucher + String.format("%02d", Integer.parseInt(sub) + 1);
+					t.setVoucher_code(voucher);
+				} else {
+					t.setVoucher_code("001");
+				}
+			} else {
+				voucher = voucher + String.format("%02d", 1);
+				t.setVoucher_code(voucher);
+			}
+			res = 0;
+		} catch (Exception e) {
+			t.setVoucher_code("001");
+			e.printStackTrace();
+		}
+		return res;
+	}
+
+	public List<InvoiceTempDTO> searchInvoiceTemp(Date startDate, Date endDate) {
+	    StringBuilder sql = new StringBuilder();
+	    sql.append("SELECT ");
+	    sql.append("ive.id AS idInvoice, ");
+	    sql.append("ctum.customer_code AS customerCode, ");
+	    sql.append("ctum.customer_name AS customerName, ");
+	    sql.append("ive.order_code AS orderCode, ");
+	    sql.append("ive.order_voucher AS orderVoucher, ");
+	    sql.append("ive.invoice_temp_date AS invoiceDate, ");
+	    sql.append("ive.tax_value AS taxValue, ");
+	    sql.append("wh.code AS warehouseCode, ");
+	    sql.append("ct.code AS ieCategories, ");
+	    sql.append("ive.content_qd AS content, ");
+	    sql.append("ive.note AS note, ");
+	    sql.append("ive.tongtien AS tongtien, ");
+	    sql.append("ive.thue AS thue, ");
+	    sql.append("ive.po_no AS poNo, ");
+	    sql.append("ive.lookup_code AS lookupCode, ");
+	    sql.append("ive.delivery_date AS delivery_date, ");
+	    sql.append("ive.voucher_code AS voucher_code, ");
+	    sql.append("ive.order_lix_id AS orderId, ");
+	    sql.append("ive.exported AS exported, ");
+	    sql.append("ive.isSaved AS isSaved ");
+	    sql.append("FROM consumption.invoicetemp ive ");
+	    sql.append("LEFT JOIN Customer ctum ON ctum.id = ive.customer_id ");
+	    sql.append("LEFT JOIN warehouse wh ON wh.id = ive.warehouse_id ");
+	    sql.append("LEFT JOIN iecategories ct ON ct.id = ive.ie_categories_id ");
+	    sql.append("LEFT JOIN orderlix ord ON ord.id = ive.order_lix_id ");
+	    sql.append("WHERE invoice_temp_date BETWEEN :startDate AND :endDate ");
+	    sql.append("GROUP BY ive.id, ctum.customer_code, ctum.customer_name, ive.order_code, ive.order_voucher, ");
+	    sql.append("ive.invoice_temp_date, ive.tax_value, wh.code, ct.code, ive.content_qd, ive.note, ");
+	    sql.append("ive.tongtien, ive.thue, ive.po_no, ive.lookup_code, ive.delivery_date, ive.voucher_code, ");
+	    sql.append("ive.order_lix_id, ive.isSaved ");
+	    sql.append("ORDER BY ive.invoice_temp_date DESC, ive.id DESC");
+
+	    Query query = em.createNativeQuery(sql.toString());
+	    query.setParameter("startDate", startDate);
+	    query.setParameter("endDate", endDate);
+
+	    @SuppressWarnings("unchecked")
+	    List<Object[]> resultList = query.getResultList();
+
+	    // Chuyển đổi danh sách kết quả sang InvoiceTempDTO
+	    List<InvoiceTempDTO> results = resultList.stream().map(InvoiceTempDTO::new).collect(Collectors.toList());
+
+	    return results;
+	}
+
+	public List<InvoiceDetailTempDTO> searchInvoiceDetailTemp(long idInvoice) {
+		StringBuilder sql = new StringBuilder();
+		sql.append("SELECT ");
+		sql.append("indl.id AS invoiceDetailId, ");
+		sql.append("indl.quantity AS quantity, ");
+		sql.append("pro.product_code AS productCode, ");
+		sql.append("pro.product_name AS productName, ");
+		sql.append("pro.box_quantity AS boxQuantity, ");
+		sql.append("pro.specification AS specification, ");
+		sql.append("indl.productdh_code AS productDHCode, ");
+		sql.append("indl.unit_price AS unit_price, ");
+		sql.append("indl.real_quantity AS realQuantityDVT, ");
+		sql.append("indl.invoicetemp_id AS invoiceTempId,  ");
+		sql.append("indl.real_quantity_box AS realQuantity ");
+		sql.append("FROM consumption.invoicetemp ive ");
+		sql.append("LEFT JOIN invoicedetailtemp indl ON ive.id = indl.invoicetemp_id ");
+		sql.append("LEFT JOIN product pro ON pro.id = indl.product_id ");
+		sql.append("WHERE ive.id = :idInvoice ");
+		sql.append("ORDER BY ive.id DESC");
+
+		Query query = em.createNativeQuery(sql.toString());
+		query.setParameter("idInvoice", idInvoice);
+
+		@SuppressWarnings("unchecked")
+		List<Object[]> resultList = query.getResultList();
+
+		// Chuyển đổi danh sách kết quả sang InvoiceTempDTO
+		List<InvoiceDetailTempDTO> results = resultList.stream().map(InvoiceDetailTempDTO::new)
+				.collect(Collectors.toList());
+
+		return results;
+	}
+	
+	
+}

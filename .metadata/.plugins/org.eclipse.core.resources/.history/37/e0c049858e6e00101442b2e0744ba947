@@ -1,0 +1,141 @@
+package vinh.lixco.com.apiecommerce;
+
+import java.io.*;
+import java.net.*;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class ShopeeTokenManager {
+    private static final long PARTNER_ID = 2012115L;
+    private static final String PARTNER_KEY = "shpk76694e444a51764f786775544b7a64446577784f7652476b72556b485163";
+    private static final long SHOP_ID = 779607831L;
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    private String accessToken;
+    private String refreshToken = ""; // lấy 1 lần ban đầu từ auth
+    private long tokenExpiryTime;
+
+    private static ShopeeTokenManager instance = new ShopeeTokenManager();
+
+    private ShopeeTokenManager() {
+        refreshToken(); // lấy token ban đầu
+    }
+
+    public static ShopeeTokenManager getInstance() {
+        return instance;
+    }
+
+    public synchronized String getAccessToken() {
+        long now = System.currentTimeMillis() / 1000L;
+        if (accessToken == null || now >= tokenExpiryTime) {
+            refreshToken();
+        }
+        return accessToken;
+    }
+
+    private void refreshToken() {
+        try {
+            long timestamp = System.currentTimeMillis() / 1000L;
+            String path = "/api/v2/auth/access_token/get";
+            String baseString = PARTNER_ID + path + timestamp;
+            String sign = generateHmacSHA256(baseString, PARTNER_KEY);
+
+            String urlStr = "https://partner.shopeemobile.com" + path
+                    + "?partner_id=" + PARTNER_ID + "&timestamp=" + timestamp + "&sign=" + sign;
+
+            Map<String, Object> payloadMap = new HashMap<>();
+            payloadMap.put("refresh_token", this.refreshToken);
+            payloadMap.put("partner_id", PARTNER_ID);
+            payloadMap.put("shop_id", SHOP_ID);
+            String payload = mapper.writeValueAsString(payloadMap);
+
+            HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(payload.getBytes(StandardCharsets.UTF_8));
+            }
+
+            StringBuilder responseBuilder = new StringBuilder();
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                String line;
+                while ((line = in.readLine()) != null) responseBuilder.append(line);
+            }
+
+            JsonNode json = mapper.readTree(responseBuilder.toString());
+            this.accessToken = json.path("access_token").asText();
+            this.refreshToken = json.path("refresh_token").asText();
+            long expireIn = json.path("expire_in").asLong();
+            this.tokenExpiryTime = timestamp + expireIn - 60; // refresh trước 60s
+
+            System.out.println("Shopee Access Token updated: " + accessToken);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to refresh Shopee token", e);
+        }
+    }
+
+    private String generateHmacSHA256(String data, String key) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        mac.init(secretKey);
+        byte[] hashBytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder();
+        for (byte b : hashBytes) sb.append(String.format("%02x", b));
+        return sb.toString();
+    }
+    public void fetchInitialToken(String code, long shopId) {
+        try {
+            long timestamp = System.currentTimeMillis() / 1000L;
+            String path = "/api/v2/auth/token/get";
+            String baseString = PARTNER_ID + path + timestamp;
+            String sign = generateHmacSHA256(baseString, PARTNER_KEY);
+
+            String urlStr = "https://partner.shopeemobile.com" + path
+                    + "?partner_id=" + PARTNER_ID + "&timestamp=" + timestamp + "&sign=" + sign;
+
+            Map<String, Object> payloadMap = new HashMap<>();
+            payloadMap.put("code", code);
+            payloadMap.put("shop_id", shopId);
+            payloadMap.put("partner_id", PARTNER_ID);
+            String payload = mapper.writeValueAsString(payloadMap);
+
+            HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(payload.getBytes(StandardCharsets.UTF_8));
+            }
+
+            StringBuilder responseBuilder = new StringBuilder();
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                String line;
+                while ((line = in.readLine()) != null) responseBuilder.append(line);
+            }
+
+            JsonNode json = mapper.readTree(responseBuilder.toString());
+            this.accessToken = json.path("access_token").asText();
+            this.refreshToken = json.path("refresh_token").asText();
+            long expireIn = json.path("expire_in").asLong();
+            this.tokenExpiryTime = timestamp + expireIn - 60;
+
+            System.out.println("Initial token fetched.");
+            System.out.println("AccessToken: " + this.accessToken);
+            System.out.println("RefreshToken: " + this.refreshToken);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch initial Shopee token", e);
+        }
+    }
+
+}

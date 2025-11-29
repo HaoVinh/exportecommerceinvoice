@@ -1,0 +1,690 @@
+package vinh.lixco.com.apiecommerce;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import lixco.com.entity.Customer;
+import lixco.com.entity.CustomerPricingProgram;
+import lixco.com.entity.EcomOrder;
+import lixco.com.entity.EcomOrderDetail;
+import lixco.com.entity.PricingProgram;
+import lixco.com.entity.PricingProgramDetail;
+import lixco.com.entity.Product;
+import lixco.com.interfaces.ICustomerPricingProgramService;
+import lixco.com.interfaces.ICustomerService;
+import lixco.com.interfaces.IPricingProgramDetailService;
+import lixco.com.interfaces.IPricingProgramService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.service.EcomOrderDetailService;
+import lixco.com.service.EcomOrderService;
+
+@Path("shopee")
+
+public class ShopeeAPIServlet {
+
+	private static final long PARTNER_ID = 2012115L;
+	private static final String API_PARTNER_KEY = "shpk76694e444a51764f786775544b7a64446577784f7652476b72556b485163";
+	private static final long SHOP_ID = 779607831L;
+	private static final Logger LOGGER = Logger.getLogger(ShopeeAPIServlet.class.getName());
+	private static final ObjectMapper mapper = new ObjectMapper();
+	private static final String BASE_URL = "https://partner.shopeemobile.com";
+
+	@Inject
+	private EcomOrderService ecomOrderService;
+
+	@Inject
+	private ShopeeTokenManager shopeeTokenManager;
+
+	@Inject
+	private EcomOrderDetailService ecomOrderDetailService;
+
+	@POST
+	@Path("/webhook/order")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response webhookShopee(@Context HttpHeaders headers, String inputJson) {
+		LOGGER.info("Webhook Shopee: " + inputJson);
+		try {
+			JsonNode jsonNode = mapper.readTree(inputJson);
+			JsonNode dataNode = jsonNode.path("data");
+
+			if (dataNode.has("verify_info")) {
+				ObjectNode verifyResp = mapper.createObjectNode();
+				verifyResp.put("code", 0);
+				verifyResp.put("message", "Verified OK");
+				return Response.ok(verifyResp).build();
+			}
+
+			String orderSn = dataNode.path("ordersn").asText(null);
+			String status = dataNode.path("status").asText(null);
+			long updateTime = dataNode.path("update_time").asLong(0);
+
+			if (orderSn == null || orderSn.trim().isEmpty() || status == null || status.trim().isEmpty()) {
+				throw new IllegalArgumentException("Missing or invalid ordersn or status in Shopee webhook");
+			}
+			OrderDTO orderDTO = new OrderDTO();
+			orderDTO.setOrderId(orderSn);
+			orderDTO.setOrder_status(status);
+			orderDTO.setUpdatedAt(updateTime > 0 ? new Date(updateTime * 1000) : new Date());
+			orderDTO.seteCommerceType("Shopee");
+
+			try {
+				OrderDTO fetchedDTO = fetchOrder(orderSn);
+				if (fetchedDTO != null) {
+					String webhookStatus = status;
+					Date webhookUpdateTime = updateTime > 0 ? new Date(updateTime * 1000) : new Date();
+
+					// copy dữ liệu cần từ API sang orderDTO
+					orderDTO = fetchedDTO;
+					orderDTO.setOrder_status(webhookStatus); // luôn dùng trạng thái từ webhook
+					orderDTO.setUpdatedAt(webhookUpdateTime);
+				}
+				fetchEscrowDetails(orderDTO);
+			} catch (Exception e) {
+				LOGGER.warning("Failed to fetch order or escrow details for orderSn: " + orderSn + ", error: "
+						+ e.getMessage());
+			}
+
+			saveOrUpdateOrder(orderDTO);
+
+			ObjectNode successResp = mapper.createObjectNode();
+			successResp.put("status", "success");
+			successResp.put("message", "Shopee webhook processed successfully");
+			successResp.put("ordersn", orderSn);
+			successResp.put("order_status", status);
+			return Response.ok(successResp).build();
+
+		} catch (Exception e) {
+			LOGGER.severe("Webhook Shopee error: " + e.getMessage());
+			ObjectNode err = mapper.createObjectNode();
+			err.put("error", e.getMessage());
+			return Response.status(500).entity(err).build();
+		}
+	}
+
+	public OrderDTO fetchOrder(String orderSn) throws Exception {
+		if (orderSn == null || orderSn.trim().isEmpty()) {
+			throw new IllegalArgumentException("orderSn cannot be null or empty");
+		}
+
+		String accessToken = shopeeTokenManager.getAccessToken();
+		long timestamp = System.currentTimeMillis() / 1000L;
+		String path = "/api/v2/order/get_order_detail";
+		String baseString = PARTNER_ID + path + timestamp + accessToken + SHOP_ID;
+		String sign = generateHmacSHA256(baseString, API_PARTNER_KEY);
+
+		String url = BASE_URL + path + "?partner_id=" + PARTNER_ID + "&timestamp=" + timestamp + "&access_token="
+				+ accessToken + "&shop_id=" + SHOP_ID + "&sign=" + sign + "&order_sn_list=" + orderSn
+				+ "&response_optional_fields=buyer_user_id,buyer_username,recipient_address,item_list,order_status,create_time,update_time,total_amount,payment_method,shipping_carrier";
+
+		int maxRetries = 5;
+		long delayMillis = 5000;
+		IOException lastException = null;
+
+		for (int attempt = 1; attempt <= maxRetries; attempt++) {
+			HttpURLConnection conn = null;
+			try {
+				conn = (HttpURLConnection) new URL(url).openConnection();
+				conn.setRequestMethod("GET");
+				conn.setConnectTimeout(30000);
+				conn.setReadTimeout(10000);
+				conn.setRequestProperty("Accept", "application/json");
+
+				int responseCode = conn.getResponseCode();
+				InputStream inputStream = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
+
+				StringBuilder responseBuilder = new StringBuilder();
+				try (BufferedReader in = new BufferedReader(new InputStreamReader(inputStream))) {
+					String line;
+					while ((line = in.readLine()) != null) {
+						responseBuilder.append(line);
+					}
+				}
+
+				String jsonResponse = responseBuilder.toString();
+				LOGGER.info("API Response for orderSn " + orderSn + ": " + jsonResponse);
+
+				if (responseCode != 200) {
+					throw new IOException("HTTP error code: " + responseCode + ", Response: " + jsonResponse);
+				}
+
+				JsonNode root = mapper.readTree(jsonResponse);
+				JsonNode orderList = root.path("response").path("order_list");
+
+				if (orderList.isArray() && orderList.size() > 0) {
+					JsonNode orderData = orderList.get(0);
+					String responseOrderSn = orderData.path("order_sn").asText(null);
+					LOGGER.info("Response order_sn: " + responseOrderSn);
+					if (responseOrderSn == null || responseOrderSn.isEmpty()) {
+						throw new RuntimeException("Order SN missing in response for order_sn: " + orderSn);
+					}
+					if (!orderSn.equals(responseOrderSn)) {
+						throw new RuntimeException("Order SN from response (" + responseOrderSn
+								+ ") does not match requested order SN (" + orderSn + ")");
+					}
+					return parseOrderDTO(orderData, orderSn);
+				} else {
+					throw new RuntimeException("Không có đơn hàng nào trả về từ Shopee cho order_sn: " + orderSn);
+				}
+
+			} catch (IOException ex) {
+				lastException = ex;
+//                LOGGER.warning("Attempt " + attempt + " failed for orderSn " + orderSn + ": " + ex.getMessage());
+				Thread.sleep(delayMillis);
+			} finally {
+				if (conn != null) {
+					conn.disconnect();
+				}
+			}
+		}
+
+		throw new IOException("Failed to fetch order details after " + maxRetries + " attempts.", lastException);
+	}
+
+	private void fetchEscrowDetails(OrderDTO dto) throws Exception {
+		if (dto == null || dto.getOrderId() == null) {
+			throw new IllegalArgumentException("OrderDTO or orderId cannot be null");
+		}
+
+		String orderSn = dto.getOrderId();
+		String accessToken = shopeeTokenManager.getAccessToken();
+		long timestamp = System.currentTimeMillis() / 1000L;
+		String path = "/api/v2/payment/get_escrow_detail";
+		String baseString = PARTNER_ID + path + timestamp + accessToken + SHOP_ID;
+		String sign = generateHmacSHA256(baseString, API_PARTNER_KEY);
+
+		String url = BASE_URL + path + "?partner_id=" + PARTNER_ID + "&timestamp=" + timestamp + "&access_token="
+				+ accessToken + "&shop_id=" + SHOP_ID + "&sign=" + sign + "&order_sn=" + orderSn;
+
+		System.out.println(url);
+
+		int maxRetries = 5;
+		long delayMillis = 5000;
+		IOException lastException = null;
+
+		for (int attempt = 1; attempt <= maxRetries; attempt++) {
+			HttpURLConnection conn = null;
+			try {
+				conn = (HttpURLConnection) new URL(url).openConnection();
+				conn.setRequestMethod("GET");
+				conn.setConnectTimeout(30000);
+				conn.setReadTimeout(10000);
+				conn.setRequestProperty("Accept", "application/json");
+
+				int responseCode = conn.getResponseCode();
+				InputStream inputStream = (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream();
+
+				StringBuilder responseBuilder = new StringBuilder();
+				try (BufferedReader in = new BufferedReader(new InputStreamReader(inputStream))) {
+					String line;
+					while ((line = in.readLine()) != null) {
+						responseBuilder.append(line);
+					}
+				}
+
+				String jsonResponse = responseBuilder.toString();
+//                LOGGER.info("Escrow API Response for orderSn " + orderSn + ": " + jsonResponse);
+
+				if (responseCode != 200) {
+					throw new IOException("HTTP error code: " + responseCode + ", Response: " + jsonResponse);
+				}
+
+				JsonNode root = mapper.readTree(jsonResponse);
+				JsonNode orderIncome = root.path("response").path("order_income");
+				JsonNode items = orderIncome.path("items");
+
+				if (items.isArray() && items.size() > 0) {
+					double totalShopeeDiscount = 0.0;
+					double totalSellerDiscount = 0.0;
+					double totalComboDiscount = 0.0;
+					double discountPrice = 0.0;
+
+					for (JsonNode item : items) {
+						totalShopeeDiscount += item.path("shopee_discount").asDouble(0.0);
+						totalSellerDiscount += item.path("discount_from_voucher_seller").asDouble(0.0);
+						totalComboDiscount += (item.path("selling_price").asDouble(0.0)
+								- item.path("discounted_price").asDouble(0.0));
+						discountPrice += item.path("discounted_price").asDouble(0.0);
+					}
+
+					dto.setShopeeDiscount(totalShopeeDiscount);
+					dto.setSellerDiscount(totalSellerDiscount);
+					dto.setComboDiscount(totalComboDiscount);
+					dto.setDiscountedPrice(discountPrice);
+
+					double lastPrice = (discountPrice + totalShopeeDiscount - totalSellerDiscount - totalComboDiscount)
+							/ (1.1);
+					dto.setLastPrice(lastPrice);
+
+//                    LOGGER.info("Escrow details parsed for orderSn: " + orderSn + ", Shopee discount: "
+//                            + totalShopeeDiscount + ", Seller discount: " + totalSellerDiscount + ", Combo discount: "
+//                            + totalComboDiscount + ", Last price: " + lastPrice);
+
+				} else {
+					LOGGER.warning("No items found in escrow details for orderSn: " + orderSn);
+					dto.setShopeeDiscount(0.0);
+					dto.setSellerDiscount(0.0);
+					dto.setComboDiscount(0.0);
+					dto.setLastPrice(dto.getPrice() != null ? dto.getPrice() : 0.0);
+				}
+
+				return;
+
+			} catch (IOException ex) {
+				lastException = ex;
+				LOGGER.warning("Attempt " + attempt + " failed for escrow details of orderSn " + orderSn + ": "
+						+ ex.getMessage());
+				Thread.sleep(delayMillis);
+			} finally {
+				if (conn != null) {
+					conn.disconnect();
+				}
+			}
+		}
+
+		if (lastException != null) {
+			throw new IOException("Failed to fetch escrow details after " + maxRetries + " attempts.", lastException);
+		}
+	}
+
+	private OrderDTO parseOrderDTO(JsonNode data, String orderSn) throws Exception {
+		OrderDTO dto = new OrderDTO();
+		dto.setOrderId(orderSn);
+		LOGGER.info("Setting orderId in OrderDTO: " + orderSn);
+
+		dto.setOrder_status(data.path("order_status").asText());
+		dto.setCreatedAt(new Date(data.path("create_time").asLong(0) * 1000));
+		dto.setUpdatedAt(new Date(data.path("update_time").asLong(0) * 1000));
+		dto.setPrice(data.path("total_amount").asDouble(0.0));
+
+		dto.setCustomerFirstName(data.path("recipient_address").path("name").asText(""));
+		dto.setCustomerLastName("");
+		dto.seteCommerceType("Shopee");
+
+		// Bước 1: Parse dữ liệu gốc từ Shopee (KHÔNG phân bổ lastItemPrice)
+		List<OrderDetailDTO> originalDetails = new ArrayList<>();
+		JsonNode itemList = data.path("item_list");
+		int index = 1;
+
+		for (JsonNode item : itemList) {
+			OrderDetailDTO detail = new OrderDetailDTO();
+			detail.setOrderItemId(item.path("order_item_id").asText(""));
+			String itemName = item.path("item_name").asText("");
+			String modelName = item.path("model_name").asText("");
+			if (!modelName.isEmpty()) {
+				itemName += " (" + modelName + ")";
+			}
+			detail.setName(itemName);
+			String sku = item.path("model_sku").asText();
+			if (sku == null || sku.trim().isEmpty()) {
+				sku = item.path("item_sku").asText("");
+			}
+			detail.setSku(sku);
+			detail.setItemPrice(item.path("model_discounted_price").asDouble(0.0)); // Giá từ Shopee
+			detail.setStt(index++);
+			detail.setQuantity(item.path("model_quantity_purchased").asInt(0));
+			detail.setOrderId(orderSn);
+			boolean isVariant = !item.path("main_item").asBoolean(true) && !item.path("model_sku").asText("").isEmpty();
+			detail.setVariant(isVariant);
+			detail.setLoaitmdt("Shopee");
+			// KHÔNG set lastItemPrice và unitPrice ở đây
+			originalDetails.add(detail);
+		}
+
+		// Bước 2: Lấy lastPrice từ escrow
+		dto.setOrderDetails(originalDetails);
+		fetchEscrowDetails(dto);
+		double totalLastPrice = dto.getLastPrice() != null ? dto.getLastPrice() : 0.0;
+
+		// Bước 3: Tách SKU và tìm itemPrice từ pricing program
+		List<OrderDetailDTO> allSplitDetails = new ArrayList<>();
+		for (OrderDetailDTO detail : originalDetails) {
+			List<OrderDetailDTO> splitDetails = splitSku(detail);
+			allSplitDetails.addAll(splitDetails);
+		}
+
+		// Bước 4: Phân bổ lastPrice dựa trên itemPrice thực tế từ pricing program
+		if (!allSplitDetails.isEmpty() && totalLastPrice > 0) {
+			List<OrderDetailDTO> validDetails = allSplitDetails.stream().filter(detail -> detail.getItemPrice() > 0)
+					.collect(Collectors.toList());
+
+			if (!validDetails.isEmpty()) {
+				// Sử dụng hàm calculateAllocationRatios để phân bổ có trọng số
+				double[] itemPricesArray = validDetails.stream().mapToDouble(OrderDetailDTO::getItemPrice).toArray();
+				double[] ratios = calculateAllocationRatios(itemPricesArray);
+
+				// Phân bổ lastPrice theo tỷ lệ đã tính
+				for (int i = 0; i < validDetails.size(); i++) {
+					OrderDetailDTO detail = validDetails.get(i);
+					double allocatedPrice = ratios[i] * totalLastPrice;
+					detail.setLastItemPrice(allocatedPrice);
+				}
+
+				// Gán lastItemPrice = 0 cho các sản phẩm có itemPrice = 0
+				for (OrderDetailDTO detail : allSplitDetails) {
+					if (detail.getItemPrice() <= 0) {
+						detail.setLastItemPrice(0.0);
+					}
+				}
+
+				// Tính unitPrice = lastItemPrice / quantity
+				for (OrderDetailDTO detail : allSplitDetails) {
+					if (detail.getQuantity() > 0) {
+						detail.setUnitPrice(detail.getLastItemPrice() / detail.getQuantity());
+					} else {
+						detail.setUnitPrice(0.0);
+					}
+				}
+			}
+		}
+
+		dto.setOrderDetails(allSplitDetails);
+		return dto;
+	}
+
+	public void saveOrUpdateOrder(OrderDTO dto) {
+		String orderNumber = dto.getOrderId();
+		String platform = dto.geteCommerceType(); // Luôn là "Shopee"
+
+		// Tìm theo orderNumber và loaitmdt để tránh nhầm sàn
+		EcomOrder existing = ecomOrderService.findByCodeAndPlatform(orderNumber, platform);
+		EcomOrder order;
+
+		if (existing == null) {
+			order = new EcomOrder();
+			order.setOrderNumber(orderNumber);
+			order.setCustomerFirstName(dto.getCustomerFirstName());
+			order.setCustomerLastName(dto.getCustomerLastName());
+			order.setCreatedAt(dto.getCreatedAt());
+			order.setLoaitmdt(platform);
+		} else {
+			order = existing;
+		}
+
+		order.setUpdatedAt(dto.getUpdatedAt());
+		order.setPrice(dto.getPrice());
+		order.setStatus(dto.getOrder_status());
+		order.setThoigiancapnhat(new Date());
+		order.setComboDiscount(dto.getComboDiscount());
+		order.setShopeeDiscount(dto.getShopeeDiscount());
+		order.setSellerDiscount(dto.getSellerDiscount());
+		order.setDiscountedPrice(dto.getDiscountedPrice());
+		order.setLastPrice(dto.getLastPrice()); // Giữ nguyên lastPrice từ fetchEscrowDetails
+
+		if (existing == null) {
+			ecomOrderService.create(order);
+			LOGGER.info("Saved new Shopee order: " + orderNumber);
+		} else {
+			ecomOrderService.update(order);
+			LOGGER.info("Updated Shopee order: " + orderNumber);
+		}
+
+		// Xóa các chi tiết cũ
+		List<EcomOrderDetail> oldDetails = ecomOrderDetailService.findByCodeAndPlatform(orderNumber, platform);
+		for (EcomOrderDetail old : oldDetails) {
+			ecomOrderDetailService.delete(old);
+		}
+
+		// Lưu chi tiết đã được tách và phân bổ giá
+		for (OrderDetailDTO splitDetail : dto.getOrderDetails()) {
+			EcomOrderDetail orddetail = new EcomOrderDetail();
+			orddetail.setOrder(order);
+			orddetail.setOrderItemNumber(splitDetail.getOrderItemId());
+			orddetail.setName(splitDetail.getName());
+			orddetail.setSku(splitDetail.getSku());
+			orddetail.setLoaitmdt(platform);
+			orddetail.setVariant(splitDetail.isVariant());
+			orddetail.setQuantity(splitDetail.getQuantity());
+			orddetail.setItemPrice(splitDetail.getItemPrice()); // Giá từ pricing program
+			orddetail.setSplitPrice(splitDetail.getLastItemPrice()); // Giá đã phân bổ
+			orddetail.setUnitPrice(splitDetail.getUnitPrice()); // Đơn giá
+			orddetail.setOrderId(orderNumber);
+			ecomOrderDetailService.create(orddetail);
+
+			LOGGER.info("Saved detail: sku=" + splitDetail.getSku() + ", itemPrice=" + splitDetail.getItemPrice()
+					+ ", lastItemPrice=" + splitDetail.getLastItemPrice() + ", unitPrice=" + splitDetail.getUnitPrice()
+					+ ", quantity=" + splitDetail.getQuantity());
+		}
+	}
+
+	@Inject
+	private ICustomerPricingProgramService customerPricingProgramService;
+
+	@Inject
+	private IProductService productService;
+
+	@Inject
+	private IPricingProgramService priceProgramService;
+
+	@Inject
+	private ICustomerService customerService;
+
+	@Inject
+	private IPricingProgramDetailService pricingProgramDetailService;
+
+	private List<OrderDetailDTO> splitSku(OrderDetailDTO detail) {
+        if (customerService == null) {
+            LOGGER.severe("customerService is null, injection failed");
+            List<OrderDetailDTO> result = new ArrayList<>();
+            result.add(detail);
+            return result;
+        }
+
+        Customer customer = null;
+        try {
+            customer = customerService.selectByCode("CO648");
+        } catch (Exception e) {
+            LOGGER.warning("Error fetching customer CO648: " + e.getMessage());
+            List<OrderDetailDTO> result = new ArrayList<>();
+            result.add(detail);
+            return result;
+        }
+        if (customer == null) {
+            LOGGER.warning("Không thấy mã KH CO648");
+            List<OrderDetailDTO> result = new ArrayList<>();
+            result.add(detail);
+            return result;
+        }
+
+        PricingProgram pricingProgram = priceProgramService.findByCode("DG027968");
+        if (pricingProgram == null) {
+            LOGGER.warning("Pricing program DG027968 not found");
+            List<OrderDetailDTO> result = new ArrayList<>();
+            result.add(detail);
+            return result;
+        }
+
+        List<PricingProgramDetail> pricingProgramDetails = pricingProgramDetailService
+                .findAllByPricingProgram(pricingProgram.getId());
+
+        List<OrderDetailDTO> result = new ArrayList<>();
+        String skuString = detail.getSku();
+
+        if (skuString == null || skuString.trim().isEmpty()) {
+            result.add(detail);
+            return result;
+        }
+
+        skuString = skuString.trim();
+        int originalQuantity = detail.getQuantity();
+
+        Pattern pattern = Pattern.compile("^(\\d+)C\\s*-\\s*(.+)$");
+        Matcher matcher = pattern.matcher(skuString);
+
+        if (matcher.matches()) {
+            int prefixNumber = Integer.parseInt(matcher.group(1));
+            String remainingSku = matcher.group(2).trim();
+            String[] skuParts = remainingSku.split("\\s*\\+\\s*");
+
+            if (skuParts.length == 1) {
+                OrderDetailDTO newDetail = createDetailWithPricing(detail, skuParts[0].trim(), detail.getName(),
+                        prefixNumber, pricingProgramDetails);
+                result.add(newDetail);
+            } else if (skuParts.length == 2) {
+                String originalName = detail.getName();
+                int tặngIndex = originalName.toLowerCase().indexOf("tặng");
+                String nameA = tặngIndex != -1 ? originalName.substring(0, tặngIndex).trim() : originalName;
+                String nameB = tặngIndex != -1 ? originalName.substring(tặngIndex + "tặng".length()).trim() : originalName;
+
+                OrderDetailDTO detailA = createDetailWithPricing(detail, skuParts[0].trim(), nameA,
+                        prefixNumber == 3 ? 3 : 2, pricingProgramDetails);
+                OrderDetailDTO detailB = createDetailWithPricing(detail, skuParts[1].trim(), nameB, 1,
+                        pricingProgramDetails);
+
+                result.add(detailA);
+                result.add(detailB);
+            }
+        } else {
+            String[] skuParts = skuString.split("\\s*\\+\\s*");
+            if (skuParts.length > 1) {
+                for (String part : skuParts) {
+                    if (!part.trim().isEmpty()) {
+                        OrderDetailDTO newDetail = createDetailWithPricing(detail, part.trim(), detail.getName(), 1,
+                                pricingProgramDetails);
+                        result.add(newDetail);
+                    }
+                }
+            } else {
+                OrderDetailDTO newDetail = createDetailWithPricing(detail, skuString, detail.getName(),
+                        originalQuantity, pricingProgramDetails);
+                result.add(newDetail);
+            }
+        }
+
+        return result;
+    }
+	private OrderDetailDTO createDetailWithPricing(OrderDetailDTO originalDetail, String sku, String name, int quantity,
+			List<PricingProgramDetail> pricingDetails) {
+
+		OrderDetailDTO newDetail = new OrderDetailDTO();
+		newDetail.setOrderItemId(originalDetail.getOrderItemId());
+		newDetail.setName(name);
+		newDetail.setSku(sku);
+		newDetail.setStt(originalDetail.getStt());
+		newDetail.setQuantity(quantity);
+		newDetail.setOrderId(originalDetail.getOrderId());
+		newDetail.setVariant(originalDetail.isVariant());
+		newDetail.setLoaitmdt(originalDetail.getLoaitmdt());
+
+		// Tìm itemPrice từ pricing program
+		double itemPrice = findItemPriceForSku(sku, pricingDetails);
+		newDetail.setItemPrice(itemPrice);
+
+		// lastItemPrice và unitPrice sẽ được set sau trong parseOrderDTO
+		newDetail.setLastItemPrice(0.0);
+		newDetail.setUnitPrice(0.0);
+
+		LOGGER.info("Created detail: sku=" + sku + ", itemPrice=" + itemPrice + ", quantity=" + quantity);
+		return newDetail;
+	}
+
+	private double findItemPriceForSku(String sku, List<PricingProgramDetail> pricingDetails) {
+		Product product = productService.selectByCode(sku);
+		if (product == null || product.getProduct_code() == null) {
+			LOGGER.warning("Product not found for SKU: " + sku);
+			return 0.0;
+		}
+
+		return pricingDetails.stream().filter(item -> item.getProduct() != null)
+				.filter(item -> product.getProduct_code().equals(item.getProduct().getProduct_code()))
+				.mapToDouble(item -> item.getUnit_price()).findFirst().orElse(0.0);
+	}
+
+	/**
+	 * Tính toán tỷ lệ phân bổ dựa trên đơn giá với trọng số ưu tiên cho giá cao hơn
+	 * 
+	 * @param itemPrices Danh sách đơn giá các SKU
+	 * @return Mảng tỷ lệ phân bổ tương ứng
+	 */
+	private double[] calculateAllocationRatios(double[] itemPrices) {
+		double totalPrice = Arrays.stream(itemPrices).sum();
+		double[] ratios = new double[itemPrices.length];
+
+		if (totalPrice <= 0) {
+			// Nếu tất cả đơn giá = 0, chia đều
+			Arrays.fill(ratios, 1.0 / itemPrices.length);
+			return ratios;
+		}
+
+		// Tìm giá cao nhất để làm chuẩn
+		double maxPrice = Arrays.stream(itemPrices).max().orElse(1.0);
+
+		// Tính tỷ lệ cơ bản và áp dụng trọng số
+		double totalWeightedRatio = 0.0;
+		for (int i = 0; i < itemPrices.length; i++) {
+			double baseRatio = itemPrices[i] / totalPrice;
+			// Tăng trọng số cho SKU có giá cao (hệ số 0.4 để tăng tối đa 40%)
+			double weightFactor = 0.4 * (itemPrices[i] / maxPrice);
+			ratios[i] = baseRatio + (baseRatio * weightFactor);
+			totalWeightedRatio += ratios[i];
+		}
+
+		// Chuẩn hóa để tổng = 1.0
+		for (int i = 0; i < ratios.length; i++) {
+			ratios[i] = ratios[i] / totalWeightedRatio;
+			// Đảm bảo không vượt quá 80% cho bất kỳ SKU nào
+			ratios[i] = Math.min(0.8, ratios[i]);
+		}
+
+		// Điều chỉnh lại để tổng = 1.0 sau khi giới hạn 80%
+		double actualTotal = Arrays.stream(ratios).sum();
+		if (actualTotal > 0) {
+			for (int i = 0; i < ratios.length; i++) {
+				ratios[i] = ratios[i] / actualTotal;
+			}
+		}
+
+		return ratios;
+	}
+
+	private String generateHmacSHA256(String data, String key) throws Exception {
+		Mac mac = Mac.getInstance("HmacSHA256");
+		SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+		mac.init(secretKey);
+		byte[] hashBytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+		StringBuilder sb = new StringBuilder();
+		for (byte b : hashBytes) {
+			sb.append(String.format("%02x", b));
+		}
+		return sb.toString();
+	}
+
+	private static ShopeeAPIServlet instance = new ShopeeAPIServlet();
+
+	public static ShopeeAPIServlet getInstance() {
+		return instance;
+	}
+
+	public void setShopeeTokenManager(ShopeeTokenManager manager) {
+		this.shopeeTokenManager = manager;
+	}
+}

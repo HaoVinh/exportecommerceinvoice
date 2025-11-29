@@ -1,0 +1,44 @@
+package trong.lixco.com.info;
+
+import java.util.Date;
+
+import trong.lixco.com.util.MyUtil;
+import lombok.Data;
+@Data
+public class DuLieuHoaDonOnline2 {
+	Date ngay;;
+	String madonhang;
+	String masp;
+	double soluong;
+	String makh;
+	
+	//bo sung thuoc tinh cho nap hoa don mau 2
+	String maxuatnhap;
+	String manvvc;
+	String soxe;
+	String htthanhtoan;
+	
+	String sophieuvanchuyen;
+	String noiden;
+	String malohang;
+	public DuLieuHoaDonOnline2(Date ngay, String madonhang, String masp, double soluong, String makh,
+			String maxuatnhap, String manvvc, String soxe, String htthanhtoan,String sophieuvanchuyen,
+	String noiden, String malohang) {
+		super();
+		this.ngay = ngay;
+		this.madonhang = madonhang;
+		this.masp = masp;
+		this.soluong = soluong;
+		this.makh = makh;
+		this.maxuatnhap = maxuatnhap;
+		this.manvvc = manvvc;
+		this.soxe = soxe;
+		this.htthanhtoan = htthanhtoan;
+		this.sophieuvanchuyen=sophieuvanchuyen;
+		this.noiden=noiden;
+		this.malohang=malohang;
+	}
+	
+	
+
+}

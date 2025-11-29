@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+	xmlns:h="http://java.sun.com/jsf/html">
+	<div class="col-md-12"
+		style="padding-left: 0px !important; padding-right: 0px !important; background-color: #eeeeee;">
+		<div class="row"
+			style="margin-top: 5px; margin-bottom: 25px; margin-left: 16px !important; margin-right: 16px !important;">
+			<div class="col-md-12"
+				style="padding-left: 0px !important; padding-right: 0px !important;">
+				<div class="row">
+					<div class="col-md-3"
+						style="padding-left: 0px !important; padding-right: 5px !important;">
+						<div class="col-md-6"
+							style="padding-left: 0px !important; padding-right: 0px !important;">
+							<label style="display:block">Tháng</label>
+							<p:spinner style="width:90%;"
+								value="#{reportHangChamLuanChuyenBean.monthSearch}" min="1"
+								max="12" />
+						</div>
+						<div class="col-md-6"
+							style="padding-left: 0px !important; padding-right: 0px !important;">
+							<label style="display:block">Năm</label>
+							<p:spinner style="width:90%;" thousandSeparator=""
+								value="#{reportHangChamLuanChuyenBean.yearSearch}" min="1990" />
+						</div>
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 5px !important;">
+						<label>Loại sản phẩm</label>
+						<p:selectOneMenu
+							value="#{reportHangChamLuanChuyenBean.productTypeSearch}"
+							converter="abstractConverter" effect="fade" var="t"
+							style="width:100%;" filter="true" filterMatchMode="custom"
+							filterFunction="customFilter2">
+							<f:selectItem itemLabel="Tất cả" itemValue="#{null}" />
+							<f:selectItems
+								value="#{reportHangChamLuanChuyenBean.listProductType}"
+								var="theme" itemLabel="#{theme.code}-#{theme.name}"
+								itemValue="#{theme}" />
+							<p:column>
+								<h:outputText value="#{t.code}" />
+							</p:column>
+							<p:column>
+								<h:outputText value="#{t==null ? 'Tất cả' : t.name}" />
+							</p:column>
+						</p:selectOneMenu>
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 0px !important;">
+						<label>Sản phẩm</label>
+						<div class="nhapdlg">
+							<span class="fa fa-search"></span>
+							<p:autoComplete style="width:100%;" placeholder="Tìm sản phẩm"
+								title="#{reportHangChamLuanChuyenBean.productSearch.product_name}"
+								value="#{reportHangChamLuanChuyenBean.productSearch}"
+								queryDelay="900" converter="abstractConverter"
+								minQueryLength="2" maxResults="150"
+								completeMethod="#{reportHangChamLuanChuyenBean.completeProduct}"
+								var="p" itemLabel="#{p.product_name}" itemValue="#{p}"
+								forceSelection="true" onclick="this.select();">
+								<p:column style="width:50px">
+									<h:outputText value="#{p.product_code}" />
+								</p:column>
+								<p:column style="width:150px">
+									<h:outputText value="#{p.product_name}" />
+								</p:column>
+							</p:autoComplete>
+						</div>
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 0px !important;">
+						<br />
+						<div class="selectxknd"
+							style="border: 1px solid #009a8b; padding-top: 5px; padding-bottom: 4px; text-align: center; height: 31px; padding-left: 20px;">
+							<p:selectOneRadio value="#{reportHangChamLuanChuyenBean.typep}"
+								converter="integerConverter" layout="grid" columns="3">
+								<f:selectItem itemLabel="Tất cả" itemValue="-1" />
+								<f:selectItem itemLabel="Nội địa" itemValue="0" />
+								<f:selectItem itemLabel="Xuất khẩu" itemValue="1" />
+							</p:selectOneRadio>
+						</div>
+					</div>
+				</div>
+				<div class="row" style="margin-top: 10px; margin-bottom: 5px;">
+					<div class="col-md-6" style="padding-left: 0px !important;">
+						<p:commandLink
+							action="#{reportHangChamLuanChuyenBean.hangChamLuanChuyenExcel()}"
+							ajax="false" target="_blank" update=":messages"
+							styleClass="btn_primmary"
+							style="margin-left:0px; margin-right:0px;height:29px !important;line-height:29px !important;">
+							<i class="fa fa-search" aria-hidden="true"></i>
+							<span>Xuất file(excel)</span>
+						</p:commandLink>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</ui:composition>

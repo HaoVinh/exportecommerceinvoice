@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3 class="titleform">Kiểm tra nhập hàng</h3>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<p:tabView id="tabview1" styleClass="clearfix label12 tabview_lix">
+					<p:tab id="tab2" title="Danh sách phiếu">
+						<div class="col-md-12"
+							style="padding-left: 0px !important; padding-right: 0px !important; background-color: #eeeeee;">
+							<p:fieldset id="searchform"
+								style="margin-bottom:10px;background:#3c8dbc">
+								<div class="row">
+									<div class="ui-g">
+										<div class="ui-md-6 ui-sm-12 ">
+											<div class="ui-g">
+												<div class="ui-md-8 ui-sm-12 ">
+													<div class="nhapdlg">
+														<span class="fa fa-search" />
+														<p:remoteCommand name="searchEnter"
+															actionListener="#{xacNhanKiemTraBean.search()}"
+															update="tablesp" />
+														<p:inputText
+															placeholder="Tìm theo số chứng từ,sản phẩm,.."
+															id="inputsearch" style="width:100%;"
+															value="#{xacNhanKiemTraBean.stextStr}"
+															onkeypress="if (event.keyCode === 13) { searchEnter(); return false; }">
+														</p:inputText>
+													</div>
+												</div>
+												<div class="ui-md-4 ui-sm-12 ">
+													<p:commandLink id="idorder" styleClass="btn_primmary"
+														immediate="true"
+														style="margin-left:5px; margin-right:0px;height:28px !important;line-height:28px !important;">
+														<i class="fa fa-search" aria-hidden="true"></i>
+														<span>Lọc nâng cao</span>
+													</p:commandLink>
+													<p:overlayPanel id="imagePanel" for="idorder"
+														hideEffect="fade" dismissable="false"
+														widgetVar="panelsearch" style="width:360px;">
+														<div class="col-md-12"
+															style="padding-top: 10px !important; padding-left: 0px !important; padding-right: 0px !important;">
+															<div class="row">
+																<div class="col-md-6">
+																	<label>Từ ngày</label>
+																	<p:calendar
+																		value="#{xacNhanKiemTraBean.fromDateSearch}"
+																		pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+																		showButtonPanel="true" />
+																</div>
+																<div class="col-md-6">
+																	<label>Đến ngày</label>
+																	<p:calendar value="#{xacNhanKiemTraBean.toDateSearch}"
+																		pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+																		showButtonPanel="true" />
+																</div>
+															</div>
+															<div class="col-md-12"
+																style="margin: 10px; margin-right: 15px">
+																<div class="pull-right">
+																	<p:commandLink styleClass="btn_new"
+																		process="searchform"
+																		update="menuformid:tabview1:tablesp"
+																		style="margin-left:5px;"
+																		title="Lọc dữ liệu theo điều kiện lọc ở trên"
+																		oncomplete="PF('panelsearch').hide();"
+																		action="#{xacNhanKiemTraBean.search()}">
+																		<i class="fa fa-search" aria-hidden="true"></i>
+																		<span>Lọc</span>
+																	</p:commandLink>
+																</div>
+															</div>
+														</div>
+													</p:overlayPanel>
+												</div>
+											</div>
+										</div>
+										<div class="ui-md-6 ui-sm-12">
+											<div style="float: right">
+												<p:commandLink styleClass="btn_destroy"
+													style="margin-left:2px; margin-right:0px;height:29px !important;line-height:29px !important;"
+													update="menuformid:tabview1:tablesp,messages"
+													disabled="#{xacNhanKiemTraBean.xacNhanKiemTra.id==0}"
+													action="#{xacNhanKiemTraBean.delete()}" title="Xóa phiếu">
+													<i class="fa fa-trash" aria-hidden="true"></i>
+													<p:confirm icon="ui-icon-alert" />
+													<span>Xóa #{xacNhanKiemTraBean.xacNhanKiemTra.id}</span>
+												</p:commandLink>
+												<p:commandLink styleClass="btn_printtt" id="idlaypalletgn"
+													immediate="true" 
+													style="margin-left:5px; margin-right:5px; ">
+													<i class="fa fa-paper-plane" aria-hidden="true"></i>
+													<span>Dữ liệu sản lượng GN-TTSP</span>
+												</p:commandLink>
+												<p:overlayPanel id="idflaypalletgn" for="idlaypalletgn"
+													hideEffect="fade" dismissable="false"
+													widgetVar="panelpalletgiaonhan" style="width:300px;">
+													<div class="col-md-12" style="margin-bottom: 20px;">
+														<div class="col-md-8">
+															<label>Ngày</label>
+															<p:calendar value="#{xacNhanKiemTraBean.dateSearchGN}"
+																pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+																showButtonPanel="true" />
+														</div>
+														<div class="col-md-4">
+															<p:commandLink process="idflaypalletgn"
+																styleClass="btn_other" style="margin-top:20px"
+																update="formpalletgiaonhan"
+																oncomplete="PF('panelpalletgiaonhan').hide();PF('dlgpalletgiaonhan').show()"
+																action="#{xacNhanKiemTraBean.searchGN}">Lấy dữ liệu</p:commandLink>
+														</div>
+													</div>
+												</p:overlayPanel>
+											</div>
+										</div>
+									</div>
+								</div>
+							</p:fieldset>
+							<p:sticky target="searchform" />
+							<div class="row"
+								style="margin-top: 5px; margin-bottom: 25px; margin-left: 16px !important; margin-right: 16px !important;">
+								<p:dataTable value="#{xacNhanKiemTraBean.xacNhanKiemTras}"
+									paginatorPosition="bottom" styleClass="tablenhapsp"
+									style="width:100%;" paginator="true" rowKey="#{item.id}"
+									id="tablesp" widgetVar="tablesp" scrollable="true"
+									scrollHeight="650"
+									rowStyleClass="#{item.dakiemtra?'hlsuccess':''}"
+									selection="#{xacNhanKiemTraBean.xacNhanKiemTraSelect}"
+									selectionMode="single" resizableColumns="true" var="item">
+									<p:ajax event="rowSelect"
+										listener="#{xacNhanKiemTraBean.showEdit()}"
+										update="menuformid" />
+									<p:column headerText="ID" width="50" styleClass="textcenter">
+										<h:outputText value="#{item.id}" />
+									</p:column>
+									<p:column headerText="Mã phiếu" width="60"
+										styleClass="textcenter">
+										<h:outputText value="#{item.requestCode}" />
+									</p:column>
+									<p:column headerText="Ngày nhập" width="70"
+										styleClass="textcenter">
+										<h:outputText value="#{item.requestDate}">
+											<f:convertDateTime pattern="dd/MM/yyyy" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="Người tạo" width="120">
+										<h:outputText style="white-space: initial;"
+											value="#{item.createdBy}" />
+									</p:column>
+									<p:column headerText="Xác nhận" width="70"
+										styleClass="textcenter">
+										<p:selectBooleanCheckbox value="#{item.dakiemtra}"
+											disabled="true" />
+									</p:column>
+									<p:column headerText="Người xác nhận" width="120">
+										<h:outputText style="white-space: initial;"
+											value="#{item.createdCheck}" />
+									</p:column>
+									<p:column headerText="Trạng thái" width="60"
+										style="text-align:center;#{item.trangthaicl==0?'':item.trangthaicl==1?'background: #9bc29c;color: white;':item.trangthaicl==2?'background: #f5b661;color: white;':item.trangthaicl==3?'background: #e58c8c;':''}">
+										<h:outputText
+											value="#{item.trangthaicl==0?'CHƯA KIỂM':item.trangthaicl==1?'ĐẠT':item.trangthaicl==2?'CHỜ KIỂM':item.trangthaicl==3?'KHÔNG ĐẠT':''}" />
+									</p:column>
+								</p:dataTable>
+							</div>
+						</div>
+					</p:tab>
+					<p:tab id="tab1" title="Chi tiết phiếu">
+						<h:panelGroup id="group1" style="margin:10px">
+							<div class="col-md-12" style="background-color: #eeeeee;">
+								<div class="col-md-9" style="margin-top: 10px;">
+									<div class="row pdnone" style="margin-bottom: 20px;">
+										<p:dataTable
+											value="#{xacNhanKiemTraBean.xacNhanKiemTraDetails}"
+											paginatorPosition="bottom" rowsPerPageTemplate="10,20,30"
+											style="width:100%" rowIndexVar="index" paginator="true"
+											styleClass="tablenhapsp tableright1" rows="10" id="tablect"
+											rowStyleClass="#{item.trangthaicl!=1?'hlnotsuccess':''}"
+											widgetVar="wgtablect" resizableColumns="true" var="item">
+											<p:column headerText="" width="50" styleClass="textcenter">
+												<p:commandLink update="tablect,messages,fdlchitiet"
+													value="Edit " styleClass="texttrash_edit" process="@this"
+													actionListener="#{xacNhanKiemTraBean.editDetail(item)}">
+												</p:commandLink>|
+												<p:commandLink update="tablect,messages" value=" Del"
+													styleClass="texttrash_del" process="@this"
+													actionListener="#{xacNhanKiemTraBean.deleteDetail(item)}">
+													<p:confirm icon="ui-icon-alert" />
+												</p:commandLink>
+											</p:column>
+											<p:column headerText="ID" width="40" styleClass="textcenter">
+												<h:outputText value="#{item.id}" />
+											</p:column>
+											<p:column headerText="STT" width="30" styleClass="textcenter">
+												<h:outputText value="#{index+1}" />
+											</p:column>
+											<p:column headerText="Sản phẩm" width="150"
+												filterBy="#{item.product.product_code}#{item.product.product_name}"
+												filterMatchMode="contains">
+												<h:outputText style="font-weight:bold"
+													value="#{item.product.product_code}" />-
+												<h:outputText style="white-space: initial;"
+													value="#{item.product.product_name}" />
+											</p:column>
+											<p:column headerText="Ca 1" width="40"
+												style="text-align:right">
+												<h:outputText style="white-space: initial;"
+													value="#{item.quantityCa1}">
+													<f:convertNumber locale="vi" pattern="###,###,###,##0.##" />
+												</h:outputText>
+											</p:column>
+											<p:column headerText="Ca 2" width="40"
+												style="text-align:right">
+												<h:outputText style="white-space: initial;"
+													value="#{item.quantityCa2}">
+													<f:convertNumber locale="vi" pattern="###,###,###,##0.##" />
+												</h:outputText>
+											</p:column>
+											<p:column headerText="Ca 3" width="40"
+												style="text-align:right">
+												<h:outputText style="white-space: initial;"
+													value="#{item.quantityCa3}">
+													<f:convertNumber locale="vi" pattern="###,###,###,##0.##" />
+												</h:outputText>
+											</p:column>
+											<p:column headerText="Tổng" width="40"
+												style="text-align:right">
+												<h:outputText
+													style="white-space: initial;font-weight: bold;"
+													value="#{item.quantityCa1+item.quantityCa2+item.quantityCa3}">
+													<f:convertNumber locale="vi" pattern="###,###,###,##0.##" />
+												</h:outputText>
+											</p:column>
+											<p:column headerText="Đạt" width="30"
+												style="text-align:center">
+												<p:selectBooleanCheckbox disabled="true"
+													value="#{item.trangthaicl==1?true:false}" />
+											</p:column>
+											<p:column headerText="Ghi chú" width="100">
+												<h:outputText style="white-space: initial;"
+													value="#{item.note}" />
+											</p:column>
+										</p:dataTable>
+									</div>
+								</div>
+								<div class="col-md-3"
+									style="margin-top: 10px; background-color: white;">
+									<label>ID</label>
+									<p:inputText disabled="true"
+										value="#{xacNhanKiemTraBean.xacNhanKiemTra.id}" />
+
+									<label>Ngày<span style="color: red;">*</span></label>
+									<p:calendar
+										value="#{xacNhanKiemTraBean.xacNhanKiemTra.requestDate}"
+										pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+										showButtonPanel="true" />
+									<label>Số chứng từ<span style="color: red;">*</span></label>
+									<p:inputText
+										value="#{xacNhanKiemTraBean.xacNhanKiemTra.requestCode}" />
+									<label>Nhân viên tạo</label>
+									<div class="usernhapsp">
+										<span class="fa fa-user-circle-o"></span>
+										<p:inputText disabled="true"
+											value="#{xacNhanKiemTraBean.xacNhanKiemTra.createdBy}" />
+									</div>
+									<label>Nhân viên xác nhận</label>
+									<div class="usernhapsp">
+										<span class="fa fa-user-circle-o"></span>
+										<p:inputText disabled="true"
+											value="#{xacNhanKiemTraBean.xacNhanKiemTra.createdCheck}" />
+									</div>
+									<div class="row">
+										<div class="col-md-6 pdnone">
+											<p:selectBooleanCheckbox itemLabel="Đã xác nhận"
+												disabled="true" style="margin-top:20px"
+												styleClass="blchecknormal"
+												value="#{xacNhanKiemTraBean.xacNhanKiemTra.dakiemtra}" />
+										</div>
+										<div class="col-md-6 pdright3">
+											<label>Ngày xác nhận</label>
+											<p:calendar disabled="true"
+												value="#{xacNhanKiemTraBean.xacNhanKiemTra.ngayKiemTra}"
+												pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+												showButtonPanel="true" />
+										</div>
+									</div>
+									<label>Trạng thái phiếu</label>
+									<span style="#{xacNhanKiemTraBean.xacNhanKiemTra.trangthaicl==0?'':xacNhanKiemTraBean.xacNhanKiemTra.trangthaicl==1?'background: #9bc29c;color: white;':xacNhanKiemTraBean.xacNhanKiemTra.trangthaicl==2?'background: #f5b661;color: white;':xacNhanKiemTraBean.xacNhanKiemTra.trangthaicl==3?'background: #e58c8c;':''}">
+								<h:outputText
+									value="#{xacNhanKiemTraBean.xacNhanKiemTra.trangthaicl==0?'CHƯA KIỂM':xacNhanKiemTraBean.xacNhanKiemTra.trangthaicl==1?'ĐẠT':xacNhanKiemTraBean.xacNhanKiemTra.trangthaicl==2?'CHỜ KIỂM':xacNhanKiemTraBean.xacNhanKiemTra.trangthaicl==3?'KHÔNG ĐẠT':''}" />
+								</span>
+									<div class="row" style="margin-top: 10px;">
+										<p:separator />
+									</div>
+									<div class="row" style="margin: 10px 0px; text-align: center;">
+										<p:commandLink styleClass="btn_printtt" id="idinphieu"
+											rendered="false" style="margin-left:10px;">
+											<i class="fa fa-print" aria-hidden="true"></i>
+											<span>In</span>
+										</p:commandLink>
+										<p:overlayPanel id="idfinphieu" for="idinphieu"
+											hideEffect="fade" dismissable="false"
+											widgetVar="panelinphieu" style="width:170px;">
+											<div class="col-md-12">
+												<div class="row" style="text-align: left;">
+													<p:commandLink
+														style="margin-right:10px;text-decoration: underline;"
+														oncomplete="PF('panelinphieu').hide()">Phiếu yêu cầu</p:commandLink>
+												</div>
+												<div class="row" style="text-align: left; margin-top: 5px">
+													<p:commandLink style="text-decoration: underline;"
+														oncomplete="PF('panelinphieu').hide()">Kết quả kiểm tra</p:commandLink>
+												</div>
+											</div>
+										</p:overlayPanel>
+									</div>
+								</div>
+							</div>
+						</h:panelGroup>
+					</p:tab>
+				</p:tabView>
+			</h:form>
+		</div>
+		<p:dialog header="Chi tiết" styleClass="dialogcommon"
+			resizable="false" width="450" style="oveFrflow: initial;"
+			closeOnEscape="true" widgetVar="dlchitiet">
+			<h:form id="fdlchitiet">
+				<div class="col-md-12 pdnone">
+					<div class="row">
+						<div class="row">
+							<label>Sản phẩm<span style="color: red;">*</span></label>
+						</div>
+						<div class="row">
+							<div class="nhapdlg">
+								<span class="fa fa-search"></span>
+								<p:autoComplete style="width:100%;" placeholder="Tìm sản phẩm"
+									value="#{xacNhanKiemTraBean.xacNhanKiemTraDetailCrud.product}"
+									disabled="#{xacNhanKiemTraBean.xacNhanKiemTraDetailCrud.id ==0}"
+									maxResults="30" converter="abstractConverter"
+									minQueryLength="2" queryDelay="900"
+									completeMethod="#{abstractAutoComplete.completeProduct}"
+									var="p" itemLabel="#{p.product_name}" itemValue="#{p}"
+									forceSelection="true" onclick="this.select();">
+									<p:column style="width:50px">
+										<h:outputText value="#{p.product_code}" />
+									</p:column>
+									<p:column style="width:150px">
+										<h:outputText value="#{p.product_name}" />
+									</p:column>
+								</p:autoComplete>
+							</div>
+						</div>
+						<label>Ca 1</label>
+						<p:inputNumber
+							value="#{xacNhanKiemTraBean.xacNhanKiemTraDetailCrud.quantityCa1}"
+							decimalPlaces="2" decimalSeparator="," thousandSeparator=".">
+						</p:inputNumber>
+						<label>Ca 2</label>
+						<p:inputNumber
+							value="#{xacNhanKiemTraBean.xacNhanKiemTraDetailCrud.quantityCa2}"
+							decimalPlaces="2" decimalSeparator="," thousandSeparator=".">
+						</p:inputNumber>
+						<label>Ca 3</label>
+						<p:inputNumber
+							value="#{xacNhanKiemTraBean.xacNhanKiemTraDetailCrud.quantityCa3}"
+							decimalPlaces="2" decimalSeparator="," thousandSeparator=".">
+						</p:inputNumber>
+						<label>Ghi chú</label>
+						<p:inputTextarea rows="3"
+							value="#{xacNhanKiemTraBean.xacNhanKiemTraDetailCrud.note}" />
+
+					</div>
+				</div>
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important; margin-top: 10px;">
+					<p:commandLink process="fdlchitiet"
+						update="fdlchitiet,menuformid:tabview1:tablect,:messages"
+						action="#{invoiceBean.saveOrUpdateInvoiceDetail(false)}"
+						styleClass="btn_primmary">
+						<i class="fa fa-floppy-o" aria-hidden="true"></i>
+						<span>Cập nhật</span>
+					</p:commandLink>
+					<p:commandLink styleClass="btn_new"
+						action="#{xacNhanKiemTraBean.resetDetail()}"
+						update="fdlchitiet,menuformid:tabview1:tablect,:messages"
+						style="margin-left:10px;">
+						<i class="fa fa-file-o" aria-hidden="true"></i>
+						<span>Tạo mới</span>
+					</p:commandLink>
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog styleClass="dialogcommon" resizable="false"
+			style="overflow: initial;max-width: 70%;min-width: 384px;"
+			closeOnEscape="true" header="Sản lượng" widgetVar="dlgpalletgiaonhan">
+			<h:form id="formpalletgiaonhan">
+				<div class="col-md-12" style="background-color: #eeeeee;">
+					<div class="row">
+						<p:commandLink id="btchuyenphieu"
+							update="tablect1,menuformid:tabview1" styleClass="btn_new"
+							style="margin-top:20px;"
+							action="#{xacNhanKiemTraBean.taoPhieuYeuCauXacNhan(true)}">
+							<i class="fa fa-paper-plane" aria-hidden="true"></i>
+							<span>Tạo phiếu yêu cầu xác nhận</span>
+						</p:commandLink>
+					</div>
+					<div class="row">
+						<div class="col-md-12" style="padding: 10px !important;">
+							<div>
+								<span>Lưu ý<span style="color: red;">*</span>:
+								</span>
+							</div>
+							<div class="col-md-12">
+								<div class="row">- Khi tạo phiếu yêu cầu xác nhận chương
+									trình sẽ phân thành các phiếu (đạt, không đạt, chờ kiểm).</div>
+								<div class="row">- Số lượng theo đơn vị tính.</div>
+							</div>
+						</div>
+
+					</div>
+					<div class="row">
+						<p:messages id="messNotCode" showDetail="true" closable="true">
+							<p:autoUpdate />
+						</p:messages>
+					</div>
+					<div class="row" style="margin-top: 2px;">
+						<p:dataTable value="#{xacNhanKiemTraBean.xacNhanKiemTraDetailGNs}"
+							rowKey="#{item.id}" style="width:100%;" scrollHeight="400"
+							styleClass="tablenhapsp" scrollable="true" scrollWidth="100%"
+							id="tablect1" widgetVar="tablect1" resizableColumns="true"
+							var="item">
+							<p:column headerText="Sản phẩm" width="250">
+								<h:outputText style="font-weight: bold;"
+									value="#{item.product.product_code}" />-
+								<h:outputText style="white-space: initial;"
+									value="#{item.product.product_name}" />
+							</p:column>
+							<p:column headerText="ĐVT" width="50">
+								<h:outputText value="#{item.product.unit}" />
+							</p:column>
+							<p:column headerText="SL ca 1" width="60" styleClass="textright">
+								<h:outputText value="#{item.quantityCa1}">
+									<f:convertNumber locale="vi" pattern="###,###,##0" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="SL ca 2" width="60" styleClass="textright">
+								<h:outputText value="#{item.quantityCa2}">
+									<f:convertNumber locale="vi" pattern="###,###,##0" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="SL ca 3" width="60" styleClass="textright">
+								<h:outputText value="#{item.quantityCa3}">
+									<f:convertNumber locale="vi" pattern="###,###,##0" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="SLGN(tổng)" width="70"
+								styleClass="textright">
+								<h:outputText
+									value="#{item.quantityCa1+item.quantityCa2+item.quantityCa3}"
+									style="font-weight: bold;">
+									<f:convertNumber locale="vi" pattern="###,###,##0.##" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="SL TTSP" width="60" styleClass="textright">
+								<h:outputText value="#{item.quantityTTSP}"
+									style="color: #{item.chenhlech>=1?'red':''}; font-weight: bold;">
+									<f:convertNumber locale="vi" pattern="###,###,##0.##" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="Chất lượng" width="100"
+								style="#{item.trangthaicl==0?'':item.trangthaicl==1?'background: #9bc29c;color: white;':item.trangthaicl==2?'background: #f5b661;color: white;':item.trangthaicl==3?'background: #e58c8c;':''}">
+								<h:outputText
+									value="#{item.trangthaicl==0?'CHƯA KIỂM':item.trangthaicl==1?'ĐẠT':item.trangthaicl==2?'CHỜ KIỂM':item.trangthaicl==3?'KHÔNG ĐẠT':''}" />
+							</p:column>
+
+						</p:dataTable>
+					</div>
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog header="Xác nhận tạo phiếu"
+			styleClass="dialogcommon dialogerror" resizable="false"
+			style="overflow: initial;width:100%;max-width: min-content;min-width: 400px;"
+			closeOnEscape="true" widgetVar="dlthongbaodl">
+			<h:form id="idfthongbaodl">
+				<h:outputText value="Dữ liệu đã có trong ngày " />
+				<h:outputText value="#{xacNhanKiemTraBean.dateSearchGN}">
+					<f:convertDateTime pattern="dd/MM/yyyy" />
+				</h:outputText>
+				<h:outputText value=" .Bạn vẫn muốn tiếp tục tạo phiếu?" />
+				<p:separator />
+				<p:commandButton value="Tạo phiếu"
+					update=":messages,menuformid:tabview1"
+					action="#{xacNhanKiemTraBean.taoPhieuYeuCauXacNhan(false)}"
+					oncomplete="PF('dlthongbaodl').hide();"
+					styleClass="ui-confirmdialog-yes" icon="ui-icon-check" />
+				<p:commandButton value="Không" update=":messages"
+					oncomplete="PF('dlthongbaodl').hide();"
+					styleClass="ui-confirmdialog-no " icon="ui-icon-close" />
+			</h:form>
+		</p:dialog>
+
+	</ui:define>
+</ui:composition>

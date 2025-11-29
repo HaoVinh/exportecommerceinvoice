@@ -1,0 +1,1428 @@
+package lixco.com.bean;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+import javax.faces.context.FacesContext;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.servlet.http.HttpServletRequest;
+
+import lixco.com.commom_ejb.MyMath;
+import lixco.com.common.ApiCallClient;
+import lixco.com.common.FormatHandler;
+import lixco.com.common.JsonParserUtil;
+import lixco.com.common.SessionHelper;
+import lixco.com.common.ToolTimeCustomer;
+import lixco.com.delivery.Delivery;
+import lixco.com.delivery.DeliveryDetail;
+import lixco.com.delivery.ShiftLix;
+import lixco.com.entity.Customer;
+import lixco.com.entity.GoodsReceiptNote;
+import lixco.com.entity.GoodsReceiptNoteDetail;
+import lixco.com.entity.IECategories;
+import lixco.com.entity.Product;
+import lixco.com.entity.Warehouse;
+import lixco.com.interfaces.ICustomerService;
+import lixco.com.interfaces.IGoodsReceiptNoteDetailService;
+import lixco.com.interfaces.IGoodsReceiptNoteService;
+import lixco.com.interfaces.IIECategoriesService;
+import lixco.com.interfaces.IProcessLogicGoodsReceiptNoteService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.interfaces.IWarehouseService;
+import lixco.com.reqInfo.GoodsReceiptNoteDetailReqInfo;
+import lixco.com.reqInfo.GoodsReceiptNoteReqInfo;
+import lixco.com.reqInfo.IECategoriesReqInfo;
+import lixco.com.reqInfo.Message;
+import lixco.com.reqInfo.ProductReqInfo;
+import lixco.com.reqInfo.WarehouseReqInfo;
+import lixco.com.reqInfo.WrapGoodsReceiptNoteReqInfo;
+import lixco.com.reqInfo.WrapListGoodsReceiptNoteDetailReqInfo;
+import lombok.Getter;
+import lombok.Setter;
+import net.sf.jasperreports.engine.JRParameter;
+import net.sf.jasperreports.engine.JasperExportManager;
+import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperPrint;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import okhttp3.Call;
+import okhttp3.Response;
+
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.jboss.logging.Logger;
+import org.omnifaces.cdi.ViewScoped;
+import org.primefaces.PrimeFaces;
+import org.primefaces.event.FileUploadEvent;
+import org.primefaces.event.TabChangeEvent;
+import org.primefaces.model.file.UploadedFile;
+
+import trong.lixco.com.account.servicepublics.Account;
+import trong.lixco.com.bean.AbstractBean;
+import trong.lixco.com.entity.AccountDatabase;
+import trong.lixco.com.entity.ParamReportDetail;
+import trong.lixco.com.service.AccountDatabaseService;
+import trong.lixco.com.service.ParamReportDetailService;
+import trong.lixco.com.util.ConvertNumberToText;
+import trong.lixco.com.util.MyStringUtil;
+import trong.lixco.com.util.MyUtil;
+import trong.lixco.com.util.MyUtilExcel;
+import trong.lixco.com.util.Notify;
+import trong.lixco.com.util.ToolReport;
+
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
+
+@Named
+@ViewScoped
+public class GoodsReceiptNoteBean extends AbstractBean {
+	private static final long serialVersionUID = 1L;
+	@Inject
+	private Logger logger;
+	@Inject
+	private IProcessLogicGoodsReceiptNoteService processLogicGoodsReceiptNoteService;
+	@Inject
+	private IGoodsReceiptNoteService goodsReceiptNoteService;
+	@Inject
+	private IGoodsReceiptNoteDetailService goodsReceiptNoteDetailService;
+	@Inject
+	private IProductService productService;
+	@Inject
+	private ICustomerService customerService;
+	@Inject
+	private IIECategoriesService ieCategoriesService;
+	@Inject
+	private IWarehouseService warehouseService;
+	@Inject
+	ParamReportDetailService paramReportDetailService;
+	@Inject
+	private AccountDatabaseService accountDatabaseService;
+	private GoodsReceiptNote goodsReceiptNoteCrud;
+	private GoodsReceiptNote goodsReceiptNoteSelect;
+	private List<GoodsReceiptNote> listGoodsReceiptNote;
+	private GoodsReceiptNoteDetail goodsReceiptNoteDetailCrud;
+	private GoodsReceiptNoteDetail goodsReceiptNoteDetailSelect;
+	private List<GoodsReceiptNoteDetail> listGoodsReceiptNoteDetail;
+	private List<IECategories> listIECategories;
+	private List<Warehouse> listWarehouse;
+	/* search phiếu nhập */
+	private Date fromDateSearch;
+	private Date toDateSearch;
+	private Customer customerSearch;
+	private IECategories ieCategoriesSearch;
+	private Warehouse warehouseSearch;
+	private FormatHandler formatHandler;
+	private Account account;
+	/* Thông tin search */
+	private Product productSearch;
+	private String batchCodeSearch;
+	/* Delivery */
+	private Date deliveryDate;
+	private List<Delivery> listDelivery;
+	private ShiftLix shiftSearch;
+	private List<ShiftLix> listShift;
+	private GoodsReceiptNote gooodsReceiptNoteD;
+	private String importCodeTH;
+	private Delivery deliveryProcess;
+	private List<GoodsReceiptNoteDetail> listGoodsReceiptNoteDetailFilter;
+
+	@Override
+	protected void initItem() {
+		try {
+			formatHandler = FormatHandler.getInstance();
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletRequest request = (HttpServletRequest) facesContext.getExternalContext().getRequest();
+			account = SessionHelper.getInstance().getSession("account", request, Account.class);
+			createNew();
+			createNewDetail();
+			listIECategories = new ArrayList<>();
+			ieCategoriesService.selectAll(listIECategories);
+			listWarehouse = new ArrayList<>();
+			warehouseService.selectAll(listWarehouse);
+			fromDateSearch = ToolTimeCustomer.plusDayNow(-1);
+			search();
+			deliveryDate = new Date();
+			try {
+				String strJson = SessionHelper.getInstance().getSession("data_th", request, String.class);
+				JsonObject json = JsonParserUtil.getGson().fromJson(strJson, JsonObject.class);
+				importCodeTH = json.get("import_code").getAsString();
+			} catch (Exception e) {
+			}
+			listGoodsReceiptNoteDetailFilter = new ArrayList<>();
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.initItem:" + e.getMessage(), e);
+		}
+	}
+
+	final int SODONG = 10;
+
+	public void copyDeliveryToReceiptNote(Delivery item) {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			this.deliveryProcess = item;
+			if (item.isImported()) {
+				current.executeScript("swalfunction2('Cảnh báo','Phiếu giao nhận đã được chuyển qua phiếu nhập, bạn có muốn chuyển tiếp không','warning','copyDelivery()')");
+			} else {
+				copyDelivery();
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.copyDeliveryToReceiptNote:" + e.getMessage(), e);
+		}
+	}
+
+	public void copyDelivery() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (allowSave(goodsReceiptNoteCrud.getImport_date(), goodsReceiptNoteCrud.getCreated_by())) {
+				if (deliveryProcess != null) {
+					// kiểm tra phiếu nhập đã tồn tại chưa
+					if (goodsReceiptNoteCrud != null && goodsReceiptNoteCrud.getId() != 0) {
+						List<DeliveryDetail> listDetail = deliveryProcess.getListDeliveryDetail();
+						int code = 0;
+						Message message = new Message();
+						for (DeliveryDetail d : listDetail) {
+							GoodsReceiptNoteDetail item = new GoodsReceiptNoteDetail();
+							item.setGoods_receipt_note(goodsReceiptNoteCrud);
+							ProductReqInfo p = new ProductReqInfo();
+							productService.selectByCode(d.getProductLix().getProduct_code(), p);
+							item.setProduct(p.getProduct());
+							double quantity = BigDecimal.valueOf(d.getNumber())
+									.multiply(BigDecimal.valueOf(p.getProduct().getSpecification())).doubleValue();
+							item.setQuantity(quantity);
+							item.setDelivery_code(deliveryProcess.getVoucher());
+							if (d.getLot() != null && !"".equals(d.getLot())) {
+								item.setBatch_code(d.getLot());
+							} else {
+								item.setBatch_code(MyUtil.chuyensangddMMyyStr(deliveryProcess.getDelivery_date())
+										+ ("CA 1".equals(deliveryProcess.getShiftLix().getName()) == true ? "18"
+												: "CA 2".equals(deliveryProcess.getShiftLix().getName()) == true ? "28"
+														: "38")
+
+								);
+							}
+							GoodsReceiptNoteDetailReqInfo rq = new GoodsReceiptNoteDetailReqInfo(item, account
+									.getMember().getName());
+							code += processLogicGoodsReceiptNoteService.insertGoodsReceiptNoteDetailFromDelivery(rq,
+									message);
+						}
+						switch (code) {
+						case 0:
+							/*
+							 * Đánh dấu phiếu giao nhận đã được import vao
+							 * chuong trinh
+							 */
+							xacNhanphieuGiaoNhanDaDuocImport(deliveryProcess);
+							goodsReceiptNoteSelect = goodsReceiptNoteCrud;
+							loadGoodsReceiptNote();
+							current.executeScript("swaldesigntimer2('Thành công','Chuyển phiếu giao nhận qua phiếu nhập thành công','success',2000)");
+
+							break;
+						default:
+							current.executeScript("swaldesignclose('Không thành công','" + message.getUser_message()
+									+ "\n " + message.getInternal_message() + "','warning')");
+							break;
+						}
+					} else {
+						current.executeScript("swaldesigntimer2('Cảnh báo','Chưa lưu phiếu nhập.','warning',2000)");
+					}
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.copyDelivery:" + e.getMessage(), e);
+		}
+	}
+
+	public void xacNhanphieuGiaoNhanDaDuocImport(Delivery delivery) {
+		try {
+			AccountDatabase accountDatabase = accountDatabaseService.findByName("giaonhan");
+			if (accountDatabase != null) {
+				JsonObject json = new JsonObject();
+				json.addProperty("delivery_id", delivery.getId());
+				Call call = ApiCallClient.updateObject(accountDatabase.getAddress(), "delivery", "imported",
+						JsonParserUtil.getGson().toJson(json));
+				Response response = call.execute();
+				if (response.isSuccessful()) {
+					String body = response.body().string();
+					JsonObject jsonData = JsonParserUtil.getGson().fromJson(body, JsonObject.class);
+					int err = jsonData.get("err").getAsInt();
+					if (err > 0) {
+						Delivery deliveryResult = JsonParserUtil.getGson().fromJson(
+								jsonData.getAsJsonObject("dt").get("delivery"), Delivery.class);
+						listDelivery.set(listDelivery.indexOf(delivery), deliveryResult);
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.xacNhanphieuGiaoNhanDaDuocImport:" + e.getMessage(), e);
+		}
+	}
+
+	public void changeImportCodeTH() {
+		try {
+			HttpServletRequest request = (HttpServletRequest) FacesContext.getCurrentInstance().getExternalContext()
+					.getRequest();
+			JsonObject json = new JsonObject();
+			json.addProperty("import_code", importCodeTH == null ? "" : importCodeTH);
+			SessionHelper.getInstance().setSession("data_th", JsonParserUtil.getGson().toJson(json), request);
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.changeImportCodeTH:" + e.getMessage(), e);
+		}
+	}
+
+	private boolean checkBatchCode(String batchCode) {
+		try {
+			if (batchCode != null && !"".equals(batchCode)) {
+				if (batchCode.length() == 8 && isNumeric(batchCode)) {
+					return true;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.changeBatchCodeTH:" + e.getMessage(), e);
+		}
+		return false;
+	}
+
+	public boolean isNumeric(String strNum) {
+		try {
+			if (strNum == null) {
+				return false;
+			}
+			return Pattern.compile("-?\\d+(\\.\\d+)?").matcher(strNum).matches();
+		} catch (Exception e) {
+		}
+		return false;
+	}
+
+	public void loadShiftLix() {
+		try {
+			if (goodsReceiptNoteCrud.getId() == 0) {
+				noticeError("Lưu thông tin phiếu nhập trước khi tải phiếu giao nhận. ");
+			} else {
+				AccountDatabase accountDatabase = accountDatabaseService.findByName("giaonhan");
+				if (accountDatabase != null) {
+					listShift = new ArrayList<>();
+					Call call = ApiCallClient.getListObjectWithParamMethodGet(accountDatabase.getAddress(), "shiftlix",
+							"list", "");
+					Response response = call.execute();
+					if (response.isSuccessful()) {
+						String body = response.body().string();
+						JsonObject jsonData = JsonParserUtil.getGson().fromJson(body, JsonObject.class);
+						if (jsonData.get("err").getAsInt() == 0) {
+							listShift = JsonParserUtil.getGson().fromJson(
+									jsonData.getAsJsonObject("dt").get("listShiftLix"),
+									new TypeToken<List<ShiftLix>>() {
+									}.getType());
+							if (listShift != null && listShift.size() > 0) {
+								// shiftSearch=listShift.get(0);
+							}
+						}
+					}
+					response.close();
+				}
+				showDialog("dlggiaonhan");
+			}
+		} catch (Exception e) {
+			noticeError("Không có kết nối đến hệ thống giao nhận. " + e.getMessage());
+			logger.error("GoogsReceiptNoteBean.loadShiftLix:" + e.getMessage(), e);
+		}
+	}
+
+	public void addGoodsReceiptNoteDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (goodsReceiptNoteCrud != null && goodsReceiptNoteDetailCrud != null) {
+				if (allowSave(goodsReceiptNoteCrud.getImport_date())) {
+					if (goodsReceiptNoteDetailCrud.getProduct() != null) {
+						goodsReceiptNoteDetailCrud.setMinv(listGoodsReceiptNoteDetail.size() + 1);
+						goodsReceiptNoteDetailCrud.setQuantity(1);
+						goodsReceiptNoteDetailCrud.setCreated_by(account.getMember().getName());
+						goodsReceiptNoteDetailCrud.setCreated_date(new Date());
+						listGoodsReceiptNoteDetail.add(goodsReceiptNoteDetailCrud.clone());
+					} else {
+						if (goodsReceiptNoteDetailCrud.getProduct() == null) {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa nhập sản phẩm để thêm vào!','warning',2000);");
+						}
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+				}
+				goodsReceiptNoteDetailCrud = new GoodsReceiptNoteDetail();
+			}
+		} catch (Exception e) {
+			// reset
+			goodsReceiptNoteDetailCrud = new GoodsReceiptNoteDetail();
+			logger.error("GoogsReceiptNoteBean.addGoodsReceiptNoteDetail:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tablect').clearFilters();");
+	}
+
+	public void ajaxt_total(GoodsReceiptNoteDetail item) {
+		try {
+			int index = 0;
+			if (item.getId() == 0) {
+				for (int i = 0; i < listGoodsReceiptNoteDetail.size(); i++) {
+					if (listGoodsReceiptNoteDetail.get(i).getMinv() == item.getMinv()) {
+						index = i;
+						break;
+					}
+				}
+			} else {
+				index = listGoodsReceiptNoteDetail.indexOf(item);
+			}
+			if (index != -1)
+				listGoodsReceiptNoteDetail.get(index).setTotal(
+						listGoodsReceiptNoteDetail.get(index).getQuantity()
+								* listGoodsReceiptNoteDetail.get(index).getPrice());
+			if (listGoodsReceiptNoteDetailFilter != null) {
+				int indexFilter = 0;
+				if (item.getId() == 0) {
+					for (int i = 0; i < listGoodsReceiptNoteDetailFilter.size(); i++) {
+						if (listGoodsReceiptNoteDetailFilter.get(i).getMinv() == item.getMinv()) {
+							indexFilter = i;
+							break;
+						}
+					}
+				} else {
+					indexFilter = listGoodsReceiptNoteDetailFilter.indexOf(item);
+				}
+				if (indexFilter != -1)
+					listGoodsReceiptNoteDetailFilter.get(indexFilter).setTotal(
+							listGoodsReceiptNoteDetailFilter.get(indexFilter).getQuantity()
+									* listGoodsReceiptNoteDetailFilter.get(indexFilter).getPrice());
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void loadListDeliveryData() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			AccountDatabase accountDatabase = accountDatabaseService.findByName("giaonhan");
+			if (accountDatabase != null) {
+				listDelivery = new ArrayList<>();
+				JsonObject json = new JsonObject();
+				JsonObject jd = new JsonObject();
+				jd.addProperty("shift_id", shiftSearch == null ? 0 : shiftSearch.getId());
+				jd.addProperty("team_id", 0);
+				jd.addProperty("workshop_id", 0);
+				jd.addProperty("voucher", "");
+				jd.addProperty("delivery_date", ToolTimeCustomer.convertDateToString(deliveryDate, "dd/MM/yyyy"));
+				json.add("delivery", jd);
+				Call call = ApiCallClient.getListObjectWithParamMethodGet(accountDatabase.getAddress(), "delivery",
+						"search_new", JsonParserUtil.getGson().toJson(json));
+
+				Response response = call.execute();
+				if (response.isSuccessful()) {
+					String body = response.body().string();
+					JsonObject jsonData = JsonParserUtil.gsonnew.fromJson(body, JsonObject.class);
+					if (jsonData.get("err").getAsInt() == 0) {
+						listDelivery = JsonParserUtil.gsonnew.fromJson(
+								jsonData.getAsJsonObject("dt").get("list_delivery"), new TypeToken<List<Delivery>>() {
+								}.getType());
+
+						if (listDelivery.size() == 0)
+							warning("Không có dữ liệu.");
+					} else {
+						current.executeScript("swaldesignclose('Xảy ra lỗi', '" + jsonData.get("msg").getAsString()
+								+ "','warning');");
+					}
+				} else {
+					int code = response.code();
+					switch (code) {
+					// lỗi unauthorizated
+					case 403:
+						current.executeScript("swaldesignclose('Tài khoản của bạn không được phân quyền.','warning')");
+						break;
+					case 500:
+						current.executeScript("swaldesignclose('Xảy ra lỗi','Server giao nhận đang bị mất kết nối','warning')");
+						break;
+					default:
+						current.executeScript("swaldesignclose('Xảy ra lỗi','Không kết nối lấy được dữ liệu giao nhận '"
+								+ code + ",'warning')");
+						break;
+
+					}
+				}
+				response.close();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			logger.error("GoogsReceiptNoteBean.getListDelivery:" + e.getMessage(), e);
+		}
+	}
+
+	public void confirmDelivery(Delivery delivery) {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			AccountDatabase accountDatabase = accountDatabaseService.findByName("giaonhan");
+			if (accountDatabase != null) {
+				JsonObject json = new JsonObject();
+				json.addProperty("delivery_id", delivery.getId());
+				json.addProperty("checked", delivery.isChecked() ? 1 : 0);
+				Call call = ApiCallClient.updateObject(accountDatabase.getAddress(), "delivery", "confirm_new",
+						JsonParserUtil.getGson().toJson(json));
+				Response response = call.execute();
+				if (response.isSuccessful()) {
+					String body = response.body().string();
+					JsonObject jsonData = JsonParserUtil.getGson().fromJson(body, JsonObject.class);
+					int err = jsonData.get("err").getAsInt();
+					switch (err) {
+					case 1:
+						Delivery deliveryResult = JsonParserUtil.getGson().fromJson(
+								jsonData.getAsJsonObject("dt").get("delivery"), Delivery.class);
+						listDelivery.set(listDelivery.indexOf(delivery), deliveryResult);
+						notify.success("Xác nhận thành công!");
+						break;
+					case -2:
+						Delivery deliveryResult2 = JsonParserUtil.getGson().fromJson(
+								jsonData.getAsJsonObject("dt").get("delivery"), Delivery.class);
+						listDelivery.set(listDelivery.indexOf(delivery), deliveryResult2);
+						notify.warning(jsonData.get("msg").getAsString());
+						break;
+					default:
+						notify.warning("Xác nhận thất bại!");
+						break;
+					}
+				} else {
+					notify.warning("Xác nhận thất bại!");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.getListDelivery:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogTongHop() {
+		try {
+			PrimeFaces current = PrimeFaces.current();
+			current.executeScript("PF('dlgth').show();");
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.showDialogTongHop:" + e.getMessage(), e);
+		}
+	}
+
+	public void tongHopDuLieu() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (listDelivery != null && listDelivery.size() > 0) {
+				current.executeScript("swalfunction2('Cảnh báo','Dữ liệu có thể ghi đè lên dữ liệu đã thêm trước đó, bạn có muốn tổng hợp không ?','warning','napLaiDuLieuPhieuNhap()')");
+			} else {
+				current.executeScript("swaldesigntimer2('Cảnh báo','không có dữ liệu','warning',2000)");
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.tongHopDuLieu:" + e.getMessage(), e);
+		}
+	}
+
+	@Getter
+	List<String> dulieukhongnapduoc;
+
+	public void napLaiDuLieuPhieuNhap() {
+		dulieukhongnapduoc = new ArrayList<String>();
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (goodsReceiptNoteCrud != null && goodsReceiptNoteCrud.getId() != 0) {
+				Map<Long, GoodsReceiptNoteDetail> map = new LinkedHashMap<Long, GoodsReceiptNoteDetail>();
+				for (Delivery d : listDelivery) {
+					// if (d.isChecked()) {
+					for (DeliveryDetail dt : d.getListDeliveryDetail()) {
+						ProductReqInfo pr = new ProductReqInfo();
+						productService.selectByCode(dt.getProductLix().getProduct_code(), pr);
+						if (!map.containsKey(dt.getProductLix().getId())) {
+							GoodsReceiptNoteDetail item = new GoodsReceiptNoteDetail();
+							double quantity = BigDecimal.valueOf(dt.getNumber())
+									.multiply(BigDecimal.valueOf(pr.getProduct().getSpecification())).doubleValue();
+							item.setQuantity(quantity);
+							item.setProduct(pr.getProduct());
+							item.setDelivery_code(d.getVoucher());
+							if (dt.getLot() != null && !"".equals(dt.getLot())) {
+								item.setBatch_code(dt.getLot());
+							} else {
+								item.setBatch_code(MyUtil.chuyensangddMMyyStr(d.getDelivery_date())
+										+ ("CA 1".equals(d.getShiftLix().getName()) == true ? "18" : "28"));
+							}
+							map.put(dt.getProductLix().getId(), item);
+							continue;
+						}
+						GoodsReceiptNoteDetail item = map.get(dt.getProductLix().getId());
+						double quantityUnit = BigDecimal.valueOf(dt.getNumber())
+								.multiply(BigDecimal.valueOf(pr.getProduct().getSpecification())).doubleValue();
+						double quantity = BigDecimal.valueOf(item.getQuantity()).add(BigDecimal.valueOf(quantityUnit))
+								.doubleValue();
+						item.setQuantity(quantity);
+					}
+					// }else{
+					// dulieukhongnapduoc.add("Phiếu chưa xác nhận  -> SoPhieu: "
+					// + d.getVoucher());
+					// }
+				}
+				if (map.size() > 0) {
+
+					if (allowSave(goodsReceiptNoteCrud.getImport_date(), goodsReceiptNoteCrud.getCreated_by())) {
+						List<GoodsReceiptNoteDetail> listData = new ArrayList<>(map.values());
+						WrapListGoodsReceiptNoteDetailReqInfo data = new WrapListGoodsReceiptNoteDetailReqInfo(
+								listData, goodsReceiptNoteCrud, account.getMember().getName());
+						Message message = new Message();
+						int code = processLogicGoodsReceiptNoteService.synthesizeDataFromDelivery(data, message);
+						switch (code) {
+						case 0:
+							if (dulieukhongnapduoc.size() == 0) {
+								success();
+							} else {
+								showDialogErrorinfor();
+							}
+							goodsReceiptNoteSelect = goodsReceiptNoteCrud;
+							loadGoodsReceiptNote();
+							break;
+						default:
+							String m = message.getUser_message() + " \\n" + message.getInternal_message();
+							current.executeScript("swaldesignclose('Xảy ra lỗi','" + m + "','warning')");
+							break;
+						}
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+					}
+				}
+			} else {
+				current.executeScript("swaldesigntimer2('Cảnh báo','Phiếu nhập có mã:" + importCodeTH
+						+ " không tồn tại!','warning',2000)");
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.napLaiDuLieuPhieuNhap:" + e.getMessage(), e);
+		}
+	}
+
+	public void deleteGoodsReceiptNoteDetail(GoodsReceiptNoteDetail f) {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (allowDelete(f.getGoods_receipt_note().getImport_date(), f.getGoods_receipt_note().getCreated_by())) {
+				current.executeScript("PF('tablect').clearFilters();");
+				if (f.getId() == 0) {
+					listGoodsReceiptNoteDetail.remove(f);
+					notify.success();
+				} else {
+					// thực hiện delete trong transation
+					Message message = new Message();
+					int code = processLogicGoodsReceiptNoteService.deleteGoodsReceiptNoteDetailMaster(f.getId(),
+							message);
+					if (code > 0) {
+						notify.success();
+						listGoodsReceiptNoteDetail.remove(f);
+						// thực hiện gọi api xóa bên foxpro
+						// deleteReceiptDetailFoxPro(idfox);
+					} else {
+						String m = message.getUser_message() + " \\n" + message.getInternal_message();
+						current.executeScript("swaldesignclose('Xảy ra lỗi', '" + m + "','warning');");
+					}
+				}
+			} else {
+				warning("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.deleteGoodsReceiptNoteDetail:" + e.getMessage(), e);
+		}
+	}
+
+	@Getter
+	@Setter
+	private String stextStr;
+
+	public void search() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			listGoodsReceiptNote = new ArrayList<>();
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("stextStr", MyStringUtil.replaceD(stextStr));
+			jsonInfo.addProperty("from_date", ToolTimeCustomer.convertDateToString(fromDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("to_date", ToolTimeCustomer.convertDateToString(toDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("customer_id", customerSearch == null ? 0 : customerSearch.getId());
+			jsonInfo.addProperty("ie_categories_id", ieCategoriesSearch == null ? 0 : ieCategoriesSearch.getId());
+			jsonInfo.addProperty("warehouse_id", warehouseSearch == null ? 0 : warehouseSearch.getId());
+			JsonObject json = new JsonObject();
+			json.add("goods_receipt_note", jsonInfo);
+			goodsReceiptNoteService.search(JsonParserUtil.getGson().toJson(json), listGoodsReceiptNote);
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.search:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tablect').clearFilters();");
+	}
+
+	public void onTabChange(TabChangeEvent event) {
+		if ("Danh sách phiếu nhập".equals(event.getTab().getTitle())) {
+			if (listGoodsReceiptNote == null || listGoodsReceiptNote.size() == 0) {
+				search();
+				PrimeFaces.current().ajax().update("menuformid:tabview1:tablesp");
+			}
+		}
+
+	}
+
+	public void createNew() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			current.executeScript("PF('tablect').clearFilters();");
+			goodsReceiptNoteCrud = new GoodsReceiptNote();
+			goodsReceiptNoteCrud.setCreated_by(account.getMember().getName());
+			goodsReceiptNoteCrud.setImport_date(new Date());
+			listGoodsReceiptNoteDetail = new ArrayList<>();
+			goodsReceiptNoteDetailCrud = new GoodsReceiptNoteDetail();
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.createNew:" + e.getMessage(), e);
+		}
+
+	}
+
+	public void createNewDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			current.executeScript("PF('tablect').clearFilters();");
+			goodsReceiptNoteDetailCrud = new GoodsReceiptNoteDetail();
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.createNewDetail:" + e.getMessage(), e);
+		}
+	}
+
+	public List<Product> completeProduct(String text) {
+		try {
+			List<Product> list = new ArrayList<Product>();
+			productService.complete(formatHandler.converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.completeProduct:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public List<Customer> completeCustomer(String text) {
+		try {
+			List<Customer> list = new ArrayList<Customer>();
+			customerService.complete(formatHandler.converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.completeCustomer:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Getter
+	@Setter
+	String matkhauxoa;
+
+	public void deleteGoodsReceiptNote() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if ("LIXCO@2022".equals(matkhauxoa)) {
+				if (allowDelete(goodsReceiptNoteSelect.getImport_date(), goodsReceiptNoteSelect.getCreated_by())) {
+					current.executeScript("PF('tablect').clearFilters();");
+					if (goodsReceiptNoteSelect != null && goodsReceiptNoteSelect.getId() != 0) {
+						// lấy danh sách idfoxpro trước khi xóa
+						List<String> listId = goodsReceiptNoteService
+								.getListNhapSPIdFox(goodsReceiptNoteSelect.getId());
+						// delete detail
+						Message messages = new Message();
+						int code = processLogicGoodsReceiptNoteService.deleteGoodsReceiptNoteMaster(
+								goodsReceiptNoteSelect.getId(), messages);
+						if (code >= 0) {
+							success();
+							listGoodsReceiptNote.remove(goodsReceiptNoteSelect);
+							// call api xóa foxpro
+							// deleteReceiptFoxPro(listId);
+							goodsReceiptNoteCrud = new GoodsReceiptNote();
+						} else {
+							String m = messages.getUser_message() + " \\n" + messages.getInternal_message();
+							current.executeScript("swaldesignclose('Xảy ra lỗi', '" + m + "','warning');");
+						}
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','error',2000);");
+				}
+			} else {
+				current.executeScript("swaldesignclose('Thông báo', 'Không đúng mật khẩu xóa','warning');");
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.deleteGoodsReceiptNote:" + e.getMessage(), e);
+		}
+	}
+
+	public void saveOrUpdateReceiptNote(int status) {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (goodsReceiptNoteCrud != null) {
+				// if(listGoodsReceiptNoteDetail.size()>0){
+				WrapGoodsReceiptNoteReqInfo t = new WrapGoodsReceiptNoteReqInfo();
+				goodsReceiptNoteCrud.setStatus(status);
+				t.setGoods_receipt_note(goodsReceiptNoteCrud);
+				t.setList_goods_receipt_note_detail(listGoodsReceiptNoteDetail);
+				t.setMember_name(account.getMember().getName());
+				t.setMember_id(account.getMember().getId());
+				Message message = new Message();
+				// check info
+				Customer customer = goodsReceiptNoteCrud.getCustomer();
+				IECategories categories = goodsReceiptNoteCrud.getIe_categories();
+				Warehouse warehouse = goodsReceiptNoteCrud.getWarehouse();
+				Date importDate = goodsReceiptNoteCrud.getImport_date();
+				if (customer != null && categories != null && warehouse != null && importDate != null) {
+					WrapGoodsReceiptNoteReqInfo cloned = t.clone();
+					if (goodsReceiptNoteCrud.getId() == 0) {
+						if (allowSave(goodsReceiptNoteCrud.getImport_date())) {
+							int code = processLogicGoodsReceiptNoteService.saveOrUpdateGoodsReceiptNoteService(cloned,
+									message);
+							switch (code) {
+							case -1:
+								String m = message.getUser_message() + " \\n" + message.getInternal_message();
+								current.executeScript("swaldesignclose('Xảy ra lỗi', '" + m + "','warning');");
+								break;
+							default:
+								success();
+								// tải lại
+								GoodsReceiptNoteReqInfo req = new GoodsReceiptNoteReqInfo();
+								goodsReceiptNoteService.selectById(cloned.getGoods_receipt_note().getId(), req);
+								goodsReceiptNoteCrud = req.getGoods_receipt_note();
+								listGoodsReceiptNote.add(0, goodsReceiptNoteCrud.clone());
+								// load danh sách chi tiết
+								listGoodsReceiptNoteDetail = new ArrayList<>();
+								goodsReceiptNoteDetailService.selectByReceiptNote(goodsReceiptNoteCrud.getId(),
+										listGoodsReceiptNoteDetail);
+								// callApiFoxPro(goodsReceiptNoteCrud.getId());
+								listGoodsReceiptNoteDetail.clear();
+								goodsReceiptNoteDetailService.selectByReceiptNote(goodsReceiptNoteCrud.getId(),
+										listGoodsReceiptNoteDetail);
+								break;
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+						}
+					} else {
+						GoodsReceiptNote goodsReceiptNoteOld = goodsReceiptNoteService.findById(goodsReceiptNoteCrud
+								.getId());
+						if (goodsReceiptNoteOld != null
+								&& allowUpdate(goodsReceiptNoteOld.getImport_date(),
+										goodsReceiptNoteOld.getCreated_by())
+								&& allowUpdate(goodsReceiptNoteCrud.getImport_date())) {
+							// update đưa vào trong trans
+							int code = processLogicGoodsReceiptNoteService.saveOrUpdateGoodsReceiptNoteService(cloned,
+									message);
+							switch (code) {
+							case -1:
+								String m = message.getUser_message() + " \\n" + message.getInternal_message();
+								current.executeScript("swaldesignclose('Xảy ra lỗi', '" + m + "','warning');");
+								break;
+							default:
+								success();
+								// tải lại
+								GoodsReceiptNoteReqInfo req = new GoodsReceiptNoteReqInfo();
+								goodsReceiptNoteService.selectById(cloned.getGoods_receipt_note().getId(), req);
+								goodsReceiptNoteCrud = req.getGoods_receipt_note();
+								listGoodsReceiptNote.set(listGoodsReceiptNote.indexOf(goodsReceiptNoteCrud),
+										goodsReceiptNoteCrud.clone());
+								// load danh sách chi tiết
+								listGoodsReceiptNoteDetail = new ArrayList<>();
+								goodsReceiptNoteDetailService.selectByReceiptNote(goodsReceiptNoteCrud.getId(),
+										listGoodsReceiptNoteDetail);
+								// callApiFoxPro(goodsReceiptNoteCrud.getId());
+								listGoodsReceiptNoteDetail.clear();
+								goodsReceiptNoteDetailService.selectByReceiptNote(goodsReceiptNoteCrud.getId(),
+										listGoodsReceiptNoteDetail);
+								break;
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+						}
+					}
+				} else {
+					warning("Nhập đầy đủ thông tin (*)");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.saveOrUpdateReceiptNote:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tablect').clearFilters();");
+	}
+
+	public void loadGoodsReceiptNote() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			current.executeScript("PF('tablect').clearFilters();");
+			if (goodsReceiptNoteSelect != null) {
+				goodsReceiptNoteCrud = goodsReceiptNoteSelect.clone();
+				// load chi tiết phiếu nhập
+				listGoodsReceiptNoteDetail = new ArrayList<>();
+				goodsReceiptNoteDetailService.selectByReceiptNote(goodsReceiptNoteCrud.getId(),
+						listGoodsReceiptNoteDetail);
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.loadGoodsReceiptNote:" + e.getMessage(), e);
+		}
+	}
+
+	public void nextOrPrev(int next) {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (listGoodsReceiptNote != null && listGoodsReceiptNote.size() > 0) {
+				int index = listGoodsReceiptNote.indexOf(goodsReceiptNoteCrud);
+				int size = listGoodsReceiptNote.size() - 1;
+				if (index == -1) {
+					goodsReceiptNoteSelect = listGoodsReceiptNote.get(0);
+					goodsReceiptNoteCrud = goodsReceiptNoteSelect.clone();
+				} else {
+					switch (next) {
+					case 1:
+						if (index == size) {
+							goodsReceiptNoteSelect = listGoodsReceiptNote.get(0);
+							goodsReceiptNoteCrud = goodsReceiptNoteSelect.clone();
+						} else {
+							goodsReceiptNoteSelect = listGoodsReceiptNote.get(index + 1);
+							goodsReceiptNoteCrud = goodsReceiptNoteSelect.clone();
+						}
+						break;
+
+					default:
+						if (index == 0) {
+							goodsReceiptNoteSelect = listGoodsReceiptNote.get(size);
+							goodsReceiptNoteCrud = goodsReceiptNoteSelect.clone();
+						} else {
+							goodsReceiptNoteSelect = listGoodsReceiptNote.get(index - 1);
+							goodsReceiptNoteCrud = goodsReceiptNoteSelect.clone();
+						}
+						break;
+					}
+				}
+				// load chi tiết phiếu nhập
+				listGoodsReceiptNoteDetail = new ArrayList<>();
+				goodsReceiptNoteDetailService.selectByReceiptNote(goodsReceiptNoteCrud.getId(),
+						listGoodsReceiptNoteDetail);
+			}
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteBean.nextOrPrev:" + e.getMessage(), e);
+		}
+		// clear filter
+		current.executeScript("PF('tablect').clearFilters();");
+	}
+
+	public void exportGoodsReceiptNew() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (goodsReceiptNoteCrud != null) {
+				String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+						.getRealPath("/resources/reports/nhaphang/phieunhapsp.jasper");
+				Map<String, Object> importParam = new HashMap<String, Object>();
+				Locale locale = new Locale("vi", "VI");
+				importParam.put(JRParameter.REPORT_LOCALE, locale);
+
+				List<ParamReportDetail> listConfig = paramReportDetailService.findByParamReportName("thongtinchung");
+				for (ParamReportDetail p : listConfig) {
+					importParam.put(p.getKey(), p.getValue());
+				}
+
+				importParam.put("import_date",
+						ToolTimeCustomer.convertDateToString(goodsReceiptNoteCrud.getImport_date(), "dd/MM/yyyy"));
+				importParam.put("import_date_Str",
+						ToolTimeCustomer.convertDateToStringNgayThangNam(goodsReceiptNoteCrud.getImport_date()));
+				importParam.put("note", goodsReceiptNoteCrud.getNote());
+				importParam.put("customer_name", goodsReceiptNoteCrud.getCustomer() != null ? goodsReceiptNoteCrud
+						.getCustomer().getCustomer_name() : "");
+				importParam.put("license_plate", listGoodsReceiptNoteDetail.get(0).getLicense_plate());
+				importParam.put("voucher_code", goodsReceiptNoteCrud.getVoucher_code());
+				importParam.put("listDetail", listGoodsReceiptNoteDetail);
+
+				double totalAmount = 0;
+				for (GoodsReceiptNoteDetail i : listGoodsReceiptNoteDetail) {
+					totalAmount += i.getTotal();
+				}
+
+				// Kiem tra khong hien don gia va tong tien
+				boolean khonghiendgtt = false;
+				if (goodsReceiptNoteCrud.getIe_categories() != null
+						&& "Q".equals(goodsReceiptNoteCrud.getIe_categories().getCode())) {
+					khonghiendgtt = true;
+				}
+				importParam.put("khonghiendgtt", khonghiendgtt);
+				totalAmount = MyMath.round(totalAmount);
+				importParam.put("words_total", ConvertNumberToText.docSo(totalAmount, "ĐỒNG"));
+				JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam,
+						new JRBeanCollectionDataSource(listGoodsReceiptNoteDetail));
+				byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+				String ba = Base64.getEncoder().encodeToString(data);
+				current.executeScript("utility.printPDF('" + ba + "')");
+			}
+		} catch (Exception e) {
+			logger.error("GoogsReceiptNoteBean.exportGoodsReceiptNew:" + e.getMessage(), e);
+		}
+		// clear filter
+		current.executeScript("PF('tablect').clearFilters();");
+	}
+
+	private Workbook getWorkbook(InputStream inputStream, String nameFile) throws IOException {
+		Workbook workbook = null;
+		if (nameFile.endsWith("xlsx")) {
+			workbook = new XSSFWorkbook(inputStream);
+		} else if (nameFile.endsWith("xls")) {
+			workbook = new HSSFWorkbook(inputStream);
+		} else {
+			throw new IllegalArgumentException("The specified file is not Excel file");
+		}
+
+		return workbook;
+	}
+
+	@Getter
+	@Setter
+	boolean ghilaidulieu = false;
+
+	public void loadFileExcelVCNB(FileUploadEvent event) {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (event.getFile() != null) {
+				UploadedFile part = event.getFile();
+				byte[] byteFile = event.getFile().getContent();
+				List<GoodsReceiptNoteDetail> listDetail = new ArrayList<>();
+				Workbook workBook = getWorkbook(new ByteArrayInputStream(byteFile), part.getFileName());
+				Sheet firstSheet = workBook.getSheetAt(0);
+				Iterator<Row> rows = firstSheet.iterator();
+				while (rows.hasNext()) {
+					rows.next();
+					rows.remove();
+					break;
+				}
+				lv1: while (rows.hasNext()) {
+					Row row = rows.next();
+					Iterator<Cell> cells = row.cellIterator();
+					GoodsReceiptNoteDetail lix = new GoodsReceiptNoteDetail();
+					while (cells.hasNext()) {
+						Cell cell = cells.next();
+						int columnIndex = cell.getColumnIndex();
+						switch (columnIndex) {
+						case 1:
+							try {
+								// so ct
+								String soct = Objects.toString(MyUtilExcel.getCellValue(cell), null);
+								if (soct != null && !"".equals(soct)) {
+									lix.setVcnb_invoice_code(soct);
+								} else {
+									continue lv1;
+								}
+							} catch (Exception e) {
+							}
+							break;
+						// case 3:
+						// try {
+						// String maKH =
+						// Objects.toString(MyUtilExcel.getCellValue(cell),
+						// null);
+						// if (maKH != null && !"".equals(maKH)) {
+						// //CO125: maKH CÔNG TY CỔ PHẦN BỘT GIẶT LIX
+						// if (!"CO125".equals(maKH)) {
+						// continue lv1;
+						// }
+						// } else {
+						// continue lv1;
+						// }
+						// } catch (Exception e) {
+						// }
+						// break;
+
+						case 7:
+							try {
+								// ma sp
+								String masp = Objects.toString(MyUtilExcel.getCellValue(cell), null);
+								try {
+									double maspIsNumber = Double.parseDouble(masp);
+									masp=((int) maspIsNumber)+"";
+								} catch (Exception e) {
+								}
+								if (masp != null && !"".equals(masp)) {
+									ProductReqInfo p = new ProductReqInfo();
+									productService.selectByCode(masp, p);
+									if (p.getProduct() != null) {
+										lix.setProduct(p.getProduct());
+									} else {
+										continue lv1;
+									}
+								} else {
+									continue lv1;
+								}
+							} catch (Exception e) {
+							}
+							break;
+						case 9:
+							try {
+								// số lượng
+								String soluong = Objects.toString(MyUtilExcel.getCellValue(cell), "0");
+								double sl = Double.parseDouble(soluong);
+								if (sl == 0) {
+									continue lv1;
+								} else {
+									lix.setQuantity(sl);
+								}
+							} catch (Exception e) {
+							}
+							break;
+						case 11:
+							try {
+								// so xe
+								String soxe = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+								if (!"null".equals(soxe)) {
+									lix.setLicense_plate(soxe);
+								} else {
+									lix.setLicense_plate("");
+								}
+							} catch (Exception e) {
+							}
+							break;
+						case 12:
+							try {
+								// don gia
+								String dongiaStr = Objects.toString(MyUtilExcel.getCellValue(cell), "0");
+								double dongia = Double.parseDouble(dongiaStr);
+								lix.setPrice(dongia);
+							} catch (Exception e) {
+							}
+							break;
+						case 13:
+							try {
+								// so tien
+								String sotienStr = Objects.toString(MyUtilExcel.getCellValue(cell), "0");
+								double sotien = Double.parseDouble(sotienStr);
+								lix.setTotal(sotien);
+							} catch (Exception e) {
+							}
+							break;
+						case 31:
+							try {
+								// lo hang
+								String malohang = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+								lix.setBatch_code(malohang);
+							} catch (Exception e) {
+							}
+							break;
+						case 36:
+							try {
+								// PO
+								String soPo = Objects.toString(MyUtilExcel.getCellValue(cell), "");
+								lix.setPo(soPo);
+							} catch (Exception e) {
+							}
+							break;
+
+						}
+					}
+					listDetail.add(lix);
+				}
+				workBook = null;// free
+				if (listGoodsReceiptNoteDetail == null)
+					listGoodsReceiptNoteDetail = new ArrayList<>();
+				if (ghilaidulieu) {
+					for (int i = 0; i < listGoodsReceiptNoteDetail.size(); i++) {
+						try {
+							// String idfox =
+							// goodsReceiptNoteService.getIdFoxNhapSP(listGoodsReceiptNoteDetail.get(i)
+							// .getId());
+							Message message = new Message();
+							int code = processLogicGoodsReceiptNoteService.deleteGoodsReceiptNoteDetailMaster(
+									listGoodsReceiptNoteDetail.get(i).getId(), message);
+							if (code > 0) {
+								// thực hiện gọi api xóa bên foxpro
+								// deleteReceiptDetailFoxPro(idfox);
+							}
+						} catch (Exception e) {
+							// TODO: handle exception
+						}
+					}
+					listGoodsReceiptNoteDetail.clear();
+				}
+
+				for (GoodsReceiptNoteDetail it : listDetail) {
+					listGoodsReceiptNoteDetail.add(it);
+				}
+				if (goodsReceiptNoteCrud.getId() == 0) {
+					IECategoriesReqInfo t = new IECategoriesReqInfo();
+					ieCategoriesService.selectByCode("N", t);// N: nhap noi bo
+					goodsReceiptNoteCrud.setIe_categories(t.getIe_categories());
+
+					WarehouseReqInfo a = new WarehouseReqInfo();
+					warehouseService.selectByCode("F", a);
+					goodsReceiptNoteCrud.setWarehouse(a.getWarehouse());
+				}
+				notify.success();
+
+			}
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteBean.loadFileExcel:" + e.getMessage(), e);
+		}
+		// clear filter
+		current.executeScript("PF('tablect').clearFilters();");
+	}
+
+	public void showDialogUpload() {
+		PrimeFaces current = PrimeFaces.current();
+		current.executeScript("PF('dlgup1').show();");
+	}
+
+	public void exportExcelTongHop() {
+		try {
+			List<Long> idReceipt = new ArrayList<Long>();
+			int size = listGoodsReceiptNote.size();
+			for (int i = 0; i < size; i++) {
+				idReceipt.add(listGoodsReceiptNote.get(i).getId());
+			}
+			List<Object[]> datas = new ArrayList<>();
+			goodsReceiptNoteService.selectByIdToExcel(idReceipt, datas);
+
+			// xuat file excel.
+			if (datas.size() > 0) {
+				List<Object[]> results = new ArrayList<Object[]>();
+				Object[] title = { "Mã KH xuất", "Số CT", "Ngày", "Mã KH", "Mã XN", "Số HĐ", "Mã SP", "Tên SP",
+						"Số lượng", "IDCT", "Số xe", "Mã lô hàng", "Đơn giá", "Thành tiền", "Hệ số quy đổi",
+						"Số lượng (kg)", "ID phiếu nhập" };
+				results.add(title);
+				for (Object[] it : datas) {
+					try {
+						results.add(it);
+					} catch (Exception e) {
+						// TODO: handle exception
+					}
+
+				}
+				String ngaynhap = "";
+				try {
+					ngaynhap = MyUtil.chuyensangStrCode(fromDateSearch) + "_" + MyUtil.chuyensangStrCode(toDateSearch);
+				} catch (Exception e) {
+					// TODO: handle exception
+				}
+				ToolReport.printReportExcelRawXLSX(results, "phieunhap_" + ngaynhap);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			logger.error("goodsReceiptNoteBean.exportExcelTongHop:" + e.getMessage(), e);
+		}
+	}
+
+	@Override
+	protected Logger getLogger() {
+		return logger;
+	}
+
+	public GoodsReceiptNoteDetail getGoodsReceiptNoteDetailCrud() {
+		return goodsReceiptNoteDetailCrud;
+	}
+
+	public void setGoodsReceiptNoteDetailCrud(GoodsReceiptNoteDetail goodsReceiptNoteDetailCrud) {
+		this.goodsReceiptNoteDetailCrud = goodsReceiptNoteDetailCrud;
+	}
+
+	public GoodsReceiptNoteDetail getGoodsReceiptNoteDetailSelect() {
+		return goodsReceiptNoteDetailSelect;
+	}
+
+	public void setGoodsReceiptNoteDetailSelect(GoodsReceiptNoteDetail goodsReceiptNoteDetailSelect) {
+		this.goodsReceiptNoteDetailSelect = goodsReceiptNoteDetailSelect;
+	}
+
+	public List<GoodsReceiptNoteDetail> getListGoodsReceiptNoteDetail() {
+		return listGoodsReceiptNoteDetail;
+	}
+
+	public void setListGoodsReceiptNoteDetail(List<GoodsReceiptNoteDetail> listGoodsReceiptNoteDetail) {
+		this.listGoodsReceiptNoteDetail = listGoodsReceiptNoteDetail;
+	}
+
+	public GoodsReceiptNote getGoodsReceiptNoteCrud() {
+		return goodsReceiptNoteCrud;
+	}
+
+	public void setGoodsReceiptNoteCrud(GoodsReceiptNote goodsReceiptNoteCrud) {
+		this.goodsReceiptNoteCrud = goodsReceiptNoteCrud;
+	}
+
+	public GoodsReceiptNote getGoodsReceiptNoteSelect() {
+		return goodsReceiptNoteSelect;
+	}
+
+	public void setGoodsReceiptNoteSelect(GoodsReceiptNote goodsReceiptNoteSelect) {
+		this.goodsReceiptNoteSelect = goodsReceiptNoteSelect;
+	}
+
+	public List<GoodsReceiptNote> getListGoodsReceiptNote() {
+		return listGoodsReceiptNote;
+	}
+
+	public void setListGoodsReceiptNote(List<GoodsReceiptNote> listGoodsReceiptNote) {
+		this.listGoodsReceiptNote = listGoodsReceiptNote;
+	}
+
+	public List<IECategories> getListIECategories() {
+		return listIECategories;
+	}
+
+	public void setListIECategories(List<IECategories> listIECategories) {
+		this.listIECategories = listIECategories;
+	}
+
+	public FormatHandler getFormatHandler() {
+		return formatHandler;
+	}
+
+	public void setFormatHandler(FormatHandler formatHandler) {
+		this.formatHandler = formatHandler;
+	}
+
+	public List<Warehouse> getListWarehouse() {
+		return listWarehouse;
+	}
+
+	public void setListWarehouse(List<Warehouse> listWarehouse) {
+		this.listWarehouse = listWarehouse;
+	}
+
+	public Date getFromDateSearch() {
+		return fromDateSearch;
+	}
+
+	public void setFromDateSearch(Date fromDateSearch) {
+		this.fromDateSearch = fromDateSearch;
+	}
+
+	public Date getToDateSearch() {
+		return toDateSearch;
+	}
+
+	public void setToDateSearch(Date toDateSearch) {
+		this.toDateSearch = toDateSearch;
+	}
+
+	public Customer getCustomerSearch() {
+		return customerSearch;
+	}
+
+	public void setCustomerSearch(Customer customerSearch) {
+		this.customerSearch = customerSearch;
+	}
+
+	public IECategories getIeCategoriesSearch() {
+		return ieCategoriesSearch;
+	}
+
+	public void setIeCategoriesSearch(IECategories ieCategoriesSearch) {
+		this.ieCategoriesSearch = ieCategoriesSearch;
+	}
+
+	public Warehouse getWarehouseSearch() {
+		return warehouseSearch;
+	}
+
+	public void setWarehouseSearch(Warehouse warehouseSearch) {
+		this.warehouseSearch = warehouseSearch;
+	}
+
+	public Product getProductSearch() {
+		return productSearch;
+	}
+
+	public void setProductSearch(Product productSearch) {
+		this.productSearch = productSearch;
+	}
+
+	public String getBatchCodeSearch() {
+		return batchCodeSearch;
+	}
+
+	public void setBatchCodeSearch(String batchCodeSearch) {
+		this.batchCodeSearch = batchCodeSearch;
+	}
+
+	public Date getDeliveryDate() {
+		return deliveryDate;
+	}
+
+	public void setDeliveryDate(Date deliveryDate) {
+		this.deliveryDate = deliveryDate;
+	}
+
+	public ShiftLix getShiftSearch() {
+		return shiftSearch;
+	}
+
+	public void setShiftSearch(ShiftLix shiftSearch) {
+		this.shiftSearch = shiftSearch;
+	}
+
+	public List<ShiftLix> getListShift() {
+		return listShift;
+	}
+
+	public void setListShift(List<ShiftLix> listShift) {
+		this.listShift = listShift;
+	}
+
+	public List<Delivery> getListDelivery() {
+		return listDelivery;
+	}
+
+	public void setListDelivery(List<Delivery> listDelivery) {
+		this.listDelivery = listDelivery;
+	}
+
+	public GoodsReceiptNote getGooodsReceiptNoteD() {
+		return gooodsReceiptNoteD;
+	}
+
+	public void setGooodsReceiptNoteD(GoodsReceiptNote gooodsReceiptNoteD) {
+		this.gooodsReceiptNoteD = gooodsReceiptNoteD;
+	}
+
+	public String getImportCodeTH() {
+		return importCodeTH;
+	}
+
+	public void setImportCodeTH(String importCodeTH) {
+		this.importCodeTH = importCodeTH;
+	}
+
+	public Delivery getDeliveryProcess() {
+		return deliveryProcess;
+	}
+
+	public void setDeliveryProcess(Delivery deliveryProcess) {
+		this.deliveryProcess = deliveryProcess;
+	}
+
+	public List<GoodsReceiptNoteDetail> getListGoodsReceiptNoteDetailFilter() {
+		return listGoodsReceiptNoteDetailFilter;
+	}
+
+	public void setListGoodsReceiptNoteDetailFilter(List<GoodsReceiptNoteDetail> listGoodsReceiptNoteDetailFilter) {
+		this.listGoodsReceiptNoteDetailFilter = listGoodsReceiptNoteDetailFilter;
+	}
+
+	public AccountDatabaseService getAccountDatabaseService() {
+		return accountDatabaseService;
+	}
+
+	public void setAccountDatabaseService(AccountDatabaseService accountDatabaseService) {
+		this.accountDatabaseService = accountDatabaseService;
+	}
+
+}

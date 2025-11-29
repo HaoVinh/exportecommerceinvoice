@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Người
+			vận chuyển</h3>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<div class="col-md-4">
+					<p:panel header="Thông tin" styleClass="panelw100">
+						<h:panelGrid id="info">
+							<label>Mã NVC (tự động) </label>
+							<p:inputText readonly="true"
+								value="#{carrierBean.carrierCrud.carrier_code}" />
+							<label>Tên người vận chuyển<span style="color: red;">*</span></label>
+							<p:inputText value="#{carrierBean.carrierCrud.carrier_name}" />
+							<label>Ghi chú</label>
+							<p:inputTextarea rows="2" value="#{carrierBean.carrierCrud.note}" />
+						</h:panelGrid>
+						<p:separator />
+
+						<p:commandLink process="@this,info"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							action="#{carrierBean.saveOrUpdate()}" styleClass="btn_primmary"
+							update="menuformid:tableid">
+							<i class="fa fa-floppy-o" aria-hidden="true"></i>
+							<span>Lưu/Cập nhật</span>
+						</p:commandLink>
+						<p:commandLink process="@this,info"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							action="#{carrierBean.createNew()}" styleClass="btn_new"
+							update="menuformid:info">
+							<i class="fa fa-file-o" aria-hidden="true"></i>
+							<span>Tạo mới</span>
+						</p:commandLink>
+						<p:commandLink process="@this" id="xoact"
+							action="#{carrierBean.delete()}"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							styleClass="btn_destroy" update=":messages,:menuformid"
+							icon="fa fa-trash">
+							<p:confirm icon="ui-icon-alert" />
+							<i class="fa fa-trash" aria-hidden="true"></i>
+							<span>Xóa</span>
+						</p:commandLink>
+
+					</p:panel>
+				</div>
+				<div class="col-md-8">
+					<p:panel header="Danh sách" id="preview" styleClass="clearfix">
+						<p:commandLink id="idorder" style="padding:4px !important;"
+							styleClass="btn_primmary" icon="fa fa-search">
+							<i class="fa fa-search" aria-hidden="true"></i>
+							<span>Tìm kiếm</span>
+						</p:commandLink>
+						<p:commandLink styleClass="btn_printtt"
+							style="padding:4px !important;" update="editdetail"
+							process="@this" ajax="false" target="blank_"
+							action="#{carrierBean.exportExcel()}">
+							<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+							<span>Xuất excel</span>
+						</p:commandLink>
+						<p:overlayPanel id="imagePanel" for="idorder" hideEffect="fade"
+							dismissable="false" widgetVar="panelsearch" style="width:300px;">
+							<div class="col-md-12" style="padding: 5px">
+								<div class="row">
+									<div class="col-md-12"
+										style="padding-left: 0px !important; padding-right: 0px !important;">
+										<label>Mã NVC</label>
+										<p:inputText value="#{carrierBean.carrierCode}"
+											style="width:100%" />
+									</div>
+									<div class="col-md-12"
+										style="padding-left: 0px !important; padding-right: 0px !important;">
+										<label>Tên NVC</label>
+										<p:inputText value="#{carrierBean.carrierName}"
+											style="width:100%" />
+									</div>
+								</div>
+								<div class="row" style="text-align: right">
+									<p:separator />
+									<p:commandLink process="menuformid:imagePanel"
+										oncomplete="PF('panelsearch').hide()"
+										styleClass="btn_primmary"
+										actionListener="#{carrierBean.search()}"
+										update="menuformid:tableid">
+										<span>Tìm</span>
+									</p:commandLink>
+								</div>
+							</div>
+						</p:overlayPanel>
+						<p:dataTable value="#{carrierBean.listCarrier}"
+							paginatorPosition="bottom" scrollHeight="370" paginator="true"
+							rowKey="#{item.id}" selection="#{carrierBean.carrierSelect}"
+							scrollable="true" styleClass="tablenhapsp tableright1"
+							style="width:100%;" selectionMode="single" id="tableid" rows="50"
+							widgetVar="datatb" resizableColumns="true" var="item">
+							<p:ajax event="rowSelect" listener="#{carrierBean.showEdit()}"
+								update="menuformid:info" />
+							<p:column headerText="ID" width="50">
+								<h:outputText value="#{item.id}" />
+							</p:column>
+							<p:column headerText="Mã NVC" width="100">
+								<h:outputText value="#{item.carrier_code}" />
+							</p:column>
+							<p:column headerText="Tên người vận chuyển">
+								<h:outputText value="#{item.carrier_name}" />
+							</p:column>
+						</p:dataTable>
+					</p:panel>
+				</div>
+			</h:form>
+		</div>
+	</ui:define>
+</ui:composition>

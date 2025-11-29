@@ -1,0 +1,209 @@
+package vinh.lixco.com.apiecommerce;
+
+import java.io.IOException;
+import java.util.stream.Collectors;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
+@Path("tiktok")
+public class TikTokAPIServlet {
+
+//    // Constants
+//    private static final String API_NAME = "/auth/token/create";
+//    private static final String SIGN_METHOD_HMAC = "hmac";
+//    private static final String SIGN_METHOD_HMAC_SHA256 = "HmacSHA256";
+//    private static final String CHARSET_UTF8 = "UTF-8";
+//
+//    // Placeholder for app secret and key
+//    private static final String APP_SECRET = "RZTQdjz5VUdnpQ81koTwuQ0lrBJlnepC";
+//    private static final String APP_KEY = "133487";
+
+    @GET
+    @Path("/orders")
+    @Produces("application/json; charset=utf-8")
+    public Response findOrders(@Context HttpServletRequest request) 
+            throws IOException, javax.servlet.ServletException {
+        StringBuilder result = new StringBuilder();
+        ResponseBuilder responseBuilder = Response.status(Response.Status.OK);
+
+        try {
+            String body = request.getReader().lines().collect(Collectors.joining());
+            System.out.println("Request body: " + body);
+            String authHeader = request.getHeader("Authorization");
+            System.out.println("Authorization header: " + authHeader);
+
+            result.append("{\"code\":\"0\",\"message\":\"Success\"}");
+        } catch (Exception e) {
+            result.append("{\"code\":\"-1\",\"message\":\"Error processing request\"}");
+            responseBuilder = Response.status(Response.Status.INTERNAL_SERVER_ERROR);
+        }
+        return responseBuilder.entity(result.toString()).build();
+    }
+//    @GET
+//    @Path("/auth/token/create")
+//    @Produces("application/json; charset=utf-8")
+//    public Response generateAccessToken(
+//            @QueryParam("code") String code,
+//            @Context HttpServletRequest request) throws IOException {
+//        ResponseBuilder responseBuilder = Response.status(Response.Status.OK);
+//        StringBuilder result = new StringBuilder();
+//
+//        try {
+//            LazopClient client = new LazopClient("https://auth.lazada.com/rest", APP_KEY, APP_SECRET);
+//            LazopRequest req = new LazopRequest();
+//            req.setApiName("/auth/token/create");
+//            if (code != null && !code.isEmpty()) {
+//                req.addApiParameter("code", code);
+//            }
+//            req.addApiParameter("app_key", APP_KEY);
+//            req.addApiParameter("timestamp", String.valueOf(System.currentTimeMillis()));
+//            req.addApiParameter("sign_method", SIGN_METHOD_HMAC_SHA256);
+//
+//            LazopResponse response = client.execute(req);
+//            result.append(response.getBody());
+//        } catch (Exception e) {
+//            result.append("{\"code\":\"-1\",\"message\":\"Error processing request: " + e.getMessage() + "\"}");
+//            responseBuilder = Response.status(Response.Status.INTERNAL_SERVER_ERROR);
+//        }
+//
+//        return responseBuilder.entity(result.toString()).build();
+//    }
+//    @GET
+//    @Path("/auth/token/create")
+//    @Produces("application/json; charset=utf-8")
+//    public Response generateAccessToken(
+//            @QueryParam("app_key") String appKey,
+//            @QueryParam("timestamp") String timestamp,
+//            @QueryParam("sign_method") String signMethod,
+//            @QueryParam("sign") String sign,
+//            @Context HttpServletRequest request) throws IOException {
+//
+//        ResponseBuilder responseBuilder = Response.status(Response.Status.OK);
+//        StringBuilder result = new StringBuilder();
+//
+//
+//        appKey = (appKey != null) ? appKey : APP_KEY;
+//        timestamp = (timestamp != null) ? timestamp : String.valueOf(System.currentTimeMillis()); 
+//        signMethod = (signMethod != null) ? signMethod : SIGN_METHOD_HMAC_SHA256;
+//        sign = (sign != null) ? sign : calculateDefaultSign(appKey, timestamp, signMethod);
+//
+//        System.out.println("appKey: " + appKey);
+//        System.out.println("timestamp: " + timestamp);
+//        System.out.println("signMethod: " + signMethod);
+//        System.out.println("sign: " + sign);
+//
+//        Map<String, String> params = new HashMap<>();
+//        params.put("app_key", appKey);
+//        params.put("timestamp", timestamp);
+//        params.put("sign_method", signMethod);
+//        
+//
+//
+//        String calculatedSign;
+//        try {
+//            calculatedSign = signApiRequest(params, null, APP_SECRET, signMethod, API_NAME);
+//            System.out.println("Calculated Sign: " + calculatedSign);
+//        } catch (IOException e) {
+//            result.append("{\"code\":\"-1\",\"message\":\"Error generating signature\"}");
+//            return responseBuilder.entity(result.toString()).build();
+//        }
+//
+//
+//        if (!calculatedSign.equals(sign.toUpperCase())) {
+//            result.append("{\"code\":\"-1\",\"message\":\"Invalid signature\"}");
+//            return responseBuilder.entity(result.toString()).build();
+//        }
+//
+//  
+//        String accessToken = "sample_access_token_" + System.currentTimeMillis();
+//        result.append("{\"code\":\"0\",\"message\":\"Success\",\"access_token\":\"" + accessToken + "\"}");
+//
+//        return responseBuilder.entity(result.toString()).build();
+//    }
+//
+//    private String calculateDefaultSign(String appKey, String timestamp, String signMethod) throws IOException {
+//        Map<String, String> params = new HashMap<>();
+//        params.put("app_key", appKey);
+//        params.put("timestamp", timestamp);
+//        params.put("sign_method", signMethod);
+//        return signApiRequest(params, null, APP_SECRET, signMethod, API_NAME);
+//    }
+//
+//    public static String signApiRequest(Map<String, String> params, String body, String appSecret, String signMethod, String apiName) throws IOException {
+//        String[] keys = params.keySet().toArray(new String[0]);
+//        Arrays.sort(keys);
+//
+//
+//        StringBuilder query = new StringBuilder();
+//        query.append(apiName);
+//        for (String key : keys) {
+//            String value = params.get(key);
+//            if (areNotEmpty(key, value)) {
+//                query.append(key).append(value);
+//            }
+//        }
+//
+//
+//        if (body != null) {
+//            query.append(body);
+//        }
+//
+//
+//        byte[] bytes = null;
+//        try {
+//            if (signMethod.equals(SIGN_METHOD_HMAC)) {
+//                bytes = encryptWithHmac(query.toString(), appSecret);
+//            } else if (signMethod.equals(SIGN_METHOD_HMAC_SHA256)) {
+//                bytes = encryptHMACSHA256(query.toString(), appSecret);
+//            }
+//        } catch (Exception e) {
+//            throw new IOException(e.toString());
+//        }
+//
+//
+//        return byte2hex(bytes);
+//    }
+//
+//    private static byte[] encryptHMACSHA256(String data, String secret) throws IOException {
+//        byte[] bytes = null;
+//        try {
+//            SecretKeySpec secretKey = new SecretKeySpec(secret.getBytes(CHARSET_UTF8), SIGN_METHOD_HMAC_SHA256);
+//            Mac mac = Mac.getInstance(SIGN_METHOD_HMAC_SHA256);
+//            mac.init(secretKey);
+//            bytes = mac.doFinal(data.getBytes(CHARSET_UTF8));
+//        } catch (GeneralSecurityException gse) {
+//            throw new IOException(gse.toString());
+//        }
+//        return bytes;
+//    }
+//
+//    /**
+//     * Transfer binary array to HEX string.
+//     */
+//    public static String byte2hex(byte[] bytes) {
+//        StringBuilder sign = new StringBuilder();
+//        for (int i = 0; i < bytes.length; i++) {
+//            String hex = Integer.toHexString(bytes[i] & 0xFF);
+//            if (hex.length() == 1) {
+//                sign.append("0");
+//            }
+//            sign.append(hex.toUpperCase());
+//        }
+//        return sign.toString();
+//    }
+//
+//    // Utility method to check if strings are not empty
+//    private static boolean areNotEmpty(String... values) {
+//        return Arrays.stream(values).allMatch(s -> s != null && !s.isEmpty());
+//    }
+//
+//    // Placeholder for encryptWithHmac
+//    private static byte[] encryptWithHmac(String data, String secret) throws IOException {
+//        return encryptHMACSHA256(data, secret); // Default to HMAC-SHA256
+//    }
+}

@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.0.0.final using JasperReports Library version 6.0.0  -->
+<!-- 2023-01-08T10:40:09 -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="bao_cao_nhap_xuat_san_pham" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="7f72ba5a-247d-4327-b37e-08597c464d34">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<import value="lixco.com.common.ToolTimeCustomer"/>
+	<import value="lixco.com.common.FormatHandler"/>
+	<parameter name="title" class="java.lang.String"/>
+	<parameter name="tencongty" class="java.lang.String"/>
+	<queryString>
+		<![CDATA[]]>
+	</queryString>
+	<field name="data_date" class="java.util.Date"/>
+	<field name="product_type_id" class="java.lang.Long"/>
+	<field name="product_type_code" class="java.lang.String"/>
+	<field name="product_type_name" class="java.lang.String"/>
+	<field name="ie_categories_id" class="java.lang.Long"/>
+	<field name="ie_categories_code" class="java.lang.String"/>
+	<field name="ie_categories_name" class="java.lang.String"/>
+	<field name="import_quantity" class="java.lang.Double"/>
+	<field name="export_quantity" class="java.lang.Double"/>
+	<variable name="import_quantity_gr1" class="java.lang.Double" resetType="Group" resetGroup="Group1" calculation="Sum">
+		<variableExpression><![CDATA[$F{import_quantity}]]></variableExpression>
+	</variable>
+	<variable name="export_quantity_gr1" class="java.lang.Double" resetType="Group" resetGroup="Group1" calculation="Sum">
+		<variableExpression><![CDATA[$F{export_quantity}]]></variableExpression>
+	</variable>
+	<group name="Group1" isStartNewPage="true">
+		<groupExpression><![CDATA[$F{data_date}]]></groupExpression>
+		<groupHeader>
+			<band height="48">
+				<textField isStretchWithOverflow="true" evaluationTime="Group" evaluationGroup="Group1" isBlankWhenNull="true">
+					<reportElement isPrintRepeatedValues="false" x="341" y="3" width="214" height="20" printWhenGroupChanges="Group1" forecolor="#BA201E" uuid="a1708528-ac15-4c54-8629-b387cafb204c">
+						<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					</reportElement>
+					<box rightPadding="3"/>
+					<textElement textAlignment="Right" verticalAlignment="Middle">
+						<font fontName="FontReport" size="8" isBold="true"/>
+					</textElement>
+					<textFieldExpression><![CDATA["Thứ "+ToolTimeCustomer.getDayOFWeek($F{data_date})+","+ToolTimeCustomer.convertDateToString($F{data_date}, "dd/MM/yyyy")]]></textFieldExpression>
+				</textField>
+				<staticText>
+					<reportElement isPrintRepeatedValues="false" x="0" y="28" width="355" height="20" printWhenGroupChanges="Group1" uuid="c638d4b5-e34f-43cf-9557-92d44a326f0f">
+						<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					</reportElement>
+					<box>
+						<topPen lineWidth="0.23"/>
+						<leftPen lineWidth="0.23"/>
+						<bottomPen lineWidth="0.23"/>
+						<rightPen lineWidth="0.23"/>
+					</box>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font fontName="FontReport" isBold="true"/>
+					</textElement>
+					<text><![CDATA[PHÂN LOẠI]]></text>
+				</staticText>
+				<staticText>
+					<reportElement isPrintRepeatedValues="false" x="355" y="28" width="100" height="20" printWhenGroupChanges="Group1" uuid="be4fa0e2-0a8f-4eda-a6c5-511083a85762">
+						<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					</reportElement>
+					<box>
+						<topPen lineWidth="0.23"/>
+						<leftPen lineWidth="0.23"/>
+						<bottomPen lineWidth="0.23"/>
+						<rightPen lineWidth="0.23"/>
+					</box>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font fontName="FontReport" isBold="true"/>
+					</textElement>
+					<text><![CDATA[NHẬP]]></text>
+				</staticText>
+				<staticText>
+					<reportElement isPrintRepeatedValues="false" x="455" y="28" width="100" height="20" printWhenGroupChanges="Group1" uuid="80fb6077-b0de-4011-bc50-9ad4a0809b24">
+						<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					</reportElement>
+					<box>
+						<topPen lineWidth="0.23"/>
+						<leftPen lineWidth="0.23"/>
+						<bottomPen lineWidth="0.23"/>
+						<rightPen lineWidth="0.23"/>
+					</box>
+					<textElement textAlignment="Center" verticalAlignment="Middle">
+						<font fontName="FontReport" isBold="true"/>
+					</textElement>
+					<text><![CDATA[XUẤT]]></text>
+				</staticText>
+			</band>
+		</groupHeader>
+	</group>
+	<group name="Group2">
+		<groupExpression><![CDATA[$F{product_type_id}]]></groupExpression>
+		<groupHeader>
+			<band height="20">
+				<textField isStretchWithOverflow="true" evaluationTime="Group" evaluationGroup="Group2" isBlankWhenNull="true">
+					<reportElement x="0" y="0" width="355" height="20" uuid="51519c3c-e787-48af-b0a4-069374043bc8">
+						<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					</reportElement>
+					<box topPadding="3" leftPadding="3" bottomPadding="3" rightPadding="3">
+						<leftPen lineWidth="0.23"/>
+						<rightPen lineWidth="0.23"/>
+					</box>
+					<textElement verticalAlignment="Middle">
+						<font fontName="FontReport" size="8" isBold="true"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$F{product_type_name}]]></textFieldExpression>
+				</textField>
+				<textField isStretchWithOverflow="true" evaluationTime="Group" evaluationGroup="Group2" isBlankWhenNull="true">
+					<reportElement x="355" y="0" width="100" height="20" uuid="eafdfac9-eab8-4812-a715-c6da29e2ee25">
+						<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					</reportElement>
+					<box topPadding="3" leftPadding="3" bottomPadding="3" rightPadding="3">
+						<leftPen lineWidth="0.23"/>
+						<rightPen lineWidth="0.23"/>
+					</box>
+					<textElement textAlignment="Right" verticalAlignment="Middle">
+						<font fontName="FontReport" size="8" isBold="true"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$V{import_quantity_gr1}==0 ? "" :FormatHandler.getInstance().getNumberFormat($V{import_quantity_gr1}, 1000)]]></textFieldExpression>
+				</textField>
+				<textField isStretchWithOverflow="true" evaluationTime="Group" evaluationGroup="Group2" isBlankWhenNull="true">
+					<reportElement x="455" y="0" width="100" height="20" uuid="9df02388-545a-401b-bb96-1214ba78a58b">
+						<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					</reportElement>
+					<box topPadding="3" leftPadding="3" bottomPadding="3" rightPadding="3">
+						<leftPen lineWidth="0.23"/>
+						<rightPen lineWidth="0.23"/>
+					</box>
+					<textElement textAlignment="Right" verticalAlignment="Middle">
+						<font fontName="FontReport" size="8" isBold="true"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$V{export_quantity_gr1}==0 ? "" :FormatHandler.getInstance().getNumberFormat($V{export_quantity_gr1}, 1000)]]></textFieldExpression>
+				</textField>
+			</band>
+		</groupHeader>
+		<groupFooter>
+			<band>
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<staticText>
+					<reportElement positionType="Float" x="0" y="0" width="555" height="0" uuid="04e18820-b634-43f5-bcc3-4d10ce876859"/>
+					<box>
+						<topPen lineWidth="0.23"/>
+					</box>
+					<text><![CDATA[]]></text>
+				</staticText>
+			</band>
+		</groupFooter>
+	</group>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<pageHeader>
+		<band height="37">
+			<textField>
+				<reportElement x="0" y="17" width="555" height="20" uuid="51927263-faeb-4145-9161-2b705b3eac71">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="FontReport" isBold="true" isItalic="false"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{title}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement x="0" y="0" width="555" height="14" uuid="e6156389-ef12-4403-9e62-e3e5b4dbd45f">
+					<property name="local_mesure_unitwidth" value="pixel"/>
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<box leftPadding="0"/>
+				<textElement textAlignment="Left" verticalAlignment="Middle">
+					<font fontName="FontReport" size="9" isBold="true"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{tencongty}]]></textFieldExpression>
+			</textField>
+		</band>
+	</pageHeader>
+	<detail>
+		<band height="20" splitType="Stretch">
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement x="355" y="0" width="100" height="20" uuid="f0645d6f-3e58-4c29-b2ae-e6c23113f0c6">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<box topPadding="3" leftPadding="3" bottomPadding="3" rightPadding="3">
+					<leftPen lineWidth="0.23"/>
+					<rightPen lineWidth="0.23"/>
+				</box>
+				<textElement textAlignment="Right" verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{import_quantity}==0 ? "" :FormatHandler.getInstance().getNumberFormat($F{import_quantity}, 1000)]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement x="455" y="0" width="100" height="20" uuid="f682b3db-4c22-43c5-88b5-96e8b2d93ba2">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<box topPadding="3" leftPadding="3" bottomPadding="3" rightPadding="3">
+					<leftPen lineWidth="0.23"/>
+					<rightPen lineWidth="0.23"/>
+				</box>
+				<textElement textAlignment="Right" verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{export_quantity}==0 ? "" :FormatHandler.getInstance().getNumberFormat($F{export_quantity}, 1000)]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement x="0" y="0" width="355" height="20" uuid="e39df44e-f63e-404e-85e2-2479e58cd154">
+					<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				</reportElement>
+				<box topPadding="3" leftPadding="3" bottomPadding="3" rightPadding="3">
+					<leftPen lineWidth="0.23"/>
+					<rightPen lineWidth="0.23"/>
+				</box>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$F{ie_categories_name}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+	<summary>
+		<band height="26">
+			<staticText>
+				<reportElement x="0" y="6" width="277" height="20" uuid="9bbe78f6-635c-43f1-a804-3d14725e43ad"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[P.KH&KV]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="278" y="6" width="277" height="20" uuid="2c01b37c-359a-464c-8ba4-592fe71b2e88"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="FontReport" size="10" isBold="true"/>
+				</textElement>
+				<text><![CDATA[NGƯỜI LẬP]]></text>
+			</staticText>
+		</band>
+	</summary>
+</jasperReport>

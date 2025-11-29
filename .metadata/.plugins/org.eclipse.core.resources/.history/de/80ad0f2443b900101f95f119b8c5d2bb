@@ -1,0 +1,8 @@
+package vinh.lixco.com.apiecommerce;
+
+import lombok.Data;
+
+@Data
+public class PromotionDTO {
+
+}

@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Danh
+			mục Xe</h3>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<div class="col-md-4">
+					<p:panel header="Thông tin" styleClass="panelw100">
+						<h:panelGrid id="info">
+							<label>Biển số xe (ví dụ: 66S-0485, 29A-12345,
+								15B1-23456,..)<span style="color: red;">*</span>
+							</label>
+							<p:inputText value="#{carBean.carCrud.license_plate}"
+								validatorMessage="Không đúng định dạng xe">
+								<f:validateRegex
+									pattern="([0-9]){2}([a-zA-Z]){0,2}([0-9]){0,2}+\-([0-9]){4,5}+$" />
+							</p:inputText>
+							<label>Tên xe</label>
+							<p:inputText value="#{carBean.carCrud.driver}" />
+							<label>Điện thoại</label>
+							<p:inputText value="#{carBean.carCrud.phone_number}" />
+							<label>Nhóm xe</label>
+							<p:selectOneMenu value="#{carBean.carCrud.car_type}"
+								converter="abstractConverter" effect="fade" var="t"
+								style="width:100%;">
+								<f:selectItem itemLabel="--CHỌN NHÓM XE--" value="#{null}" />
+								<f:selectItems value="#{carBean.listCarType}" var="theme"
+									itemLabel="#{theme.name}" itemValue="#{theme}" />
+								<p:column>
+									<h:outputText value="#{t.code}" />
+								</p:column>
+								<p:column>
+									<h:outputText value="#{t==null ? 'Tất cả' :t.name}" />
+								</p:column>
+							</p:selectOneMenu>
+							<label>Chủ xe</label>
+							<p:selectOneMenu value="#{carBean.carCrud.car_owner}"
+								converter="abstractConverter" effect="fade" var="t"
+								style="width:100%;">
+								<f:selectItem itemLabel="--CHỌN CHỦ XE--" value="#{null}" />
+								<f:selectItems value="#{carBean.listCarOwner}" var="theme"
+									itemLabel="#{theme.name}" itemValue="#{theme}" />
+								<p:column>
+									<h:outputText value="#{t.code}" />
+								</p:column>
+								<p:column>
+									<h:outputText value="#{t==null ? 'Tất cả' :t.name}" />
+								</p:column>
+							</p:selectOneMenu>
+							<p:selectBooleanCheckbox value="#{carBean.carCrud.disable}"
+								itemLabel="Không sử dụng" />
+						</h:panelGrid>
+						<p:separator />
+
+
+						<p:commandLink process="@this,info"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							action="#{carBean.saveOrUpdate()}" styleClass="btn_primmary"
+							update="menuformid:tableid,:messages">
+							<i class="fa fa-floppy-o" aria-hidden="true"></i>
+							<span>Lưu/Cập nhật</span>
+						</p:commandLink>
+						<p:commandLink process="@this,info"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							action="#{carBean.createNew()}" styleClass="btn_new"
+							update="menuformid:info">
+							<i class="fa fa-file-o" aria-hidden="true"></i>
+							<span>Tạo mới</span>
+						</p:commandLink>
+						<p:commandLink process="@this" id="xoact"
+							action="#{carBean.delete()}"
+							style="margin-left:5px; padding-left:12px;padding-right:12px;"
+							styleClass="btn_destroy" update=":messages,:menuformid"
+							icon="fa fa-trash">
+							<p:confirm icon="ui-icon-alert" />
+							<i class="fa fa-trash" aria-hidden="true"></i>
+							<span>Xóa</span>
+						</p:commandLink>
+					</p:panel>
+				</div>
+				<div class="col-md-8">
+					<p:panel header="Danh sách" id="preview" style=" height:500px">
+						<h:panelGrid id="mainGrid" columns="6"
+							style="float:left; margin-bottom:5px">
+
+
+							<p:commandLink id="idorder" style="padding:4px !important;"
+								styleClass="btn_primmary" icon="fa fa-search">
+								<i class="fa fa-search" aria-hidden="true"></i>
+								<span>Tìm kiếm</span>
+							</p:commandLink>
+							<p:commandLink immediate="true" update=":messages" rendered="true"
+								onclick="PF('dlgup1').show();" style="padding:4px !important;"
+								styleClass="btn_upload" icon="fa fa-file-excel-o">
+								<i class="fa fa-upload" aria-hidden="true"></i>
+								<span>Nạp từ excel</span>
+							</p:commandLink>
+							<p:commandLink styleClass="btn_printtt" immediate="true"
+								style="padding:4px !important;" update="editdetail"
+								process="@this" ajax="false" target="blank_"
+								action="#{carBean.exportExcel()}">
+								<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+								<span>Xuất excel</span>
+							</p:commandLink>
+
+							<p:overlayPanel id="imagePanel" for="idorder" hideEffect="fade"
+								dismissable="false" widgetVar="panelsearch" style="width:300px;">
+								<div class="col-md-12" style="padding: 5px">
+									<div class="row">
+										<div class="col-md-12"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<label>Biển số xe</label>
+											<p:inputText value="#{carBean.licensePlateSearch}"
+												style="width:100%" />
+										</div>
+										<div class="col-md-12"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<label>Điện thoại</label>
+											<p:inputText value="#{carBean.phoneNumberSearch}"
+												style="width:100%" />
+										</div>
+										<div class="col-md-12"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<label>Nhóm xe</label>
+											<p:selectOneMenu value="#{carBean.carTypeSearch}"
+												converter="abstractConverter" effect="fade" var="t"
+												style="width:100%;">
+												<f:selectItem itemLabel="Tất cả" value="#{null}" />
+												<f:selectItems value="#{carBean.listCarType}" var="theme"
+													itemLabel="#{theme.name}" itemValue="#{theme}" />
+												<p:column>
+													<h:outputText value="#{t.code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{t==null ? 'Tất cả' :t.name}" />
+												</p:column>
+											</p:selectOneMenu>
+										</div>
+										<div class="col-md-12"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<label>Chủ xe</label>
+											<p:selectOneMenu widgetVar="carwb"
+												value="#{carBean.carOwnerSearch}"
+												converter="abstractConverter" effect="fade" var="t"
+												style="width:100%;">
+												<f:selectItem itemLabel="Tất cả" value="#{null}" />
+												<f:selectItems value="#{carBean.listCarOwner}" var="theme"
+													itemLabel="#{theme.name}" itemValue="#{theme}" />
+												<p:column>
+													<h:outputText value="#{t.code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{t==null ? 'Tất cả' :t.name}" />
+												</p:column>
+											</p:selectOneMenu>
+										</div>
+									</div>
+									<div class="row" style="text-align: right">
+										<p:separator />
+										<p:commandLink process="menuformid:imagePanel"
+											oncomplete="PF('panelsearch').hide()"
+											styleClass="btn_primmary"
+											actionListener="#{carBean.search()}"
+											update="menuformid:tableid">
+											<span>Tìm</span>
+										</p:commandLink>
+									</div>
+								</div>
+							</p:overlayPanel>
+						</h:panelGrid>
+						<div style="clear: both" />
+						<p:dataTable value="#{carBean.listCar}" paginatorPosition="bottom"
+							styleClass="tablenhapsp tableright1" style="width:100%"
+							paginator="true" rowKey="#{item.id}" rows="50"
+							selection="#{carBean.carSelect}" scrollable="true"
+							selectionMode="single" scrollWidth="" id="tableid"
+							scrollHeight="350" widgetVar="datatb" resizableColumns="true"
+							var="item">
+							<p:ajax event="rowSelect" listener="#{carBean.showEdit()}"
+								update="menuformid:info" />
+							<p:column headerText="ID" width="50">
+								<h:outputText value="#{item.id}" />
+							</p:column>
+							<p:column headerText="Biển số xe" width="70">
+								<h:outputText value="#{item.license_plate}" />
+							</p:column>
+							<p:column headerText="Tên xe" width="250">
+								<h:outputText style="white-space: initial;"
+									value="#{item.driver}" />
+							</p:column>
+							<p:column headerText="Nhóm xe" width="150">
+								<h:outputText value="#{item.car_type.name}" />
+							</p:column>
+							<p:column headerText="Chủ xe" width="150">
+								<h:outputText value="#{item.car_owner.name}" />
+							</p:column>
+						</p:dataTable>
+					</p:panel>
+				</div>
+			</h:form>
+		</div>
+		<p:dialog widgetVar="dlgup1" resizable="false"
+			styleClass="dislogUpload" header="Tải File">
+			<h:form id="dlgup1" enctype="multipart/form-data">
+				<p:selectBooleanCheckbox value="#{carBean.fontvni}"
+					itemLabel="FontVni">
+					<p:ajax process="@this" />
+				</p:selectBooleanCheckbox>
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" label="Chọn file từ máy tính"
+					cancelLabel="Huỷ" update=":messages,menuformid:tableid"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{carBean.loadExcel}" mode="advanced"
+					process="@this,dlgup1,menuformid:tableid" />
+			</h:form>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

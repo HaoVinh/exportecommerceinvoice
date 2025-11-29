@@ -1,0 +1,48 @@
+package lixco.com.interfaces;
+
+import java.sql.SQLException;
+import java.util.List;
+
+import javax.transaction.SystemException;
+
+import lixco.com.entity.Invoice;
+import lixco.com.entity.InvoiceDetail;
+import lixco.com.entity.OrderLix;
+import lixco.com.reqInfo.Message;
+import lixco.com.reqInfo.WrapDataInvoiceDetail;
+import lixco.com.reqInfo.WrapDelExportBatchReqInfo;
+import lixco.com.reqInfo.WrapDelInvoiceDetailReqInfo;
+import lixco.com.reqInfo.WrapExtensionOrderReqInfo;
+import lixco.com.reqInfo.WrapIEInvocieReqInfo;
+import lixco.com.reqInfo.WrapInvoiceDelInfo;
+import lixco.com.reqInfo.WrapInvoiceDetailTempReqInfo;
+import lixco.com.reqInfo.WrapInvoiceReqInfo;
+import lixco.com.reqInfo.WrapOrderLixReqInfo;
+import lixco.com.reqInfo.WrapPMInvoiceDetailReqInfo;
+
+public interface IProcessLogicInvoiceService {
+	public int deleteInvoiceMaster(WrapInvoiceDelInfo t,Message message,String userAction) throws IllegalStateException, SystemException, SQLException;
+	public int deleteInvoiceDetailMaster(WrapDelInvoiceDetailReqInfo t, Message message,String userAction) throws IllegalStateException, SystemException, SQLException;
+	public int createInvoiceByOrderLix(WrapOrderLixReqInfo t,StringBuilder messages,boolean kiemton) throws IllegalStateException, SystemException, SQLException;
+	public int createInvoiceByExtensionOrder(WrapExtensionOrderReqInfo t,List<Long> listIdResult,StringBuilder messages,String soxe, boolean kiemton) throws IllegalStateException, SystemException, SQLException;
+	public int createInvoiceByIEInvoice(WrapIEInvocieReqInfo t, Message message) throws SQLException, IllegalStateException, SecurityException, SystemException;
+	public int deleteExportBatch(WrapDelExportBatchReqInfo t,Message message)throws SQLException, IllegalStateException, SecurityException, SystemException;
+	public int saveListWrapExportData(WrapDataInvoiceDetail t,Message message)throws SQLException, IllegalStateException, SecurityException, SystemException;
+	public int saveOrUpdateInvoiceDetail(WrapPMInvoiceDetailReqInfo t,Message message,String userAction) throws SQLException, IllegalStateException, SecurityException, SystemException;
+	public int saveOrUpdateInvoiceDetail2(WrapPMInvoiceDetailReqInfo t,Message message,String userAction,boolean hdsuagia) throws SQLException, IllegalStateException, SecurityException, SystemException;
+	public int processExported(Invoice invoice,Message message) throws SQLException, IllegalStateException, SecurityException, SystemException;
+	public int completeInvoice(long id,Message message) throws SQLException, IllegalStateException, SecurityException, SystemException;
+	public int destroyInvoice(long id,Message message) throws SQLException, IllegalStateException, SecurityException, SystemException;
+	public int createInvoiceByExcelOnline(Invoice invoice, List<InvoiceDetail> invoiceDetails) throws IllegalStateException,
+	SystemException, SQLException;
+	public void capnhattrangthaidonhang(List<OrderLix> orderLixTrans) throws IllegalStateException, SecurityException, SystemException, SQLException ;
+	public int createInvoiceTempByOrderLix(WrapOrderLixReqInfo t,StringBuilder messages,boolean kiemton) throws IllegalStateException, SystemException, SQLException;
+	public int createInvoiceTempByExtensionOrder(WrapExtensionOrderReqInfo t,List<Long> listIdResult,StringBuilder messages,String soxe, boolean kiemton) throws IllegalStateException, SystemException, SQLException;
+	int createInvoiceByTemp(WrapInvoiceDetailTempReqInfo t, List<Long> listIdResult, StringBuilder messages,
+			String soxe, boolean kiemton) throws IllegalStateException, SystemException, SQLException;
+	int deleteInvoiceTempMaster(WrapInvoiceDelInfo t, Message message, String userAction)
+			throws IllegalStateException, SystemException, SQLException;
+	int deleteInvoiceDetailTempMaster(WrapDelInvoiceDetailReqInfo ta, Message message, String userAction)
+			throws IllegalStateException, SystemException, SQLException;
+	
+}

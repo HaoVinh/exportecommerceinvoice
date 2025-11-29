@@ -1,0 +1,132 @@
+package lixco.com.service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.Root;
+
+import lixco.com.entity.Customer;
+import lixco.com.entity.InvenCongNo;
+import lixco.com.interfaces.IInvenCongNoService;
+
+import org.jboss.logging.Logger;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.CONTAINER)
+public class InvenCongNoService implements IInvenCongNoService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource
+	private SessionContext ct;
+
+	@Override
+	public int saveOrUpdateInvenCongNo(List<InvenCongNo> list) {
+		int res = -1;
+		try {
+			// xóa dữ liệu cũ.
+			for (InvenCongNo t : list) {
+				Query queryDel = em
+						.createQuery("delete from InvenCongNo where month=:m and year=:y and customer_id=:cusid");
+				queryDel.setParameter("m", t.getMonth());
+				queryDel.setParameter("y", t.getYear());
+				queryDel.setParameter("cusid", t.getCustomer().getId());
+				queryDel.executeUpdate();
+				em.persist(t);
+				em.flush();
+			}
+
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvenCongNoService.saveOrUpdateInvenCongNo:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int saveOrUpdateInvenCongNo(InvenCongNo t) {
+		int res = -1;
+		try {
+			// xóa dữ liệu cũ.
+			Query queryDel = em
+					.createQuery("delete from InvenCongNo where month=:m and year=:y and customer_id=:cusid");
+			queryDel.setParameter("m", t.getMonth());
+			queryDel.setParameter("y", t.getYear());
+			queryDel.setParameter("cusid", t.getCustomer().getId());
+			queryDel.executeUpdate();
+			em.persist(t);
+			em.flush();
+			res = 0;
+		} catch (Exception e) {
+			logger.error("InvenCongNoService.saveOrUpdateInvenCongNo:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public void save(InvenCongNo t) {
+		try {
+			em.merge(t);
+		} catch (Exception e) {
+			logger.error("InvenCongNoService.saveOrUpdateInvenCongNo:" + e.getMessage(), e);
+		}
+	}
+
+	@Override
+	public InvenCongNo findByIdCus(long cusid, int month, int year) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<InvenCongNo> cq = cb.createQuery(InvenCongNo.class);
+			Root<InvenCongNo> root = cq.from(InvenCongNo.class);
+			cq.select(root).where(cb.equal(root.get("customer").get("id"), cusid), cb.equal(root.get("month"), month),
+					cb.equal(root.get("year"), year));
+			TypedQuery<InvenCongNo> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	@Override
+	public double getInvenFinal(long cusid, int month, int year) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Double> cq = cb.createQuery(Double.class);
+			Root<InvenCongNo> root = cq.from(InvenCongNo.class);
+			cq.select(root.get("InvenFinal")).where(cb.equal(root.get("customer").get("id"), cusid),
+					cb.equal(root.get("month"), month), cb.equal(root.get("year"), year));
+			TypedQuery<Double> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			return 0;
+		}
+	}
+	@Override
+	public List<InvenCongNo> getInvenFinal2(List<Customer> cuss, int month, int year) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<InvenCongNo> cq = cb.createQuery(InvenCongNo.class);
+			Root<InvenCongNo> root = cq.from(InvenCongNo.class);
+			root.fetch("customer", JoinType.LEFT);
+			cq.select(root).where(cb.in(root.get("customer")).value(cuss),
+					cb.equal(root.get("month"), month), cb.equal(root.get("year"), year));
+			TypedQuery<InvenCongNo> query = em.createQuery(cq);
+			return query.getResultList();
+		} catch (Exception e) {
+			return new ArrayList<InvenCongNo>();
+		}
+	}
+}

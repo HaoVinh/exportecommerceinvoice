@@ -1,0 +1,83 @@
+package trong.lixco.com.api;
+
+import io.jsonwebtoken.io.IOException;
+
+import java.util.Date;
+import java.util.List;
+
+import javax.inject.Inject;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
+
+import lixco.com.common.JsonParserUtil;
+import lixco.com.entity.KeHoachGiaoHang;
+import lixco.com.interfaces.IInventoryService;
+import lixco.com.interfaces.IOrderDetailService;
+import lixco.com.interfaces.IProductService;
+
+import org.jboss.logging.Logger;
+
+import trong.lixco.com.util.MyUtil;
+
+import com.google.gson.JsonObject;
+
+@Path("data")
+public class KeHoachGiaoHangServlet {
+	@Inject
+	private Logger logger;
+	@Context
+	private HttpServletRequest request;
+	@Inject
+	IProductService productService;
+	@Inject
+	IInventoryService inventoryService;
+	@Inject
+	IOrderDetailService orderDetailService;
+
+	@GET
+	@Path("kehoachgiaohang")
+	@Produces("application/json; charset=utf-8")
+	public Response dasxtheonhomhang(@QueryParam(DefinedName.PARAM_LAYHCM) String lay_hcm,@QueryParam(DefinedName.PARAM_LAYBD) String lay_bd,@QueryParam(DefinedName.PARAM_NDATE) String date) throws IOException,
+			ServletException {
+		StringBuilder result = new StringBuilder();
+		ResponseBuilder responseBuilder = Response.status(Response.Status.BAD_REQUEST);
+		try {
+			Date ngay = MyUtil.chuyensangStrApiDate(date);
+			boolean hcm=false;
+			if("true".equals(lay_hcm)){
+				hcm=true;
+			}
+			boolean bd=false;
+			if("true".equals(lay_bd)){
+				bd=true;
+			}
+			List<KeHoachGiaoHang> dasxtheonhomhang = orderDetailService.findBy2(hcm, bd, ngay);
+			if (dasxtheonhomhang.size() != 0) {
+				for (int i = 0; i < dasxtheonhomhang.size(); i++) {
+						dasxtheonhomhang.get(i).setKhoiluongvc(dasxtheonhomhang.get(i).getKhoiluongvc()+dasxtheonhomhang.get(i).getKhoiluongvctinh());
+					
+				}
+				JsonObject jsonObject = new JsonObject();
+				jsonObject.add("data", JsonParserUtil.getGson().toJsonTree(dasxtheonhomhang));
+				responseBuilder.status(Response.Status.OK);
+				result.append(jsonObject);
+			} else {
+				result.append(CommonModel.toJson(1, DefinedName.NO_CONTENT));
+				responseBuilder.status(Response.Status.NO_CONTENT);
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			result.append("Xảy ra lỗi: " + e.getMessage());
+			responseBuilder = Response.status(Response.Status.INTERNAL_SERVER_ERROR);
+		}
+		return responseBuilder.entity(result.toString()).build();
+	}
+}

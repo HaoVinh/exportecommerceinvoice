@@ -1,0 +1,90 @@
+package lixco.com.service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionAttribute;
+import javax.ejb.TransactionAttributeType;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.ParameterExpression;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+
+import lixco.com.entity.NhanHang;
+
+import org.jboss.logging.Logger;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.CONTAINER)
+public class NhanHangService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource
+	private SessionContext ct;
+
+	public NhanHang findById(long id) {
+		try {
+			return em.find(NhanHang.class, id);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public List<NhanHang> selectAll() {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<NhanHang> cq = cb.createQuery(NhanHang.class);
+			Root<NhanHang> root = cq.from(NhanHang.class);
+			cq.select(root);
+			TypedQuery<NhanHang> query = em.createQuery(cq);
+			return query.getResultList();
+		} catch (Exception e) {
+			logger.error("NhanHangService.selectAll:" + e.getMessage(), e);
+		}
+		return new ArrayList<NhanHang>();
+	}
+
+	public int insert(NhanHang nhanHang) {
+		int res = -1;
+		try {
+			em.persist(nhanHang);
+			return 0;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return res;
+	}@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int findLike(String text,  List<NhanHang> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<NhanHang> cq = cb.createQuery(NhanHang.class);
+			Root<NhanHang> root = cq.from(NhanHang.class);
+			ParameterExpression<String> paramLike = cb.parameter(String.class);
+			Predicate dis = cb.disjunction();
+			dis.getExpressions().add(
+					cb.like(cb.function("replace", String.class, cb.lower(root.get("name")), cb.literal("đ"),
+							cb.literal("d")), paramLike));
+			cq.select(root).where(dis);
+			TypedQuery<NhanHang> query = em.createQuery(cq);
+			query.setParameter(paramLike, "%" + text + "%");
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("NhanHangService.findLike:" + e.getMessage(), e);
+		}
+		return res;
+	}
+}

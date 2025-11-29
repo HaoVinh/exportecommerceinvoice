@@ -1,0 +1,538 @@
+package lixco.com.service;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Objects;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionAttribute;
+import javax.ejb.TransactionAttributeType;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Expression;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.ParameterExpression;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+import javax.persistence.criteria.Subquery;
+
+import lixco.com.commom_ejb.HolderParser;
+import lixco.com.commom_ejb.JsonParserUtil;
+import lixco.com.commom_ejb.ToolTimeCustomer;
+import lixco.com.entity.Customer;
+import lixco.com.entity.GoodsReceiptNote;
+import lixco.com.entity.GoodsReceiptNoteDetail;
+import lixco.com.entity.IECategories;
+import lixco.com.entity.Product;
+import lixco.com.entity.Warehouse;
+import lixco.com.interfaces.IGoodsReceiptNoteService;
+import lixco.com.reqInfo.GoodsReceiptNoteReqInfo;
+import lixco.com.reqfox.NhapSP;
+
+import org.jboss.logging.Logger;
+
+import com.google.gson.JsonObject;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.CONTAINER)
+public class GoodsReceiptNoteService implements IGoodsReceiptNoteService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource
+	private SessionContext ct;
+
+	@Override
+	public int search(String json, List<GoodsReceiptNote> list) {
+		int res = -1;
+		try {
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+
+			HolderParser hstextStr = JsonParserUtil.getValueString(j.get("goods_receipt_note"), "stextStr", null);
+			HolderParser hCustomerId = JsonParserUtil.getValueNumber(j.get("goods_receipt_note"), "customer_id", null);
+			HolderParser hFromDate = JsonParserUtil.getValueString(j.get("goods_receipt_note"), "from_date", null);
+			HolderParser hToDate = JsonParserUtil.getValueString(j.get("goods_receipt_note"), "to_date", null);
+			HolderParser hIECategoriesId = JsonParserUtil.getValueNumber(j.get("goods_receipt_note"),
+					"ie_categories_id", null);
+			HolderParser hWarehouseId = JsonParserUtil
+					.getValueNumber(j.get("goods_receipt_note"), "warehouse_id", null);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<GoodsReceiptNote> cq = cb.createQuery(GoodsReceiptNote.class);
+			Root<GoodsReceiptNote> root_ = cq.from(GoodsReceiptNote.class);
+			root_.fetch("customer", JoinType.INNER);
+			root_.fetch("ie_categories", JoinType.INNER);
+			root_.fetch("warehouse", JoinType.LEFT);
+			ParameterExpression<Date> pFromDate = cb.parameter(Date.class);
+			ParameterExpression<Date> pToDate = cb.parameter(Date.class);
+			ParameterExpression<Long> pCustomerId = cb.parameter(Long.class);
+			ParameterExpression<Long> pIECategorieId = cb.parameter(Long.class);
+			ParameterExpression<Long> pWarehouseId = cb.parameter(Long.class);
+			List<Predicate> predicates = new ArrayList<Predicate>();
+			Predicate dis = cb.disjunction();
+			dis.getExpressions().add(cb.isNull(pFromDate));
+			dis.getExpressions().add(cb.greaterThanOrEqualTo(root_.get("import_date"), pFromDate));
+			predicates.add(dis);
+			Predicate dis1 = cb.disjunction();
+			dis1.getExpressions().add(cb.isNull(pToDate));
+			dis1.getExpressions().add(cb.lessThanOrEqualTo(root_.get("import_date"), pToDate));
+			predicates.add(dis1);
+			Predicate dis2 = cb.disjunction();
+			dis2.getExpressions().add(cb.equal(pCustomerId, 0));
+			dis2.getExpressions().add(cb.equal(root_.get("customer").get("id"), pCustomerId));
+			predicates.add(dis2);
+			Predicate dis3 = cb.disjunction();
+			dis3.getExpressions().add(cb.equal(pIECategorieId, 0));
+			dis3.getExpressions().add(cb.equal(root_.get("ie_categories").get("id"), pIECategorieId));
+			predicates.add(dis3);
+			Predicate dis4 = cb.disjunction();
+			dis4.getExpressions().add(cb.equal(pWarehouseId, 0));
+			dis4.getExpressions().add(cb.equal(root_.get("warehouse").get("id"), pWarehouseId));
+			predicates.add(dis4);
+
+			List<Predicate> predicatesStr = new ArrayList<Predicate>();
+
+			String stextStr = Objects.toString(hstextStr.getValue());
+			if (hstextStr.getValue() != null && !"".equals(stextStr.trim())) {
+				Predicate predicatevoucher_code = cb.like(root_.get("voucher_code"), "%" + stextStr + "%");// so
+				predicatesStr.add(predicatevoucher_code);
+
+				Join<GoodsReceiptNote, Customer> cus_ = root_.join("customer", JoinType.LEFT);
+				Predicate predicateCuscode = cb.like(cus_.get("customer_code"), "%" + stextStr + "%");// ma
+				predicatesStr.add(predicateCuscode);
+				Predicate predicateCus = cb.like(cus_.get("customer_name"), "%" + stextStr + "%");// ten
+				predicatesStr.add(predicateCus);
+
+				Join<GoodsReceiptNote, IECategories> iecate_ = root_.join("ie_categories", JoinType.LEFT);
+				Predicate predicateIeCateCode = cb.like(iecate_.get("code"), "%" + stextStr + "%");// ma
+				predicatesStr.add(predicateIeCateCode);
+				Predicate predicateIeCateName = cb.like(iecate_.get("content"), "%" + stextStr + "%");// ten
+				predicatesStr.add(predicateIeCateName);
+
+				Predicate predicatecreated_by = cb.like(root_.get("created_by"), "%" + stextStr + "%");// nguoi
+				predicatesStr.add(predicatecreated_by);
+
+				List<Predicate> subpredicates = new LinkedList<Predicate>();
+				Subquery<GoodsReceiptNoteDetail> sqOne = cq.subquery(GoodsReceiptNoteDetail.class);
+				Root subroot = sqOne.from(GoodsReceiptNoteDetail.class);
+				Predicate predicatePdCode = cb.like(subroot.get("product").get("product_code"), "%" + stextStr + "%");
+				subpredicates.add(predicatePdCode);
+				Predicate predicatePdName = cb.like(subroot.get("product").get("product_name"), "%" + stextStr + "%");
+				subpredicates.add(predicatePdName);
+				sqOne.select(subroot.get("goods_receipt_note")).where(cb.or(subpredicates.toArray(new Predicate[0])));
+				Predicate predicateSub = cb.equal(root_, cb.any(sqOne));
+				predicatesStr.add(predicateSub);// truy cap chi tiet
+			}
+			if (predicatesStr.size() != 0) {
+				cq.select(root_)
+						.where(cb.and(predicates.toArray(new Predicate[0])),
+								cb.or(predicatesStr.toArray(new Predicate[0])))
+						.orderBy(cb.desc(root_.get("import_date")));
+			} else {
+				cq.select(root_).where(cb.and(predicates.toArray(new Predicate[0])))
+						.orderBy(cb.desc(root_.get("import_date")));
+			}
+			TypedQuery<GoodsReceiptNote> query = em.createQuery(cq);
+			query.setParameter(pFromDate,
+					ToolTimeCustomer.convertStringToDate(Objects.toString(hFromDate.getValue(), null), "dd/MM/yyyy"));
+			query.setParameter(pToDate,
+					ToolTimeCustomer.convertStringToDate(Objects.toString(hToDate.getValue(), null), "dd/MM/yyyy"));
+			query.setParameter(pCustomerId, Long.parseLong(Objects.toString(hCustomerId.getValue(), "0")));
+			query.setParameter(pIECategorieId, Long.parseLong(Objects.toString(hIECategoriesId.getValue(), "0")));
+			query.setParameter(pWarehouseId, Long.parseLong(Objects.toString(hWarehouseId.getValue(), "0")));
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteService.search:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	private String initReceiptNoteCode() {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Integer> cq = cb.createQuery(Integer.class);
+			Root<GoodsReceiptNote> root = cq.from(GoodsReceiptNote.class);
+			// cq.multiselect(cb.coalesce(cb.max(root.get("id")),0));
+			cq.multiselect(cb.coalesce(cb.max(cb.quot((Expression) root.get("receipt_code"), 1)), 0));
+			TypedQuery<Integer> query = em.createQuery(cq);
+			int max = query.getSingleResult();
+			double p = (double) max / 10000000;
+			if (p < 1) {
+				return String.format("%07d", max + 1);
+			}
+			return (max + 1) + "";
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteService.initReceiptNoteCode:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Override
+	public int insert(GoodsReceiptNoteReqInfo t) {
+		int res = -1;
+		try {
+			GoodsReceiptNote p = t.getGoods_receipt_note();
+			if (p != null) {
+				// auto general receipt_code
+				String receiptCode = initReceiptNoteCode();
+				if (receiptCode != null && !"".equals(receiptCode)) {
+					p.setReceipt_code(receiptCode);
+					em.persist(p);
+					if (p.getId() > 0) {
+						selectById(p.getId(), t);
+						res = 0;
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteService.insert:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int update(GoodsReceiptNoteReqInfo t) {
+		int res = -1;
+		try {
+			GoodsReceiptNote p = t.getGoods_receipt_note();
+			if (p != null) {
+				p = em.merge(p);
+				if (p != null) {
+					selectById(p.getId(), t);
+					res = 0;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteService.update:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int selectById(long id, GoodsReceiptNoteReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<GoodsReceiptNote> cq = cb.createQuery(GoodsReceiptNote.class);
+			Root<GoodsReceiptNote> root = cq.from(GoodsReceiptNote.class);
+			root.fetch("customer", JoinType.INNER);
+			root.fetch("ie_categories", JoinType.INNER);
+			root.fetch("warehouse", JoinType.LEFT);
+			cq.select(root).where(cb.equal(root.get("id"), id));
+			TypedQuery<GoodsReceiptNote> query = em.createQuery(cq);
+			t.setGoods_receipt_note(query.getSingleResult());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteService.selectById:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public GoodsReceiptNote findById(long id) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<GoodsReceiptNote> cq = cb.createQuery(GoodsReceiptNote.class);
+			Root<GoodsReceiptNote> root = cq.from(GoodsReceiptNote.class);
+			root.fetch("customer", JoinType.INNER);
+			root.fetch("ie_categories", JoinType.INNER);
+			root.fetch("warehouse", JoinType.LEFT);
+			cq.select(root).where(cb.equal(root.get("id"), id));
+			TypedQuery<GoodsReceiptNote> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteService.selectById:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Override
+	public int deleteById(long id) {
+		int res = -1;
+		try {
+			// JPQl
+			GoodsReceiptNote t = em.find(GoodsReceiptNote.class, id);
+			if (t != null) {
+				em.remove(t.getList_goods_receipt_note_detail());
+				em.remove(t);
+				res = 0;
+			}
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteService.deleteById:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	private int initCode(GoodsReceiptNote t) {
+		int res = -1;
+
+		try {
+			Date date = t.getImport_date();
+			int year = ToolTimeCustomer.getYearM(date);
+			int month = ToolTimeCustomer.getMonthM(date);
+			int day = ToolTimeCustomer.getDayM(date);
+
+			String voucher = day + "" + month + "" + year + "/";
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<String> cq = cb.createQuery(String.class);
+			Root<GoodsReceiptNote> root = cq.from(GoodsReceiptNote.class);
+			cq.select(root.get("voucher_code"))
+					.where(cb.equal(root.get("import_date"), ToolTimeCustomer.getFirstDateOfDay(date)))
+					.orderBy(cb.desc(root.get("import_date")));
+			TypedQuery<String> query = em.createQuery(cq);
+			List<String> list = query.getResultList();
+
+			if (list.size() > 0) {
+				String temp = list.get(0);
+				if (temp != null) {
+					int last = temp.lastIndexOf("/");
+					String sub = temp.substring(last + 1);
+					voucher = voucher + String.format("%02d", Integer.parseInt(sub) + 1);
+					t.setVoucher_code(voucher);
+				}
+			} else {
+				voucher = voucher + String.format("%02d", 1);
+				t.setVoucher_code(voucher);
+			}
+			res = 0;
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteService.initCode:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int selectByCode(String code, GoodsReceiptNoteReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<GoodsReceiptNote> cq = cb.createQuery(GoodsReceiptNote.class);
+			Root<GoodsReceiptNote> root = cq.from(GoodsReceiptNote.class);
+			root.fetch("customer", JoinType.INNER);
+			root.fetch("ie_categories", JoinType.INNER);
+			root.fetch("warehouse", JoinType.LEFT);
+			cq.select(root).where(cb.equal(root.get("receipt_code"), code));
+			TypedQuery<GoodsReceiptNote> query = em.createQuery(cq);
+			t.setGoods_receipt_note(query.getSingleResult());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNoteService.selectByCode:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public GoodsReceiptNote checkReceiptNoteExists(String voucherCode, String batchCode, Date importDate,
+			long customerId, long warehouseId, long iECategoriesId) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<GoodsReceiptNote> cq = cb.createQuery(GoodsReceiptNote.class);
+			Root<GoodsReceiptNote> root = cq.from(GoodsReceiptNote.class);
+			Join<GoodsReceiptNote, Customer> customer_ = root.join("customer", JoinType.INNER);
+			ParameterExpression<String> pBatchCode = cb.parameter(String.class);
+			List<Predicate> predicates = new LinkedList<>();
+			predicates.add(cb.equal(root.get("voucher_code"), voucherCode));
+			predicates.add(cb.equal(root.get("import_date"), importDate));
+			predicates.add(cb.equal(root.get("customer").get("id"), customerId));
+			predicates.add(cb.equal(root.get("warehouse").get("id"), warehouseId));
+			predicates.add(cb.equal(root.get("ie_categories").get("id"), iECategoriesId));
+			Predicate dis = cb.disjunction();
+			dis.getExpressions().add(cb.notEqual(customer_.get("customer_code"), "N"));
+			Predicate con = cb.conjunction();
+			con.getExpressions().add(cb.equal(customer_.get("customer_code"), "N"));
+			con.getExpressions().add(cb.equal(root.get("batch_code"), pBatchCode));
+			dis.getExpressions().add(con);
+			predicates.add(dis);
+			cq.select(root).where(cb.and(predicates.toArray(new Predicate[0])));
+			TypedQuery<GoodsReceiptNote> query = em.createQuery(cq);
+			query.setParameter(pBatchCode, batchCode);
+			List<GoodsReceiptNote> list = query.getResultList();
+			if (list.size() > 0) {
+				return list.get(0);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	@Override
+	public int selectByFoxPro(long receiptId, List<NhapSP> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<NhapSP> cq = cb.createQuery(NhapSP.class);
+			Root<GoodsReceiptNoteDetail> root = cq.from(GoodsReceiptNoteDetail.class);
+			Join<GoodsReceiptNoteDetail, GoodsReceiptNote> receipt_ = root.join("goods_receipt_note", JoinType.INNER);
+			Join<GoodsReceiptNoteDetail, Product> product_ = root.join("product", JoinType.INNER);
+			Join<GoodsReceiptNote, Customer> customer_ = receipt_.join("customer", JoinType.INNER);
+			Join<GoodsReceiptNote, Warehouse> warehouse_ = receipt_.join("warehouse", JoinType.LEFT);
+			Join<GoodsReceiptNote, IECategories> ieCate_ = receipt_.join("ie_categories", JoinType.LEFT);
+			// (String soct, Date ngay, String makh, String makho, String maxn,
+			// String masp,
+			// double soluong,String soxe, String malohang, String lydonkho,
+			// String soldd,String sogiaonhan)
+			cq.select(
+					cb.construct(NhapSP.class, root.get("id"), receipt_.get("voucher_code"),
+							receipt_.get("import_date"), customer_.get("customer_code"), warehouse_.get("code"),
+							ieCate_.get("code"), product_.get("product_code"), root.get("quantity"), root.get("price"),
+							root.get("total"), root.get("vcnb_invoice_code"), root.get("license_plate"),
+							root.get("batch_code"), receipt_.get("note"), receipt_.get("movement_commands"),
+							root.get("idfox"), root.get("delivery_code"))).where(
+					cb.equal(receipt_.get("id"), receiptId));
+			TypedQuery<NhapSP> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNote.selectByFoxPro:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.REQUIRED)
+	public int updateNhapSPByFox(List<NhapSP> list) {
+		int res = -1;
+		try {
+			if (list != null) {
+				for (NhapSP p : list) {
+					Query query = em.createQuery("update GoodsReceiptNoteDetail set idfox=:f where id=:id ");
+					query.setParameter("f", p.getIdfox());
+					query.setParameter("id", p.getId());
+					query.executeUpdate();
+				}
+			}
+			res = 0;
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNote.updateNhapSPByFox:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public List<String> getListNhapSPIdFox(long receiptId) {
+		try {
+			Query query = em.createQuery("select idfox from GoodsReceiptNoteDetail where goods_receipt_note.id=:id");
+			query.setParameter("id", receiptId);
+			List<String> list = query.getResultList();
+			return list;
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNote.getListNhapSPIdFox:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Override
+	public String getIdFoxNhapSP(long detailID) {
+		try {
+			Query query = em.createQuery("select idfox from GoodsReceiptNoteDetail where id=:id");
+			query.setParameter("id", detailID);
+			return Objects.toString(query.getSingleResult(), null);
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNote.getIdFoxNhapSP:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int selectByIdToExcel(List<Long> receiptIds, List<Object[]> list) {
+		int res = -1;
+		try {
+			if (receiptIds.size() != 0) {
+				StringBuilder sql = new StringBuilder();
+				sql.append("SELECT ").append("'', ").append("i.voucher_code, ").append("i.import_date, ")
+						.append("c.customer_code, ").append("ie.code as maxn, ").append("ind.vcnb_invoice_code, ")
+						.append("pd.product_code, ").append("pd.product_name, ").append("ind.quantity, ")
+						.append("ind.id as idct, ").append("ind.license_plate, ").append("ind.batch_code, ")
+						.append("ind.price, ").append("ind.total, ").append("pd.factor, ")
+						.append("ind.quantity*pd.factor, ").append("i.id as idpn ");
+
+				sql.append("FROM ").append("goodsreceiptnote AS i ").append("JOIN ")
+						.append("goodsreceiptnotedetail AS ind ON i.id = ind.goods_receipt_note_id ")
+						.append("LEFT JOIN ").append("iecategories AS ie ON ie.id = i.ie_categories_id ")
+						.append("LEFT JOIN ").append("customer AS c ON c.id = i.customer_id ").append("LEFT JOIN ")
+						.append("product AS pd ON pd.id = ind.product_id ");
+				sql.append("WHERE ").append("i.id IN :idInvs");
+
+				Query query = em.createNativeQuery(sql.toString());
+				query.setParameter("idInvs", receiptIds);
+				list.addAll(query.getResultList());
+				res = 0;
+			}
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNote.selectByIdToExcel:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public List<Object[]> ngaysxgannhat(List<String> masps) {
+		try {
+			if (masps.size() != 0) {
+				// //5: nhap san xuat, 7: nhap xu ly, 10: nhap khac
+				// List<Long> idIec=new ArrayList<Long>();
+				// idIec.add(5l);
+				// idIec.add(7l);
+				// idIec.add(10l);
+				StringBuilder sql = new StringBuilder();
+				sql.append("SELECT pd.product_code,max(gr.import_date) ");
+				sql.append("FROM goodsreceiptnotedetail as grd ");
+				sql.append("LEFT JOIN goodsreceiptnote as gr ON grd.goods_receipt_note_id=gr.id ");
+				sql.append("LEFT JOIN product as pd ON grd.product_id=pd.id ");
+				sql.append("WHERE pd.product_code IN :masps AND (gr.voucher_code LIKE '%CN%' OR gr.voucher_code LIKE '%KM%' OR gr.voucher_code LIKE '%MN%') ");
+				sql.append("GROUP BY pd.product_code");
+				Query query = em.createNativeQuery(sql.toString());
+				query.setParameter("masps", masps);
+				// query.setParameter("idIec", idIec);
+				return query.getResultList();
+			}
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNote.selectByIdToExcel:" + e.getMessage(), e);
+		}
+		return new ArrayList<Object[]>();
+	}
+
+	// Ngày sản xuất gần nhất BN lấy theo mã lô hàng
+	// "N- PHÂN XƯỞNG CÔNG NGHỆ"
+	// "K0652 - UNILERVER"
+	// "K0492 - LIX BD;
+	// "K0013 - LIX THỦ ĐỨC"
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public List<Object[]> ngaysxgannhatBN(List<String> masps) {
+		try {
+			if (masps.size() != 0) {
+				StringBuilder sql = new StringBuilder();
+				sql.append("SELECT pd.product_code,max(IF(STR_TO_DATE(SUBSTRING(grd.batch_code, 1, 6), '%d%m%y') = '0000-00-00','2000-01-01',STR_TO_DATE(SUBSTRING(grd.batch_code, 1, 6), '%d%m%y'))) AS max_date ");
+				sql.append("FROM goodsreceiptnotedetail as grd ");
+				sql.append("LEFT JOIN goodsreceiptnote as gr ON grd.goods_receipt_note_id=gr.id ");
+				sql.append("LEFT JOIN customer as cus ON gr.customer_id=cus.id ");
+				sql.append("LEFT JOIN product as pd ON grd.product_id=pd.id ");
+				sql.append("WHERE pd.product_code IN :masps AND  cus.customer_code in ('N','K0013','K0492','K0652') ");
+				sql.append("GROUP BY pd.product_code");
+				Query query = em.createNativeQuery(sql.toString());
+				query.setParameter("masps", masps);
+				return query.getResultList();
+			}
+		} catch (Exception e) {
+			logger.error("GoodsReceiptNote.selectByIdToExcel:" + e.getMessage(), e);
+		}
+		return new ArrayList<Object[]>();
+	}
+}

@@ -1,0 +1,221 @@
+package lixco.com.common;
+
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.text.Normalizer;
+import java.util.Locale;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Pattern;
+
+import lixco.com.commom_ejb.MyMath;
+
+public class FormatHandler {
+	private static FormatHandler instance_;
+	private static final Lock createLock_ = new ReentrantLock();
+	DecimalFormatSymbols otherSymbols;
+	DecimalFormat decimalFormat;
+	DecimalFormat decimalFormat2;
+
+	DecimalFormat decimalFormatEN;
+
+	String pattern = "#,###,###,###,###,###,##0.##";
+	String pattern2 = "#,###,###,###,###,###,##0.000";
+	DecimalFormat df = (DecimalFormat) DecimalFormat.getInstance(new Locale("vi", "VN"));
+
+	private FormatHandler() {
+		otherSymbols = new DecimalFormatSymbols(new Locale("vi", "VN"));
+		otherSymbols.setDecimalSeparator(',');
+		otherSymbols.setGroupingSeparator('.');
+		decimalFormat = new DecimalFormat(pattern, otherSymbols);
+
+		DecimalFormatSymbols otherSymbols2 = new DecimalFormatSymbols(new Locale("vi", "VN"));
+		otherSymbols2.setDecimalSeparator(',');
+		otherSymbols2.setGroupingSeparator('.');
+		decimalFormat2 = new DecimalFormat(pattern, otherSymbols2);
+
+		DecimalFormatSymbols otherSymbols3 = new DecimalFormatSymbols(new Locale("en", "US"));
+		otherSymbols3.setDecimalSeparator('.');
+		otherSymbols3.setGroupingSeparator(',');
+		decimalFormatEN = new DecimalFormat(pattern, otherSymbols3);
+		
+		otherSymbols3.setDecimalSeparator('.');
+		otherSymbols3.setGroupingSeparator(',');
+		decimalFormatEN = new DecimalFormat(pattern2, otherSymbols3);
+	}
+
+	public static FormatHandler getInstance() {
+		if (instance_ == null) {
+			createLock_.lock();
+			try {
+				if (instance_ == null) {
+					instance_ = new FormatHandler();
+				}
+			} finally {
+				createLock_.unlock();
+			}
+
+		}
+		return instance_;
+	}
+
+	public String getNumberFormat(double number, int max) {
+		try {
+			double r = roundCus(number, max);
+			int sl = 0;
+			if (r % 1 == 0) {
+				pattern = "#,###,###,###,###,###,##0";
+			} else {
+				String number1 = String.valueOf(number);
+				sl = number1.split("\\.")[1].length();
+			}
+			if (sl != 1) {
+				sl = countZero(max);
+			}
+			decimalFormat.setMaximumFractionDigits(sl);
+			return decimalFormat.format(r);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return "";
+	}
+
+	public String getNumberFormat2(double number, int max) {
+		try {
+
+			double r = roundCus(number, max);
+			int sl = 0;
+			if (r % 1 == 0) {
+				pattern = "#,###,###,###,###,###,##0";
+			} else {
+				String number1 = String.valueOf(number);
+				sl = number1.split("\\.")[1].length();
+			}
+			if (sl != 1) {
+				sl = countZero(max);
+			}
+			decimalFormat2.setMaximumFractionDigits(sl);
+			return decimalFormat2.format(r);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return "";
+	}
+
+	public String getNumberFormatEn(double number, int max) {
+		try {
+			double r = roundCus(number, max);
+			int sl = 0;
+			pattern = "#,###,###,###,###,###,##0.00";
+			if (r % 1 == 0) {
+				pattern = "#,###,###,###,###,###,##0";
+			} else {
+				String number1 = String.valueOf(number);
+				sl = number1.split("\\.")[1].length();
+			}
+			if (sl != 1) {
+				sl = countZero(max);
+			}
+			decimalFormatEN.setMaximumFractionDigits(sl);
+			String str = decimalFormatEN.format(r);
+			return str;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return "";
+	}
+	public String getNumberFormatEn2(double number, int max) {
+		try {
+			double r = roundCus(number, max);
+			int sl = 0;
+			pattern = "#,###,###,###,###,###,##0.000";
+			if (r % 1 == 0) {
+				pattern = "#,###,###,###,###,###,##0";
+			} else {
+				String number1 = String.valueOf(number);
+				sl = number1.split("\\.")[1].length();
+			}
+			if (sl != 1) {
+				sl = countZero(max);
+			}
+			decimalFormatEN.setMaximumFractionDigits(sl);
+			String str = decimalFormatEN.format(r);
+			return str;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return "";
+	}
+
+
+	private int countZero(int number) {
+		if (number == 0) {
+			return 0;
+		}
+		int counter = 0;
+		while (number % 10 == 0) {
+			counter++;
+			number /= 10;
+		}
+		return counter;
+	}
+
+	public double roundCus(double number, int max) {
+		try {
+			return (double) MyMath.round(number * max) / max;
+		} catch (Exception e) {
+			return 0;
+		}
+	}
+
+	public double changeStringToNumber(String number) {
+		try {
+			String temp = number.replaceAll("\\.", "");
+			temp = temp.replace(",", ".");
+			double result = Double.parseDouble(temp);
+			return result;
+		} catch (Exception e) {
+			return 0;
+		}
+
+	}
+
+	public String fromToString(String str) {
+		String summary = "";
+		try {
+			if (str != null && str != "") {
+				String[] arr = str.split(",");
+				summary += arr[0];
+				if (arr.length > 1) {
+					summary += " -> " + arr[arr.length - 1];
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return summary;
+	}
+
+	public double sum(double... params) {
+		BigDecimal result = BigDecimal.valueOf(0.0);
+		BigDecimal t = null;
+		for (double item : params) {
+			t = BigDecimal.valueOf(item);
+			result = result.add(t);
+		}
+		return result.doubleValue();
+	}
+
+	public String converViToEn(String s) {
+		try {
+			s = s.toLowerCase().trim();
+			String temp = Normalizer.normalize(s, Normalizer.Form.NFD);
+			Pattern pattern = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+			String result = pattern.matcher(temp).replaceAll("");
+			return pattern.matcher(result).replaceAll("");
+		} catch (Exception e) {
+		}
+		return null;
+	}
+}

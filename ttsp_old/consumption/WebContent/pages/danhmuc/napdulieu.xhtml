@@ -1,0 +1,555 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Nạp
+			dữ liệu từ chương trình cũ</h3>
+		<p:separator />
+		<h:form id="menuformid">
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp dữ liệu chương trình đơn giá</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapCTDG()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu CTDG" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapCTCTDG()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu CT CTDG" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapCDCTDG}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu cài đặt CTDG" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp dữ liệu chương trình khuyến mãi</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapCTKM()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu CTKM" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapCTCTKM()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu CT CTKM" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapCDCTKM()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu cài đặt CTKM" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp đơn hàng</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapDonHang()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu đơn hàng" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapCTDonHang()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu CT đơn hàng" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapKMDonHang()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu KM đơn hàng" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp phiếu nhập</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNhapHang()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu phiếu nhập" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp hợp đồng</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapHopDong()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu hợp đồng" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapCTHopDong()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu CT hợp đồng" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp xuất hàng</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapXuatHang()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu xuất hàng" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapCTXuatHang()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu CT xuất hàng" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapXuatHangMisa()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu xuất hàng (excel hóa đơn misa)"
+						icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.capnhattongtien()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Cập nhật tổng tiền" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.capnhatdongiakm()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Cập nhật tổng tiền" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp ĐH xuất xuất khẩu</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapXuatXuatKhau()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu xuất xuất khẩu" icon="fa fa-file-excel-o" />
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapCTXuatXuatKhau()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu CT xuất xuất khẩu" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp dữ liệu đơn giá khuyến mãi</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapDonGiaKM()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu đơn giá KM" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp dữ liệu nhóm sản phẩm khuyến mãi</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNhomSPKM()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu nhóm sản phẩm KM" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp dữ liệu cảng</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogHarbor()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu cảng" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp dữ liệu Người vận chuyển</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogCarrier()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu người vận chuyển" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp dữ liệu Thủ kho</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogStocker()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp dữ liệu thủ kho" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp dữ liệu sản phẩm</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNapSanPham()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp sản phẩm" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp dữ liệu UNC</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogUNC()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp UNC" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp dữ liệu Tồn kho</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogTonkho()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp tồn kho" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp tất cả</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this"
+						action="#{dataSettingBean.showDialogNaptatca()}"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp tất cả" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+			<div class="col-md-12">
+				<div class="col-md-12">
+					<h4>Nạp công nợ</h4>
+				</div>
+				<div class="col-md-12">
+					<p:commandButton process="@this" onclick="PF('wgcongno').show();"
+						style="padding:4px !important;" styleClass="buttonaddrow"
+						value="Nạp công nợ" icon="fa fa-file-excel-o" />
+				</div>
+			</div>
+		</h:form>
+		<p:dialog widgetVar="ctdg" resizable="false" styleClass="dislogUpload"
+			header="Tải File CTDG">
+			<h:form id="ctdg" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napCTDonGia}" mode="advanced"
+					process="@this,ctdg" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="ctctdg" resizable="false"
+			styleClass="dislogUpload" header="Tải File CTCTDG">
+			<h:form id="ctctdg" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napCTCTDonGia}"
+					mode="advanced" process="@this,ctctdg" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="cdctdg" resizable="false"
+			styleClass="dislogUpload" header="Tải File Cài Đặt CTDG">
+			<h:form id="cdctdg" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napCDCTDonGia}"
+					mode="advanced" process="@this,cdctdg" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="ctkm" resizable="false" styleClass="dislogUpload"
+			header="Tải File CTKM">
+			<h:form id="ctkm" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napCTKM}" mode="advanced"
+					process="@this,ctkm" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="ctctkm" resizable="false"
+			styleClass="dislogUpload" header="Tải File CTCTKM">
+			<h:form id="ctctkm" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napCTCTKM}" mode="advanced"
+					process="@this,ctctkm" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="cdctkm" resizable="false"
+			styleClass="dislogUpload" header="Tải File Cài Đặt CTKM">
+			<h:form id="cdctkm" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napCDCTKM}" mode="advanced"
+					process="@this,cdctkm" />
+			</h:form>
+		</p:dialog>
+
+		<p:dialog widgetVar="donhang" resizable="false"
+			styleClass="dislogUpload" header="Tải File đơn hàng">
+			<h:form id="donhang" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napDonHang}" mode="advanced"
+					process="@this,donhang" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="ctdonhang" resizable="false"
+			styleClass="dislogUpload" header="Tải File CT đơn hàng">
+			<h:form id="ctdonhang" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napCTDonHang}"
+					mode="advanced" process="@this,ctdonhang" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="kmdonhang" resizable="false"
+			styleClass="dislogUpload" header="Tải File Cài Đặt CTKM">
+			<h:form id="kmdonhang" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napKMDonhang}"
+					mode="advanced" process="@this,kmdonhang" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="dongiakm" resizable="false"
+			styleClass="dislogUpload" header="Tải File Đơn giá KM">
+			<h:form id="dongiakm" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napDonGiaKM}" mode="advanced"
+					process="@this,dongiakm" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="nhomspkm" resizable="false"
+			styleClass="dislogUpload" header="Tải File nhóm sản phẩm KM">
+			<h:form id="nhomspkm" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napNhomSPKM}" mode="advanced"
+					process="@this,nhomspkm" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="nhaphang" resizable="false"
+			styleClass="dislogUpload" header="Tải File nhập sản phẩm">
+			<h:form id="nhaphang" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napPhieuNhap}"
+					mode="advanced" process="@this,nhaphang" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="harbor" resizable="false"
+			styleClass="dislogUpload" header="Tải File cảng">
+			<h:form id="harbor" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.loadHarborExcel}"
+					mode="advanced" process="@this,harbor" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="carrier" resizable="false"
+			styleClass="dislogUpload" header="Tải File Người vận chuyển">
+			<h:form id="carrier" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napExcelCarrier}"
+					mode="advanced" process="@this,carrier" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="stocker" resizable="false"
+			styleClass="dislogUpload" header="Tải File Thủ kho">
+			<h:form id="stocker" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napExcelStocker}"
+					mode="advanced" process="@this,stocker" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="xuathang" resizable="false"
+			styleClass="dislogUpload" header="Tải File xuất hàng">
+			<h:form id="xuathang" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napXuatHang}" mode="advanced"
+					process="@this,xuathang" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="ctxuathang" resizable="false"
+			styleClass="dislogUpload" header="Tải File CT xuất hàng">
+			<h:form id="ctxuathang" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napCTXuatHang}"
+					mode="advanced" process="@this,ctxuathang" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="hopdong" resizable="false"
+			styleClass="dislogUpload" header="Tải File hợp đồng">
+			<h:form id="hopdong" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napHopDong}" mode="advanced"
+					process="@this,hopdong" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="cthopdong" resizable="false"
+			styleClass="dislogUpload" header="Tải File chi tiết hợp đồng">
+			<h:form id="cthopdong" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napCTHopDong}"
+					mode="advanced" process="@this,cthopdong" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="xuatxuatkhau" resizable="false"
+			styleClass="dislogUpload" header="Tải File ĐH xuất xuất khẩu">
+			<h:form id="xuatxuatkhau" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napXuatXuatKhau}"
+					mode="advanced" process="@this,xuatxuatkhau" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="ctxuatxuatkhau" resizable="false"
+			styleClass="dislogUpload"
+			header="Tải File chi tiết ĐH xuất xuất khẩu">
+			<h:form id="ctxuatxuatkhau" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napCTXuatXuatKhau}"
+					mode="advanced" process="@this,ctxuatxuatkhau" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="napsanpham" resizable="false"
+			styleClass="dislogUpload" header="Tải File sản phẩm">
+			<h:form id="napsanpham" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napSanPham}" mode="advanced"
+					process="@this,napsanpham" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="napuynhiemchi" resizable="false"
+			styleClass="dislogUpload" header="Tải file Ủy nhiệm chi">
+			<h:form id="napuynhiemchi" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napuynhiemchi}"
+					mode="advanced" process="@this,napuynhiemchi" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="naptonkho" resizable="false"
+			styleClass="dislogUpload" header="Tải file Tồn kho">
+			<h:form id="naptonkho" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.naptonkho}" mode="advanced"
+					process="@this,naptonkho" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="naptatca" resizable="false"
+			styleClass="dislogUpload" header="Nạp tất cả">
+			<h:form id="naptatca" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="true"
+					listener="#{dataSettingBean.naptatca}" mode="advanced"
+					process="@this,naptatca" />
+			</h:form>
+			<h:form>
+				<p:commandButton value="Nạp tất cả"
+					action="#{dataSettingBean.batdaunaptatca}" update=":messages" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="xuathangmisa" resizable="false"
+			styleClass="dislogUpload" header="Tải File xuất hàng misa">
+			<h:form id="xuathangmisa" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napXuatHangMisa}"
+					mode="advanced" process="@this,xuathang" />
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="wgcongno" resizable="false"
+			styleClass="dislogUpload" header="Tải File công nợ">
+			<h:form id="idcongno" enctype="multipart/form-data">
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+					label="Chọn file từ máy tính" cancelLabel="Huỷ" update=":messages"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{dataSettingBean.napcongno}" mode="advanced"
+					process="@this,idcongno" />
+			</h:form>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

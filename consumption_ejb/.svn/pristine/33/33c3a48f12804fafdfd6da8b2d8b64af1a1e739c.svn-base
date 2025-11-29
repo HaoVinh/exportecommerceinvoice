@@ -1,0 +1,43 @@
+package lixco.com.service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.ejb.Stateless;
+import javax.ejb.TransactionAttribute;
+import javax.ejb.TransactionAttributeType;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Root;
+
+import lixco.com.entity.DVTXuatKhau;
+
+import org.jboss.logging.Logger;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.CONTAINER)
+public class DVTXuatKhauService{
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public List<DVTXuatKhau> selectAll() {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<DVTXuatKhau> cq = cb.createQuery(DVTXuatKhau.class);
+			Root<DVTXuatKhau> root = cq.from(DVTXuatKhau.class);
+			cq.select(root);
+			TypedQuery<DVTXuatKhau> query = em.createQuery(cq);
+			return query.getResultList();
+		} catch (Exception e) {
+			logger.error("DVTXuatKhauService.selectAll:" + e.getMessage(), e);
+		}
+		return new ArrayList<DVTXuatKhau>();
+	}
+}

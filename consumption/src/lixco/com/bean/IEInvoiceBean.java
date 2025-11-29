@@ -1,0 +1,5757 @@
+package lixco.com.bean;
+
+import huyen.lixco.com.service.InvoiceDetailTempService;
+import huyen.lixco.com.service.InvoiceTempService;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.text.DateFormat;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import javax.faces.application.FacesMessage;
+import javax.faces.context.FacesContext;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import lixco.com.commom_ejb.MyMath;
+import lixco.com.commom_ejb.PagingInfo;
+import lixco.com.common.ApiCallClient;
+import lixco.com.common.FormatHandler;
+import lixco.com.common.JsonParserUtil;
+import lixco.com.common.NavigationInfo;
+import lixco.com.common.SessionHelper;
+import lixco.com.common.ToolTimeCustomer;
+import lixco.com.entity.BindUser;
+import lixco.com.entity.Car;
+import lixco.com.entity.CarOwner;
+import lixco.com.entity.CarType;
+import lixco.com.entity.Contract;
+import lixco.com.entity.ContractDetail;
+import lixco.com.entity.ContractReqInfo;
+import lixco.com.entity.Currency;
+import lixco.com.entity.Customer;
+import lixco.com.entity.DVTXuatKhau;
+import lixco.com.entity.Driver;
+import lixco.com.entity.FormUpGoods;
+import lixco.com.entity.HarborCategory;
+import lixco.com.entity.IECategories;
+import lixco.com.entity.IEInvoice;
+import lixco.com.entity.IEInvoiceDetail;
+import lixco.com.entity.InvoiceDetail;
+import lixco.com.entity.InvoiceDetailTemp;
+import lixco.com.entity.InvoiceTemp;
+import lixco.com.entity.PaymentMethod;
+import lixco.com.entity.Product;
+import lixco.com.entity.Stevedore;
+import lixco.com.entity.Stocker;
+import lixco.com.entity.Warehouse;
+import lixco.com.interfaces.IBatchService;
+import lixco.com.interfaces.IBindUserService;
+import lixco.com.interfaces.ICarOwnerService;
+import lixco.com.interfaces.ICarService;
+import lixco.com.interfaces.ICarTypeService;
+import lixco.com.interfaces.IContractService;
+import lixco.com.interfaces.ICurrencyService;
+import lixco.com.interfaces.ICustomerService;
+import lixco.com.interfaces.IFormUpGoodsService;
+import lixco.com.interfaces.IHarborCategoryService;
+import lixco.com.interfaces.IIECategoriesService;
+import lixco.com.interfaces.IIEInvoiceService;
+import lixco.com.interfaces.IInventoryService;
+import lixco.com.interfaces.IInvoiceService;
+import lixco.com.interfaces.IPaymentMethodService;
+import lixco.com.interfaces.IProcessLogicIEInvoiceService;
+import lixco.com.interfaces.IProcessLogicInvoiceService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.interfaces.IStevedoreService;
+import lixco.com.interfaces.IStockerService;
+import lixco.com.interfaces.IWarehouseService;
+import lixco.com.reportInfo.IECommercialInvoiceReportInfo;
+import lixco.com.reportInfo.IEExportReport;
+import lixco.com.reportInfo.IEInvoiceCustomerBillNoDetailReport;
+import lixco.com.reportInfo.IEInvoiceHarborBillNoDetailReport;
+import lixco.com.reportInfo.IEInvoiceListByContNoReport;
+import lixco.com.reportInfo.IEInvoiceListByTaxValueZeroReport;
+import lixco.com.reportInfo.IEInvoiceOrderListByProductCodeReport;
+import lixco.com.reportInfo.IEInvoiceOrderListByVoucherReport;
+import lixco.com.reportInfo.IEInvoiceReport;
+import lixco.com.reportInfo.IEOrderFormReport;
+import lixco.com.reportInfo.IEPackingListReport;
+import lixco.com.reportInfo.IEProformaInvocieReportInfo;
+import lixco.com.reportInfo.IEVanningReport;
+import lixco.com.reportInfo.ReportFormD;
+import lixco.com.reqInfo.BatchReqInfo;
+import lixco.com.reqInfo.CarReqInfo;
+import lixco.com.reqInfo.HarborCategoryReqInfo;
+import lixco.com.reqInfo.IEInvoiceDetailReqInfo;
+import lixco.com.reqInfo.IEInvoiceReqInfo;
+import lixco.com.reqInfo.Message;
+import lixco.com.reqInfo.ProcessContractIEInvoice;
+import lixco.com.reqInfo.ReportTypeIEInVoice;
+import lixco.com.reqInfo.WrapDataIEInvoiceReqInfo;
+import lixco.com.reqInfo.WrapIEInvocieReqInfo;
+import lixco.com.reqInfo.WrapIEInvoiceDetailReqInfo;
+import lixco.com.reqInfo.WrapProcessContractIEInvoiceReqInfo;
+import lixco.com.reqfox.WrapDataInvoice;
+import lixco.com.service.CarIEIVService;
+import lixco.com.service.DVTXuatKhauService;
+import lixco.com.service.DriverIEIVService;
+import lixco.com.service.DriverService;
+import lombok.Getter;
+import lombok.Setter;
+import net.sf.jasperreports.engine.JREmptyDataSource;
+import net.sf.jasperreports.engine.JRExporterParameter;
+import net.sf.jasperreports.engine.JRParameter;
+import net.sf.jasperreports.engine.JasperExportManager;
+import net.sf.jasperreports.engine.JasperFillManager;
+import net.sf.jasperreports.engine.JasperPrint;
+import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
+import net.sf.jasperreports.engine.export.ooxml.JRDocxExporter;
+import net.sf.jasperreports.export.SimpleDocxReportConfiguration;
+import net.sf.jasperreports.export.SimpleExporterInput;
+import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
+import okhttp3.Call;
+import okhttp3.Response;
+
+import org.jboss.logging.Logger;
+import org.omnifaces.cdi.ViewScoped;
+import org.primefaces.PrimeFaces;
+import org.primefaces.event.TabChangeEvent;
+
+import trong.lixco.com.account.servicepublics.Account;
+import trong.lixco.com.api.AppConfig;
+import trong.lixco.com.bean.AbstractBean;
+import trong.lixco.com.entity.AccountDatabase;
+import trong.lixco.com.info.InvoiceExcelMisa;
+import trong.lixco.com.service.AccountDatabaseService;
+import trong.lixco.com.util.ConvertNumberToText;
+import trong.lixco.com.util.MyStringUtil;
+import trong.lixco.com.util.MyUtil;
+import trong.lixco.com.util.Notify;
+import trong.lixco.com.util.NumberWordConverter;
+import trong.lixco.com.util.ToolReport;
+
+import com.google.gson.JsonObject;
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.pdf.PdfCopy;
+import com.lowagie.text.pdf.PdfImportedPage;
+import com.lowagie.text.pdf.PdfReader;
+
+@Named("iEInvoiceBean")
+@ViewScoped
+public class IEInvoiceBean extends AbstractBean {
+	private static final long serialVersionUID = 1L;
+	@Inject
+	private IIEInvoiceService iEInvoiceService;
+	@Inject
+	private IProductService productService;
+	@Inject
+	private ICustomerService customerService;
+	@Inject
+	private IPaymentMethodService paymentMethodService;
+	@Inject
+	private IIECategoriesService iECategoriesService;
+	@Inject
+	private IWarehouseService warehouseService;
+	@Inject
+	private ICurrencyService currencyService;
+	@Inject
+	private IHarborCategoryService harborCategoryService;
+	@Inject
+	private IStockerService stockerService;
+	@Inject
+	private ICarService carService;
+	@Inject
+	private IContractService contractService;
+	@Inject
+	private IFormUpGoodsService formUpGoodsService;
+	@Inject
+	private IProcessLogicInvoiceService processLogicInvoiceService;
+	@Inject
+	private IInvoiceService invoiceService;
+	@Inject
+	private IBatchService batchService;
+	@Inject
+	private IInventoryService inventoryService;
+	@Inject
+	private Logger logger;
+	@Inject
+	private ICarTypeService carTypeService;
+	@Inject
+	private ICarOwnerService carOwnerService;
+	@Inject
+	private IStevedoreService stevedoreService;
+	@Inject
+	private IProcessLogicIEInvoiceService processLogicIEInvoiceService;
+	@Inject
+	private AccountDatabaseService accountDatabaseService;
+	@Inject
+	private IBindUserService bindUserService;
+	private List<PaymentMethod> listPaymentMethod;
+	private List<Stevedore> listStevedore;
+	private List<Currency> listCurrency;
+	private List<FormUpGoods> listFormUpGoods;
+	private IEInvoice iEInvoiceCrud;
+	private IEInvoice iEInvoiceSelect;
+	private List<IEInvoice> listIEInvoice;
+	private IEInvoiceDetail iEInvoiceDetailCrud;
+	private IEInvoiceDetail iEInvoiceDetailSelect;
+	private List<IEInvoiceDetail> listIEInvoiceDetail;
+	private double quantityContract;
+	private double quantityContractProcessed;
+	private double quantityBatchInvCurr;// số lượng lô hàng tồn hiện tại
+	private double quantityBatchInvCal;// số lượng lô hàng tồn ước tính.
+
+	private double sumUSD;
+	private double sumUSDXK;
+	private long sumVND;
+	/* search ieinvoice */
+	private Date fromDateSearch;
+	private Date toDateSearch;
+	private Customer customerSearch;
+	private String invoiceCodeSearch;
+	private String voucherCodeSearch;
+	private Product productSearch;
+	private IECategories iECategoriesSearch;
+	private String contractVoucherCode;
+	private int pageSize;
+	private NavigationInfo navigationInfo;
+	private List<Integer> listRowPerPage;
+	private Account account;
+	private FormatHandler formatHandler;
+	private boolean changeIEInvoice;
+	/* report */
+	private List<ReportTypeIEInVoice> listSelectReport;
+	private ReportTypeIEInVoice reportTypeIEInVoiceSelect;
+	/* excel */
+	private List<ReportTypeIEInVoice> listSelectExcel;
+	private ReportTypeIEInVoice reportTypeExcelSelect;
+	/* Out */
+	private List<IEInvoiceDetail> listIEInvoiceDetailOut;
+	private List<IEInvoiceDetail> listIEInvoiceDetailSelectOut;
+	private List<IEInvoice> listIEInvoiceOut;
+	private boolean checkAll;
+	/* danh sách report tab danh sách */
+	private List<ReportTypeIEInVoice> listReportPdfOut;
+	private ReportTypeIEInVoice reportPdfOutSelect;
+	/* danh sách bill no hải quan */
+	private List<ReportTypeIEInVoice> listReportHarborOut;
+	private ReportTypeIEInVoice reportHarborOutSelect;
+	/* xe */
+	private Car carCrud;
+	private Car carSelect;
+	private List<Car> listCar;
+	private List<CarType> listCarType;
+	private List<CarOwner> listCarOwner;
+	private CarType carTypeSearch;
+	private CarOwner carOwnerSearch;
+	private String licensePlateSearch;
+	private String phoneNumberSearch;
+	/* Xư lý hợp đồng */
+	private List<ProcessContractIEInvoice> listProcessContractIEInvocie;
+	private List<ProcessContractIEInvoice> listProcessContractIEInvocieFilter;
+	private double[] arrValueContract = { 0, 0, 0, 0, 0, 0 };
+
+	@Override
+	protected void initItem() {
+		try {
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletRequest request = (HttpServletRequest) facesContext.getExternalContext().getRequest();
+			account = SessionHelper.getInstance().getSession("account", request, Account.class);
+			formatHandler = FormatHandler.getInstance();
+			listStevedore = new ArrayList<>();
+			stevedoreService.selectAll(listStevedore);
+			listFormUpGoods = new ArrayList<>();
+			formUpGoodsService.selectAll(listFormUpGoods);
+			listCurrency = new ArrayList<>();
+			currencyService.selectAll(listCurrency);
+			listPaymentMethod = new ArrayList<>();
+			paymentMethodService.selectAll(listPaymentMethod);
+			final int IE_HARBORCATEGORY = 1;
+			// init contract crud
+			iEInvoiceCrud = new IEInvoice();
+			iEInvoiceCrud.setInvoice_date(new Date());
+			fromDateSearch = ToolTimeCustomer.plusMonthNow(-1);
+			toDateSearch = ToolTimeCustomer.plusDayNow(0);
+			navigationInfo = new NavigationInfo();
+			navigationInfo.setCurrentPage(1);
+			navigationInfo.setLimit(pageSize);
+			navigationInfo.setMaxIndices(5);
+			createNew();
+			/* init report */
+			listSelectReport = new ArrayList<>();
+			listSelectReport.add(new ReportTypeIEInVoice(1, "In hóa đơn"));
+			listSelectReport.add(new ReportTypeIEInVoice(2, "Commercial Invoice"));
+			listSelectReport.add(new ReportTypeIEInVoice(3, "In phiếu xuất kho"));
+			listSelectReport.add(new ReportTypeIEInVoice(4, "Proforma Invoice"));
+			listSelectReport.add(new ReportTypeIEInVoice(5, "In đơn hàng"));
+			listSelectReport.add(new ReportTypeIEInVoice(6, "Packing List"));
+			listSelectReport.add(new ReportTypeIEInVoice(8, "Vanning Report"));
+			listSelectReport.add(new ReportTypeIEInVoice(9, "Commercial Invoice (mẫu 2)"));
+			listSelectReport.add(new ReportTypeIEInVoice(10, "Packing List (mẫu 2)"));
+			/* init report pdf tab danh sách */
+			listReportPdfOut = new ArrayList<>();
+			listReportPdfOut.add(new ReportTypeIEInVoice(1, "Commercial Invoice"));
+			listReportPdfOut.add(new ReportTypeIEInVoice(3, "Packing List"));
+			listReportPdfOut.add(new ReportTypeIEInVoice(4, "Vanning Report"));
+			/* report hải quan và c/o */
+			listReportHarborOut = new ArrayList<>();
+			listReportHarborOut.add(new ReportTypeIEInVoice(1, "Chi tiết bill no(hải quan)"));
+			listReportHarborOut.add(new ReportTypeIEInVoice(2, "Chi tiết bill no(khách hàng)"));
+			listReportHarborOut.add(new ReportTypeIEInVoice(3, "From D"));
+			listReportHarborOut.add(new ReportTypeIEInVoice(4, "C/O from AJ"));
+			/* innit excel report */
+			listSelectExcel = new ArrayList<>();
+			listSelectExcel.add(new ReportTypeIEInVoice(1, "Bảng kê thứ tự theo số ct"));
+			listSelectExcel.add(new ReportTypeIEInVoice(2, "Bảng kê thứ tự theo masp"));
+			listSelectExcel.add(new ReportTypeIEInVoice(3, "Bảng kê Cont no"));
+			listSelectExcel.add(new ReportTypeIEInVoice(4, "Bảng kê thuế suất 0%"));
+			listIEInvoiceOut = new ArrayList<>();
+			listIEInvoiceDetailSelectOut = new ArrayList<>();
+
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.initItem:" + e.getMessage(), e);
+		}
+	}
+
+	public void exportTrackContractPDF() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0 && iEInvoiceCrud.getContract() != null
+					&& listProcessContractIEInvocie != null && listProcessContractIEInvocie.size() > 0) {
+				String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+						.getRealPath("/resources/reports/ieinvocie/theodoihopdong.jasper");
+				Map<String, Object> importParam = new HashMap<String, Object>();
+				Locale locale = new Locale("vi", "VI");
+				importParam.put(JRParameter.REPORT_LOCALE, locale);
+				importParam.put(
+						"logo",
+						FacesContext.getCurrentInstance().getExternalContext()
+								.getRealPath("/resources/gfx/lixco_logo.png"));
+				importParam.put("customer_name", iEInvoiceCrud.getCustomer().getCustomer_name());
+				importParam.put("title", "THEO DÕI HỢP ĐỒNG TIÊU THỤ SẢN PHẨM SỐ "
+						+ iEInvoiceCrud.getContract().getVoucher_code());
+				importParam.put("customer_code", iEInvoiceCrud.getContract().getCustomer().getCustomer_code());
+				importParam.put("list_data", listProcessContractIEInvocie);
+				JasperPrint jasperPrint = JasperFillManager
+						.fillReport(reportPath, importParam, new JREmptyDataSource());
+				byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+				String ba = Base64.getEncoder().encodeToString(data);
+				current.executeScript("utility.printPDF('" + ba + "')");
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo', 'Không có dữ liệu','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportTrackContract:" + e.getMessage(), e);
+		}
+	}
+
+	// cảnh báo vượt số tiền ủy nhiệm chi khi lưu hoặc update table
+	public void OverAmountUNC() {
+		try {
+
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.OverAmountUNC:" + e.getMessage(), e);
+		}
+	}
+
+	public void selectOrDeSelectAll(boolean checkbox) {
+		try {
+			if (checkbox) {
+				// load list chi tiết đơn hàng xuất xuất khẩu
+				// listIEInvoiceDetailOut=new ArrayList<>();
+				// iEInvoiceService.selectIEInvoideDetailByInvoice(item.getId(),
+				// listIEInvoiceDetailOut);
+				// for(IEInvoiceDetail d:listIEInvoiceDetailOut){
+				// d.setIe_invoice(item);
+				//
+				// }
+				// check tất cả các detail
+				if (listIEInvoiceDetailOut != null && listIEInvoiceDetailOut.size() > 0) {
+					for (IEInvoiceDetail d : listIEInvoiceDetailOut) {
+						d.setCheck(true);
+
+					}
+				}
+			} else {
+				// bỏ check tất cả detail
+				if (listIEInvoiceDetailOut != null && listIEInvoiceDetailOut.size() > 0) {
+					for (IEInvoiceDetail d : listIEInvoiceDetailOut) {
+						d.setCheck(false);
+
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.selectAll:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogCar() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			listCarOwner = new ArrayList<>();
+			carOwnerService.selectAll(listCarOwner);
+			listCarType = new ArrayList<>();
+			carTypeService.selectAll(listCarType);
+			createNewCar();
+			searchCar();
+			current.executeScript("PF('dlgcar').show();");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.showDialogCar:" + e.getMessage(), e);
+		}
+	}
+
+	public void createNewCar() {
+		carCrud = new Car();
+	}
+
+	// private void saveOrUpdateFoxpro(long carId) {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// lixco.com.reqfox.Car car = carService.getCarFoxPro(carId);
+	// AccountDatabase accountDatabase =
+	// accountDatabaseService.findByName("foxproapi");
+	// if (car != null) {
+	// try {
+	// Call call =
+	// ApiCallClient.getListObjectWithParam(accountDatabase.getAddressPublic(),
+	// "car", "sa",
+	// JsonParserUtil.getGson().toJson(car));
+	// Response response = call.execute();
+	// String body = response.body().string();
+	// JsonObject result = JsonParserUtil.getGson().fromJson(body,
+	// JsonObject.class);
+	// if (response.isSuccessful() && result.get("err").getAsInt() == 0) {
+	// lixco.com.reqfox.Car carResult =
+	// JsonParserUtil.getGson().fromJson(result.get("dt"),
+	// lixco.com.reqfox.Car.class);
+	// carService.updateIdFox(carResult);
+	// } else {
+	// String mesages = result.get("msg").getAsString();
+	// current.executeScript("swaldesignclose2('Cảnh báo!', '" + mesages +
+	// "','warning');");
+	// }
+	// } catch (Exception e) {
+	// e.printStackTrace();
+	// current.executeScript("swaldesignclose2('Cảnh báo!', 'Không thực hiện liên kết dữ liệu foxpro','warning');");
+	// }
+	// }
+	// } catch (Exception e) {
+	// logger.error("IEInvoiceBean.saveOrUpdateFoxpro:foxpro");
+	// }
+	// }
+
+	public void saveOrUpdateCar() {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (carCrud != null) {
+				String licensePlate = carCrud.getLicense_plate();
+				String driver = carCrud.getDriver();
+				if (licensePlate != null && !"".equals(licensePlate) && driver != null && !"".equals(driver)
+						&& carCrud.getCar_type() != null && carCrud.getCar_owner() != null) {
+					CarReqInfo t = new CarReqInfo(carCrud);
+					if (carCrud.getId() == 0) {
+						// check code đã tồn tại chưa
+						if (allowSave(new Date())) {
+							carCrud.setCreated_date(new Date());
+							carCrud.setCreated_by(account.getMember().getName());
+							if (carService.insert(t) != -1) {
+								notify.success("Thêm thành công");
+								Car clone = carCrud.clone();
+								iEInvoiceCrud.setCar(clone);
+								listCar.add(0, carCrud.clone());
+								// saveOrUpdateFoxpro(carCrud.getId());
+								createNewCar();
+							} else {
+								notify.warning("Thêm thất bại");
+							}
+
+						} else {
+							notify.warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!");
+						}
+					} else {
+						// check code update đã tồn tại chưa
+						if (allowUpdate(new Date())) {
+							carCrud.setLast_modifed_by(account.getMember().getName());
+							carCrud.setLast_modifed_date(new Date());
+							if (carService.update(t) != -1) {
+								notify.success("Cập nhật thành công");
+								listCar.set(listCar.indexOf(carCrud), t.getCar());
+								// saveOrUpdateFoxpro(carCrud.getId());
+							} else {
+								notify.warning("Cập nhật thất bại!");
+							}
+						} else {
+							notify.warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!");
+						}
+					}
+				} else {
+					notify.warning("Thông tin không đầy đủ, điền đủ thông tin chứa(*)");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.saveOrUpdateCar:" + e.getMessage(), e);
+		}
+	}
+
+	public void showEditCar() {
+		try {
+			if (carSelect != null) {
+				Car clone = carSelect.clone();
+				iEInvoiceCrud.setCar(clone);
+				carCrud = clone;
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.showEditCar:" + e.getMessage(), e);
+		}
+	}
+
+	public void searchCar() {
+		try {
+			listCar = new ArrayList<Car>();
+			/*
+			 * { car_info:{car_owner_id:0,car_type_id:0,license_plate:
+			 * '',phone_number:''}, page:{page_index:0, page_size:0}}
+			 */
+			PagingInfo page = new PagingInfo();
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("car_owner_id", carOwnerSearch == null ? 0 : carOwnerSearch.getId());
+			jsonInfo.addProperty("car_type_id", carTypeSearch == null ? 0 : carTypeSearch.getId());
+			jsonInfo.addProperty("license_plate", licensePlateSearch);
+			jsonInfo.addProperty("phone_number", phoneNumberSearch);
+			JsonObject json = new JsonObject();
+			json.add("car_info", jsonInfo);
+			carService.search(JsonParserUtil.getGson().toJson(json), listCar);
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.searchCar:" + e.getMessage(), e);
+		}
+	}
+
+	public void nextOrPrev(int next) {
+		try {
+			if (listIEInvoice != null && listIEInvoice.size() > 0) {
+				int index = listIEInvoice.indexOf(iEInvoiceCrud);
+				int size = listIEInvoice.size() - 1;
+				if (index == -1) {
+					iEInvoiceSelect = listIEInvoice.get(0);
+					iEInvoiceCrud = iEInvoiceSelect.clone();
+				} else {
+					switch (next) {
+					case 1:
+						if (index == size) {
+							iEInvoiceSelect = listIEInvoice.get(0);
+							iEInvoiceCrud = iEInvoiceSelect.clone();
+						} else {
+							iEInvoiceSelect = listIEInvoice.get(index + 1);
+							iEInvoiceCrud = iEInvoiceSelect.clone();
+						}
+						break;
+
+					default:
+						if (index == 0) {
+							iEInvoiceSelect = listIEInvoice.get(size);
+							iEInvoiceCrud = iEInvoiceSelect.clone();
+						} else {
+							iEInvoiceSelect = listIEInvoice.get(index - 1);
+							iEInvoiceCrud = iEInvoiceSelect.clone();
+						}
+						break;
+					}
+				}
+				// load chi tiết đơn hàng xuất xuất khẩu
+				listIEInvoiceDetail = new ArrayList<>();
+				iEInvoiceService.selectIEInvoideDetailByInvoice(iEInvoiceCrud.getId(), listIEInvoiceDetail);
+				sumUSD();
+				listIEInvoiceDetailOut = new ArrayList<>();
+				if (iEInvoiceSelect.isCheck()) {
+					listIEInvoiceDetailOut = new ArrayList<>();
+					// load danh sách đã check vào
+					for (IEInvoiceDetail ie : listIEInvoiceDetailSelectOut) {
+						if (ie.getIe_invoice().equals(iEInvoiceSelect)) {
+							listIEInvoiceDetailOut.add(ie);
+						}
+					}
+
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.nextOrPrev:" + e.getMessage(), e);
+		}
+	}
+
+	public void processInvoice() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (allowSave(iEInvoiceCrud.getInvoice_date())) {
+				if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0) {
+					WrapIEInvocieReqInfo t = new WrapIEInvocieReqInfo(iEInvoiceCrud.getId(), account.getMember()
+							.getName(), account.getMember().getId());
+					Message message = new Message();
+					int code = processLogicInvoiceService.createInvoiceByIEInvoice(t, message);
+					if (code == 0) {
+						success();
+						// call api tạo hóa đơn bên foxpro
+						// createApiInvoiceFox(iEInvoiceCrud.getId());
+						current.executeScript("swaldesigntimer('Lưu ý!', '" + message.getUser_message()
+								+ "','warning',2000);");
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', '" + message.getUser_message()
+								+ "','warning',2000);");
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Đơn hàng xuất xuất khẩu không tồn tại!','warning',2000);");
+				}
+			} else {
+				warning("Tài khoản này không có quyền thực hiện hoặc tháng đã khoá");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.processInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	@Getter
+	@Setter
+	private String stextStr;
+
+	public void search() {
+		try {
+			// reset bảng chọn để in report
+			listIEInvoiceOut = new ArrayList<>();
+			listIEInvoiceDetailSelectOut = new ArrayList<>();
+			listIEInvoiceDetailOut = new ArrayList<>();
+			// reset nút chọn tất cả
+			checkAll = false;
+			navigationInfo.setLimit(pageSize);
+			navigationInfo.setMaxIndices(5);
+			listIEInvoice = new ArrayList<>();
+			PagingInfo page = new PagingInfo();
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("stextStr", MyStringUtil.replaceD(stextStr));
+			jsonInfo.addProperty("from_date",
+					fromDateSearch == null ? "" : ToolTimeCustomer.convertDateToString(fromDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("to_date",
+					toDateSearch == null ? "" : ToolTimeCustomer.convertDateToString(toDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("customer_id", customerSearch == null ? 0 : customerSearch.getId());
+			jsonInfo.addProperty("invoice_code", invoiceCodeSearch);
+			jsonInfo.addProperty("voucher_code", voucherCodeSearch);
+			jsonInfo.addProperty("product_id", productSearch == null ? 0 : productSearch.getId());
+			jsonInfo.addProperty("ie_categories_id", iECategoriesSearch == null ? 0 : iECategoriesSearch.getId());
+			jsonInfo.addProperty("contract_voucher_code", contractVoucherCode);
+			JsonObject jsonPage = new JsonObject();
+			jsonPage.addProperty("page_index", 1);
+			jsonPage.addProperty("page_size", pageSize);
+			JsonObject json = new JsonObject();
+			json.add("ie_invoice", jsonInfo);
+			json.add("page", jsonPage);
+			iEInvoiceService.search(JsonParserUtil.getGson().toJson(json), page, listIEInvoice);
+			navigationInfo.setTotalRecords((int) page.getTotalRow());
+			navigationInfo.setCurrentPage(1);
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.search:" + e.getMessage(), e);
+		}
+	}
+
+	public void onTabChange(TabChangeEvent event) {
+		if ("Danh sách đơn hàng xuất khẩu".equals(event.getTab().getTitle())) {
+			if (listIEInvoice == null || listIEInvoice.size() == 0) {
+				search();
+				PrimeFaces.current().ajax().update("menuformid:tabview1:tablesp");
+			}
+		}
+
+	}
+
+	public void saveOrUpdateProcessContract() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (listProcessContractIEInvocie != null && listProcessContractIEInvocie.size() > 0) {
+				List<ProcessContractIEInvoice> listProcess = new ArrayList<>();
+				for (ProcessContractIEInvoice p : listProcessContractIEInvocie) {
+					if (p.isSelectp() && p.getExport_quantity() > 0) {
+						listProcess.add(p);
+					}
+				}
+				WrapProcessContractIEInvoiceReqInfo t = new WrapProcessContractIEInvoiceReqInfo(account.getMember()
+						.getName(), account.getMember().getId(), iEInvoiceCrud, listProcess);
+				List<Long> listProductId = new ArrayList<>();
+				Message message = new Message();
+				int ret = processLogicIEInvoiceService.saveListProcessContract(t.clone(), listProductId, message);
+				if (ret == -1) {
+					String m = message.getUser_message() + " \\n" + message.getInternal_message();
+					current.executeScript("swaldesignclose('Xảy ra lỗi', '" + m + "','warning');");
+				} else {
+					iEInvoiceService.selectIEInvoideDetailByInvoice(iEInvoiceCrud.getId(), listIEInvoiceDetail);
+					sumUSD();
+					// tạo đơn hàng xuất khẩu thành công
+					current.executeScript("swaldesigntimer('Thành công!', 'Tạo đơn hàng xuất khẩu từ hợp đồng thành công ','success',2000);");
+					// load đơn hàng xuất khẩu
+					iEInvoiceSelect = iEInvoiceCrud;
+					showIEInvoice();
+
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Đơn hàng không có hợp đồng','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.saveOrUpdateProcessContract:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tableproc').clearFilters();");
+	}
+
+	public void trackContract() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			arrValueContract = new double[] { 0, 0, 0, 0, 0, 0 };
+			listProcessContractIEInvocie = new ArrayList<>();
+			if (changeIEInvoice) {
+				notify.warning("Đơn hàng chưa lưu");
+				return;
+			}
+			if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0) {
+				Contract contract = iEInvoiceCrud.getContract();
+				if (contract != null) {
+					JsonObject json = new JsonObject();
+					json.addProperty("contract_id", contract.getId());
+					List<Object[]> list = new ArrayList<>();
+					contractService.processContractIEInvoice(JsonParserUtil.getGson().toJson(json), list);
+					if (list.size() > 0) {
+						for (Object[] p : list) {
+							ProcessContractIEInvoice item = new ProcessContractIEInvoice(Long.parseLong(Objects
+									.toString(p[0])), Objects.toString(p[1]), Objects.toString(p[2]),
+									Double.parseDouble(Objects.toString(p[3], "0")), Double.parseDouble(Objects
+											.toString(p[4], "0")), Double.parseDouble(Objects.toString(p[5], "0")),
+									Double.parseDouble(Objects.toString(p[6], "0")), Double.parseDouble(Objects
+											.toString(p[7], "0")), Double.parseDouble(Objects.toString(p[8], "0")));
+							item.setRemain_quantity(BigDecimal.valueOf(item.getContract_quantity())
+									.subtract(BigDecimal.valueOf(item.getIeinvoice_quantity())).doubleValue());
+							listProcessContractIEInvocie.add(item);
+							arrValueContract[0] = BigDecimal.valueOf(arrValueContract[0])
+									.add(BigDecimal.valueOf(item.getContract_quantity())).doubleValue();
+							arrValueContract[1] = BigDecimal.valueOf(arrValueContract[1])
+									.add(BigDecimal.valueOf(item.getIeinvoice_quantity())).doubleValue();
+							arrValueContract[2] = BigDecimal.valueOf(arrValueContract[2])
+									.add(BigDecimal.valueOf(item.getRemain_quantity())).doubleValue();
+							arrValueContract[3] = BigDecimal.valueOf(arrValueContract[3])
+									.add(BigDecimal.valueOf(item.getContract_total_amount())).doubleValue();
+							arrValueContract[4] = BigDecimal.valueOf(arrValueContract[4])
+									.add(BigDecimal.valueOf(item.getIeinvoice_total_amount())).doubleValue();
+							arrValueContract[5] = BigDecimal.valueOf(arrValueContract[3])
+									.subtract(BigDecimal.valueOf(arrValueContract[4])).doubleValue();
+						}
+						current.executeScript("PF('tractcontract').show();");
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Đơn hàng không có hợp đồng','warning',2000);");
+				}
+			} else {
+				notify.warning("Đơn hàng không tồn tại");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.trackContract:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tableproc').clearFilters();");
+		current.executeScript("PF('tabletrackcontract').clearFilters();");
+	}
+
+	public void processContractIEInvoice() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			listProcessContractIEInvocie = new ArrayList<>();
+			if (changeIEInvoice) {
+				notify.warning("Đơn hàng chưa lưu");
+				return;
+			}
+			if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0) {
+				Contract contract = iEInvoiceCrud.getContract();
+				if (contract != null) {
+					JsonObject json = new JsonObject();
+					json.addProperty("contract_id", contract.getId());
+					List<Object[]> list = new ArrayList<>();
+					contractService.processContractIEInvoice(JsonParserUtil.getGson().toJson(json), list);
+					if (list.size() > 0) {
+						for (Object[] p : list) {
+							ProcessContractIEInvoice item = new ProcessContractIEInvoice(Long.parseLong(Objects
+									.toString(p[0])), Objects.toString(p[1]), Objects.toString(p[2]),
+									Double.parseDouble(Objects.toString(p[3], "0")), Double.parseDouble(Objects
+											.toString(p[4], "0")), Double.parseDouble(Objects.toString(p[5], "0")),
+									Double.parseDouble(Objects.toString(p[6], "0")), Double.parseDouble(Objects
+											.toString(p[7], "0")), Double.parseDouble(Objects.toString(p[8], "0")));
+							item.setRemain_quantity(BigDecimal.valueOf(item.getContract_quantity())
+									.subtract(BigDecimal.valueOf(item.getIeinvoice_quantity())).doubleValue());
+							item.setKg_remain_quantity(BigDecimal.valueOf(item.getKg_contract_quantity())
+									.subtract(BigDecimal.valueOf(item.getKg_ieinvoice_quantity())).doubleValue());
+							listProcessContractIEInvocie.add(item);
+						}
+						current.executeScript("PF('dlgprocess').show();");
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Đơn hàng không có hợp đồng','warning',2000);");
+				}
+			} else {
+				notify.warning("Đơn hàng không tồn tại");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.processContractIEInvoice:" + e.getMessage(), e);
+		}
+		current.executeScript("PF('tableproc').clearFilters();");
+	}
+
+	public void changeExportContractQuantity(ProcessContractIEInvoice item) {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			double exportQuantity = item.getExport_quantity();
+			if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0) {
+				Contract contract = iEInvoiceCrud.getContract();
+				if (contract != null) {
+					JsonObject json = new JsonObject();
+					json.addProperty("contract_id", contract.getId());
+					json.addProperty("product_id", item.getProduct_id());
+					List<Object[]> list = new ArrayList<>();
+					contractService.processContractIEInvoice(JsonParserUtil.getGson().toJson(json), list);
+					if (list.size() == 1) {
+						Object[] p = list.get(0);
+						item.setContract_quantity(Double.parseDouble(Objects.toString(p[3])));
+						item.setKg_contract_quantity(Double.parseDouble(Objects.toString(p[4], "0")));
+						item.setIeinvoice_quantity(Double.parseDouble(Objects.toString(p[5], "0")));
+						item.setKg_ieinvoice_quantity(Double.parseDouble(Objects.toString(p[6], "0")));
+						item.setContract_total_amount(Double.parseDouble(Objects.toString(p[7], "0")));
+						item.setIeinvoice_total_amount(Double.parseDouble(Objects.toString(p[8], "0")));
+						double remainQuantity = BigDecimal.valueOf(item.getContract_quantity())
+								.subtract(BigDecimal.valueOf(item.getIeinvoice_quantity())).doubleValue();
+						item.setRemain_quantity(remainQuantity);
+						if (remainQuantity == 0) {
+							notify.message("Số lượng đã được xuất hết");
+							item.setSelectp(false);
+							item.setExport_quantity(0);
+						} else if (remainQuantity < 0) {
+							notify.message("Số lượng xuất lớn không hợp lệ");
+							item.setSelectp(false);
+							item.setExport_quantity(0);
+						} else if (exportQuantity > remainQuantity) {
+							notify.message("Số lượng xuất lớn hơn số lượng còn lại");
+							item.setExport_quantity(0);
+						}
+					} else {
+						// chi tiết hợp đồng có sản phẩm đó không tồn tại,
+						// reload lại dialog
+						processContractIEInvoice();
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Đơn hàng không có hợp đồng','warning',2000);");
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Đơn hàng không chưa lưu','warning',2000);");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.changeExportContractQuantity:" + e.getMessage(), e);
+		}
+	}
+	
+	@Getter
+	@Setter
+	boolean chonhetHD = false;
+	
+
+	public void chonHetPhieu() {
+		if (listProcessContractIEInvocieFilter != null) {
+			for (int i = 0; i < listProcessContractIEInvocieFilter.size(); i++) {
+				listProcessContractIEInvocieFilter.get(i).setSelectp(chonhetHD);
+				exportContractQuantity(listProcessContractIEInvocieFilter.get(i));
+			}
+		}
+	}
+
+	public void exportContractQuantity(ProcessContractIEInvoice item) {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (item.isSelectp()) {
+				if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0) {
+					Contract contract = iEInvoiceCrud.getContract();
+					if (contract != null) {
+						JsonObject json = new JsonObject();
+						json.addProperty("contract_id", contract.getId());
+						json.addProperty("product_id", item.getProduct_id());
+						List<Object[]> list = new ArrayList<>();
+						contractService.processContractIEInvoice(JsonParserUtil.getGson().toJson(json), list);
+						if (list.size() == 1) {
+							Object[] p = list.get(0);
+							item.setContract_quantity(Double.parseDouble(Objects.toString(p[3])));
+							item.setKg_contract_quantity(Double.parseDouble(Objects.toString(p[4], "0")));
+							item.setIeinvoice_quantity(Double.parseDouble(Objects.toString(p[5], "0")));
+							item.setKg_ieinvoice_quantity(Double.parseDouble(Objects.toString(p[6], "0")));
+							item.setContract_total_amount(Double.parseDouble(Objects.toString(p[7], "0")));
+							item.setIeinvoice_total_amount(Double.parseDouble(Objects.toString(p[8], "0")));
+							double remainQuantity = BigDecimal.valueOf(item.getContract_quantity())
+									.subtract(BigDecimal.valueOf(item.getIeinvoice_quantity())).doubleValue();
+							item.setRemain_quantity(remainQuantity);
+							if (remainQuantity == 0) {
+								notify.message(item.getProduct_code()+" số lượng đã được xuất hết");
+								item.setSelectp(false);
+								return;
+							} else if (remainQuantity < 0) {
+								notify.message(item.getProduct_code()+" số lượng xuất lớn không hợp lệ");
+								item.setSelectp(false);
+								return;
+							}
+							item.setExport_quantity(remainQuantity);
+
+						} else {
+							// chi tiết hợp đồng có sản phẩm đó không tồn tại,
+							// reload lại dialog
+							processContractIEInvoice();
+						}
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Đơn hàng không có hợp đồng','warning',2000);");
+					}
+				} else {
+					current.executeScript("swaldesigntimer('Cảnh báo!', 'Đơn hàng không chưa lưu','warning',2000);");
+				}
+			} else {
+				item.setExport_quantity(0);
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportContractQuantity:" + e.getMessage(), e);
+		}
+	}
+
+	public void proccessExportIEInvoiceByHarbor(boolean word) {
+		try {
+			if (reportHarborOutSelect != null) {
+				long id = reportHarborOutSelect.getId();
+				if (id == 1) {
+					exportReportDetailBillNoHarbor(word);
+				} else if (id == 2) {
+					exportReportDetailBillNoCustomer(word);
+				} else if (id == 3) {
+					exportReportCOFromD(word);
+				} else if (id == 4) {
+					exportReportCOFromAJ(word);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.proccessExportIEInvoiceByHarbor:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportReportCOFromD(boolean word) {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			IEInvoice iEInvoiceFirst = null;
+			if (listIEInvoiceOut.size() > 0 && listIEInvoiceDetailSelectOut.size() > 0) {
+				iEInvoiceFirst = listIEInvoiceOut.get(0);
+				String customerCode = iEInvoiceFirst.getCustomer().getCustomer_code();
+				Contract contract = iEInvoiceFirst.getContract();
+				String contractVoucherCode = contract == null ? "" : contract.getVoucher_code();
+				String billNo = iEInvoiceFirst.getBill_no();
+				for (IEInvoice iv : listIEInvoiceOut) {
+					Contract con = iv.getContract();
+					String bill = iv.getBill_no();
+					boolean kt0 = customerCode.equals(iv.getCustomer().getCustomer_code());
+					boolean kt1 = (contract == null && con == null)
+							|| (contract != null && con != null && ((contractVoucherCode == null && con
+									.getVoucher_code() == null) || (contractVoucherCode != null
+									&& con.getVoucher_code() != null && contractVoucherCode.equals(con
+									.getVoucher_code()))));
+					boolean kt2 = (billNo == null && bill == null)
+							|| (billNo != null && bill != null && billNo.equals(bill));
+					if (kt0 && kt1 && kt2) {
+
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Danh sách đơn hàng chọn không cùng mã khách hàng, số hợp đồng hoặc bill no !','warning',2000);");
+						return;
+					}
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			List<ReportFormD> list = new ArrayList<>();
+			// lấy danh sách id chi tiết đơn hàng xuất xuất khẩu.
+			List<Long> listID = new ArrayList<>();
+			for (IEInvoiceDetail p : listIEInvoiceDetailSelectOut) {
+				if (p.isCheck()) {
+					listID.add(p.getId());
+				}
+			}
+			JsonObject json = new JsonObject();
+			json.add("list_ie_invoice_detail_id", JsonParserUtil.getGson().toJsonTree(listID));
+			iEInvoiceService.reportFormD(JsonParserUtil.getGson().toJson(json), list);
+			if (listID.size() == 0) {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			//
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/coformd2.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			IEInvoice ieInvoice = listIEInvoiceOut.get(0);
+			importParam.put("reference_no", ieInvoice.getReference_no());
+			importParam.put("customer_name", ieInvoice.getCustomer().getCustomer_name());
+			importParam.put("address", ieInvoice.getCustomer().getAddress());
+			HarborCategory harborCategory = ieInvoice.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_name",
+						harborCategory.getHarbor_name() == null ? "" : harborCategory.getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+			String edtDateStr = "";
+			DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.US);
+			if (ieInvoice.getEtd_date() != null) {
+				edtDateStr = dateFormat.format(ieInvoice.getEtd_date());
+			}
+			importParam.put("etd_date_str", edtDateStr.toUpperCase());
+			importParam.put("shipped_per", ieInvoice.getShipped_per() == null ? "" : ieInvoice.getShipped_per());
+			importParam.put("bill_no", ieInvoice.getBill_no() == null ? "" : ieInvoice.getBill_no());
+			String listProductName = "";
+			Double netweight = 0.0;
+			Double grossweight = 0.0;
+			Double foreignTotalAmount = 0.0;
+			Map<String, List<ReportFormD>> map = new LinkedHashMap<String, List<ReportFormD>>();
+			for (ReportFormD d : list) {
+				if (!map.containsKey(d.getProduct_type_en_name())) {
+					map.put(d.getProduct_type_en_name(), new ArrayList<>());
+				}
+				map.get(d.getProduct_type_en_name()).add(d);
+				// listProductName+=(d.getProduct_type_en_name()==null ? "":
+				// d.getProduct_type_en_name())+"\n"+(d.getProduct_en_name()==null
+				// ? "" : d.getProduct_en_name());
+				netweight = BigDecimal.valueOf(netweight).add(BigDecimal.valueOf(d.getTotal_net_weight()))
+						.doubleValue();
+				grossweight = BigDecimal.valueOf(grossweight).add(BigDecimal.valueOf(d.getTotal_gross_weight()))
+						.doubleValue();
+				foreignTotalAmount = BigDecimal.valueOf(foreignTotalAmount)
+						.add(BigDecimal.valueOf(d.getForeign_total_amount())).doubleValue();
+			}
+			for (Entry<String, List<ReportFormD>> entry : map.entrySet()) {
+				listProductName += "<b>" + entry.getKey() + "</b>\n";
+				for (ReportFormD p : entry.getValue()) {
+					listProductName += p.getProduct_en_name() + "\n";
+				}
+				// int index=listProductName.lastIndexOf("\n");
+				// listProductName=listProductName.substring(0,index);
+			}
+			importParam.put("netweight", netweight);
+			importParam.put("grossweight", grossweight);
+			importParam.put("foreign_total_amount", foreignTotalAmount);
+			importParam.put("product_list", listProductName);
+			String listVoucherCode = "";
+			for (IEInvoice p : listIEInvoiceOut) {
+				listVoucherCode += p.getVoucher_code() + "\n ";
+			}
+			importParam.put("list_voucher_code", listVoucherCode);
+			// ngày hóa đơn
+			importParam.put("invoice_date", dateFormat.format(ieInvoice.getInvoice_date()).toUpperCase());
+
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			if (word) {
+				JRDocxExporter exporter = new JRDocxExporter();
+				exporter.setParameter(JRExporterParameter.JASPER_PRINT, jasperPrint);
+				FacesContext facesContext = FacesContext.getCurrentInstance();
+				HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+						.getExternalContext().getResponse();
+				httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "co_form_d.docx");
+				ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+				exporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+				exporter.exportReport();
+				facesContext.responseComplete();
+				try {
+					servletOutputStream.close();
+				} catch (Exception e) {
+				}
+			} else {
+				// slipt 40 ký tự
+				byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+				String ba = Base64.getEncoder().encodeToString(data);
+				current.executeScript("utility.printPDF('" + ba + "')");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportReportCOFromD:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportReportCOFromAJ(boolean word) {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			// kiểm tra danh sách đơn hàng xuất xuất khẩu chọn để gọp in có cùng
+			// mã khách hàng hợp đồng và bill no hay không.
+			IEInvoice iEInvoiceFirst = null;
+			if (listIEInvoiceOut.size() > 0 && listIEInvoiceDetailSelectOut.size() > 0) {
+				iEInvoiceFirst = listIEInvoiceOut.get(0);
+				String customerCode = iEInvoiceFirst.getCustomer().getCustomer_code();
+				Contract contract = iEInvoiceFirst.getContract();
+				String contractVoucherCode = contract == null ? null : contract.getVoucher_code();
+				String billNo = iEInvoiceFirst.getBill_no();
+				for (IEInvoice iv : listIEInvoiceOut) {
+					Contract con = iv.getContract();
+					String bill = iv.getBill_no();
+					boolean kt0 = customerCode.equals(iv.getCustomer().getCustomer_code());
+					boolean kt1 = (contract == null && con == null)
+							|| (contract != null && con != null && ((contractVoucherCode == null && con
+									.getVoucher_code() == null) || (contractVoucherCode != null
+									&& con.getVoucher_code() != null && contractVoucherCode.equals(con
+									.getVoucher_code()))));
+					boolean kt2 = (billNo == null && bill == null)
+							|| (billNo != null && bill != null && billNo.equals(bill));
+					if (kt0 && kt1 && kt2) {
+
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Danh sách đơn hàng chọn không cùng mã khách hàng, số hợp đồng hoặc bill no !','warning',2000);");
+						return;
+					}
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			List<ReportFormD> list = new ArrayList<>();
+			// lấy danh sách id chi tiết đơn hàng xuất xuất khẩu.
+			List<Long> listID = new ArrayList<>();
+			for (IEInvoiceDetail p : listIEInvoiceDetailSelectOut) {
+				if (p.isCheck()) {
+					listID.add(p.getId());
+				}
+			}
+			JsonObject json = new JsonObject();
+			json.add("list_ie_invoice_detail_id", JsonParserUtil.getGson().toJsonTree(listID));
+			iEInvoiceService.reportFormD(JsonParserUtil.getGson().toJson(json), list);
+			if (listID.size() == 0) {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/co_form_aj_2.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			IEInvoice ieInvoice = listIEInvoiceOut.get(0);
+			importParam.put("reference_no", ieInvoice.getReference_no());
+			importParam.put("customer_name", ieInvoice.getCustomer().getCustomer_name());
+			importParam.put("address", ieInvoice.getCustomer().getAddress());
+			HarborCategory harborCategory = ieInvoice.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_name",
+						harborCategory.getHarbor_name() == null ? "" : harborCategory.getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+			String edtDateStr = "";
+			DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.US);
+			if (ieInvoice.getEtd_date() != null) {
+				edtDateStr = dateFormat.format(ieInvoice.getEtd_date());
+			}
+			importParam.put("etd_date_str", edtDateStr.toUpperCase());
+			importParam.put("shipped_per", ieInvoice.getShipped_per() == null ? "" : ieInvoice.getShipped_per());
+			importParam.put("bill_no", ieInvoice.getBill_no() == null ? "" : ieInvoice.getBill_no());
+			String listProductName = "";
+			Double netweight = 0.0;
+			Double grossweight = 0.0;
+			Double foreignTotalAmount = 0.0;
+			Map<String, List<ReportFormD>> map = new LinkedHashMap<String, List<ReportFormD>>();
+			for (ReportFormD d : list) {
+				if (!map.containsKey(d.getProduct_type_en_name())) {
+					map.put(d.getProduct_type_en_name(), new ArrayList<>());
+				}
+				map.get(d.getProduct_type_en_name()).add(d);
+				// listProductName+=(d.getProduct_type_en_name()==null ? "":
+				// d.getProduct_type_en_name())+"\n"+(d.getProduct_en_name()==null
+				// ? "" : d.getProduct_en_name());
+				netweight = BigDecimal.valueOf(netweight).add(BigDecimal.valueOf(d.getTotal_net_weight()))
+						.doubleValue();
+				grossweight = BigDecimal.valueOf(grossweight).add(BigDecimal.valueOf(d.getTotal_gross_weight()))
+						.doubleValue();
+				foreignTotalAmount = BigDecimal.valueOf(foreignTotalAmount)
+						.add(BigDecimal.valueOf(d.getForeign_total_amount())).doubleValue();
+			}
+			for (Entry<String, List<ReportFormD>> entry : map.entrySet()) {
+				listProductName += "<b>" + entry.getKey() + "</b><br/>";
+				for (ReportFormD p : entry.getValue()) {
+					listProductName += p.getProduct_en_name() + "<br/>";
+				}
+				// int index=listProductName.lastIndexOf("\n");
+				// listProductName=listProductName.substring(0,index);
+			}
+			if (list.size() == 1) {
+				String list_left = list.get(0).getProduct_type_en_name() + "<br/> MADE IN VIETNAM "
+						+ formatHandler.getNumberFormatEn(netweight, 100) + "CTNS";
+				importParam.put("list_left", list_left);
+			} else {
+				importParam.put("list_left", formatHandler.getNumberFormatEn(netweight, 100) + "CTNS");
+			}
+			importParam.put("netweight", netweight);
+			importParam.put("grossweight", grossweight);
+			importParam.put("foreign_total_amount", foreignTotalAmount);
+			importParam.put("product_list", listProductName.replaceAll("&", "&amp;"));
+			String listVoucherCode = "";
+			for (IEInvoice p : listIEInvoiceOut) {
+				listVoucherCode += p.getVoucher_code() + "<br/>";
+			}
+			importParam.put("list_voucher_code", listVoucherCode);
+			// ngày hóa đơn
+			importParam.put("invoice_date", dateFormat.format(ieInvoice.getInvoice_date()).toUpperCase());
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			if (word) {
+				JRDocxExporter exporter = new JRDocxExporter();
+				exporter.setExporterInput(new SimpleExporterInput(jasperPrint));
+				FacesContext facesContext = FacesContext.getCurrentInstance();
+				HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+						.getExternalContext().getResponse();
+				httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "chitietbillnohaiquan"
+						+ iEInvoiceCrud.getVoucher_code() + ".docx");
+				ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+				SimpleOutputStreamExporterOutput out = new SimpleOutputStreamExporterOutput(servletOutputStream);
+				exporter.setExporterOutput(out);
+				exporter.exportReport();
+				facesContext.responseComplete();
+				try {
+					servletOutputStream.close();
+					out.close();
+				} catch (Exception e) {
+				}
+				servletOutputStream.close();
+			} else {
+				// slipt 40 ký tự
+				byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+				String ba = Base64.getEncoder().encodeToString(data);
+				current.executeScript("utility.printPDF('" + ba + "')");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportReportCOFromAJ:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportReportDetailBillNoHarbor(boolean word) {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			// kiểm tra danh sách đơn hàng xuất xuất khẩu chọn để gọp in có cùng
+			// mã khách hàng hợp đồng và bill no hay không.
+			IEInvoice iEInvoiceFirst = null;
+			if (listIEInvoiceOut.size() > 0 && listIEInvoiceDetailSelectOut.size() > 0) {
+				iEInvoiceFirst = listIEInvoiceOut.get(0);
+				String customerCode = iEInvoiceFirst.getCustomer().getCustomer_code();
+				Contract contract = iEInvoiceFirst.getContract();
+				String contractVoucherCode = contract == null ? "" : contract.getVoucher_code();
+				String billNo = iEInvoiceFirst.getBill_no();
+				for (IEInvoice iv : listIEInvoiceOut) {
+					Contract con = iv.getContract();
+					String bill = iv.getBill_no();
+					boolean kt0 = customerCode.equals(iv.getCustomer().getCustomer_code());
+					boolean kt1 = (contract == null && con == null)
+							|| (contract != null && con != null && ((contractVoucherCode == null && con
+									.getVoucher_code() == null) || (contractVoucherCode != null
+									&& con.getVoucher_code() != null && contractVoucherCode.equals(con
+									.getVoucher_code()))));
+					boolean kt2 = (billNo == null && bill == null)
+							|| (billNo != null && bill != null && billNo.equals(bill));
+					if (kt0 && kt1 && kt2) {
+
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Danh sách đơn hàng chọn không cùng mã khách hàng, số hợp đồng hoặc bill no !','warning',2000);");
+						return;
+					}
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/chitietbillnohaiquan.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			List<IEInvoiceHarborBillNoDetailReport> list = new ArrayList<>();
+			// lấy danh sách id chi tiết đơn hàng xuất xuất khẩu.
+			List<Long> listID = new ArrayList<>();
+			for (IEInvoiceDetail p : listIEInvoiceDetailSelectOut) {
+				if (p.isCheck()) {
+					listID.add(p.getId());
+				}
+			}
+			JsonObject json = new JsonObject();
+			json.add("list_ie_invoice_detail_id", JsonParserUtil.getGson().toJsonTree(listID));
+			iEInvoiceService.selectIEInvoiceHarborBillNoDetailReport(JsonParserUtil.getGson().toJson(json), list);
+			if (listID.size() == 0) {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(list);
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, dataSource);
+			if (word) {
+				JRDocxExporter exporter = new JRDocxExporter();
+				exporter.setParameter(JRExporterParameter.JASPER_PRINT, jasperPrint);
+				FacesContext facesContext = FacesContext.getCurrentInstance();
+				HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+						.getExternalContext().getResponse();
+				httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "chitietbillnohaiquan"
+						+ iEInvoiceCrud.getVoucher_code() + ".docx");
+				ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+				exporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+				exporter.exportReport();
+				facesContext.responseComplete();
+				try {
+					servletOutputStream.close();
+				} catch (Exception e) {
+				}
+			} else {
+				// slipt 40 ký tự
+				byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+				String ba = Base64.getEncoder().encodeToString(data);
+				current.executeScript("utility.printPDF('" + ba + "')");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.proccessExportIEInvoiceByHarbor:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportReportDetailBillNoCustomer(boolean word) {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			// kiểm tra danh sách đơn hàng xuất xuất khẩu chọn để gọp in có cùng
+			// mã khách hàng hợp đồng và bill no hay không.
+			IEInvoice iEInvoiceFirst = null;
+			String customerName = null;
+			String address = null;
+			String shippingMark = null;
+			String harborEnName = null;
+			String countryEnName = null;
+			String freight = null;
+			String billNo = null;
+			if (listIEInvoiceOut.size() > 0 && listIEInvoiceDetailSelectOut.size() > 0) {
+				iEInvoiceFirst = listIEInvoiceOut.get(0);
+				Customer customer = iEInvoiceFirst.getCustomer();
+				String customerCode = customer.getCustomer_code();
+				customerName = customer.getCustomer_name();
+				address = customer.getAddress();
+				freight = iEInvoiceFirst.getFreight();
+				HarborCategory harborCategory = iEInvoiceFirst.getHarbor_category();
+				if (harborCategory != null) {
+					HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+					harborCategoryService.selectById(harborCategory.getId(), hr);
+					harborCategory = hr.getHarbor_category();
+					harborEnName = iEInvoiceFirst.getHarbor_category().getHarbor_name();
+					countryEnName = harborCategory.getCountry() == null ? "" : harborCategory.getCountry().getEn_name();
+
+				}
+				Contract contract = iEInvoiceFirst.getContract();
+				String contractVoucherCode = contract == null ? "" : contract.getVoucher_code();
+				billNo = iEInvoiceFirst.getBill_no();
+
+				for (IEInvoice iv : listIEInvoiceOut) {
+					Contract con = iv.getContract();
+					String bill = iv.getBill_no();
+					boolean kt0 = customerCode.equals(iv.getCustomer().getCustomer_code());
+					// boolean kt1 = (contract == null && con == null)
+					// || (contract != null && con != null &&
+					// ((contractVoucherCode == null && con
+					// .getVoucher_code() == null) || (contractVoucherCode !=
+					// null
+					// && con.getVoucher_code() != null &&
+					// contractVoucherCode.equals(con
+					// .getVoucher_code()))));
+					boolean kt2 = (billNo == null && bill == null)
+							|| (billNo != null && bill != null && billNo.equals(bill));
+					if (kt0 && kt2) {
+
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Danh sách đơn hàng chọn không cùng mã khách hàng, bill no !','warning',2000);");
+						return;
+					}
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/chitietbillnohaiquankhachhang.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			List<IEInvoiceCustomerBillNoDetailReport> list = new ArrayList<>();
+			// lấy danh sách id chi tiết đơn hàng xuất xuất khẩu.
+			List<Long> listID = new ArrayList<>();
+			for (IEInvoiceDetail p : listIEInvoiceDetailSelectOut) {
+				if (p.isCheck()) {
+					listID.add(p.getId());
+				}
+			}
+			JsonObject json = new JsonObject();
+			json.add("list_ie_invoice_detail_id", JsonParserUtil.getGson().toJsonTree(listID));
+			iEInvoiceService.selectIEInvoiceCustomerBillNoDetailReport(JsonParserUtil.getGson().toJson(json), list);
+			if (listID.size() == 0) {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			importParam.put("order_no", listIEInvoiceDetailSelectOut.get(0).getOrder_no());
+			importParam.put("bill_no", billNo);
+			importParam.put("customer_name", customerName);
+			importParam.put("address", address);
+			importParam.put("shipping_mark", iEInvoiceFirst.getShipping_mark());
+			importParam.put("harbor_en_name", harborEnName);
+			importParam.put("country_en_name", countryEnName);
+			importParam.put("freight", freight);
+			importParam.put("vessel", iEInvoiceFirst.getShipped_per());
+			importParam.put("portoftranshipment", iEInvoiceFirst.getPost_of_tran() != null ? iEInvoiceFirst
+					.getPost_of_tran().getHarbor_name() : "");
+			importParam.put("cleanonboad", MyUtil.chuyensangStr(iEInvoiceFirst.getETD()));
+			importParam.put("vgm", iEInvoiceFirst.getVgm());
+
+			List<String[]> vgms = new ArrayList();
+
+			Map<String, List<IEInvoiceCustomerBillNoDetailReport>> groupedByContainerPrefix = list.stream().collect(
+					Collectors.groupingBy(report -> {
+						String containerNo = report.getContainer_no();
+						return containerNo != null && containerNo.contains("/") ? containerNo.split("/")[0] : "";
+					}));
+			for (String key : groupedByContainerPrefix.keySet()) {
+				List<IEInvoiceCustomerBillNoDetailReport> hds = groupedByContainerPrefix.get(key);
+				double vgm = 0;
+				for (int i = 0; i < hds.size(); i++) {
+					vgm += MyMath.roundCustom((hds.get(i).getQuantity_export() * hds.get(i).getFactor())
+							+ (hds.get(i).getQuantity_export() / hds.get(i).getSpecification() * hds.get(i).getTare()),
+							5);
+				}
+				// String vgmfm=MyUtil.dinhdangso2sole(vgm).replaceAll(".", )
+				vgms.add(new String[] { "VGM " + key, MyUtil.dinhdangso5sole(vgm + hds.get(0).getVgm()) + " kgs" });
+			}
+			importParam.put("vgm_list", vgms);
+
+			JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(list);
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, dataSource);
+			if (word) {
+				JRDocxExporter exporter = new JRDocxExporter();
+				exporter.setParameter(JRExporterParameter.JASPER_PRINT, jasperPrint);
+				FacesContext facesContext = FacesContext.getCurrentInstance();
+				HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+						.getExternalContext().getResponse();
+				httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "chitietbillnohaiquan"
+						+ iEInvoiceCrud.getVoucher_code() + ".docx");
+				ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+				exporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+				exporter.exportReport();
+				facesContext.responseComplete();
+				try {
+					servletOutputStream.close();
+				} catch (Exception e) {
+				}
+			} else {
+				// slipt 40 ký tự
+				byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+				String ba = Base64.getEncoder().encodeToString(data);
+				current.executeScript("utility.printPDF('" + ba + "')");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportReportDetailBillNoCustomer:" + e.getMessage(), e);
+		}
+	}
+
+	public void processExportIEInvoiceByOption() {
+		try {
+			if (reportTypeExcelSelect != null) {
+				long id = reportTypeExcelSelect.getId();
+				if (id == 1) {
+					exportIEInvoiceOrderListByVoucherReport();
+				} else if (id == 2) {
+					exportIEInvoiceOrderListByProductCodeReport();
+				} else if (id == 3) {
+					exportIEInvoiceListByContNoReport();
+				} else if (id == 4) {
+					exportIEInvoiceListByTaxValueZeroReport();
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.processExportIEInvoiceByOption:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportIEInvoiceListByTaxValueZeroReport() {
+		try {
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("from_date",
+					fromDateSearch == null ? "" : ToolTimeCustomer.convertDateToString(fromDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("to_date",
+					toDateSearch == null ? "" : ToolTimeCustomer.convertDateToString(toDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("customer_id", customerSearch == null ? 0 : customerSearch.getId());
+			jsonInfo.addProperty("invoice_code", invoiceCodeSearch);
+			jsonInfo.addProperty("product_id", productSearch == null ? 0 : productSearch.getId());
+			jsonInfo.addProperty("ie_categories_id", iECategoriesSearch == null ? 0 : iECategoriesSearch.getId());
+			jsonInfo.addProperty("contract_voucher_code", contractVoucherCode);
+			List<IEInvoiceListByTaxValueZeroReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEInvoiceListByTaxValueZeroReport(JsonParserUtil.getGson().toJson(jsonInfo), list);
+			// xuat file excel.
+			if (list.size() > 0) {
+				List<Object[]> results = new ArrayList<Object[]>();
+				Object[] title = { "stt", "sohdong", "ngayhdong", "tenkh", "tinhchat", "nuocnk", "usdhdong",
+						"vndhdong", "thoihantt", "sotokhai", "ngaytokhai", "hanghoa", "soluongtokhai", "usdtokhai",
+						"vndtokhai", "phuongtienvc", "sohoadon", "ngayhoadon", "soluonghoadon", "vattu", "usdhoadon",
+						"vndhoadon", "hinhthuctt", "socttt", "ngaycttt", "usdcttt", "vndcttt", "bienbantl" };
+				results.add(title);
+				int stt = 1;
+				for (IEInvoiceListByTaxValueZeroReport it : list) {
+					Object[] row = { stt, Objects.toString(it.getContract_voucher_code(), ""),
+							Objects.toString(ToolTimeCustomer.convertDatetoString(it.getContract_date()), ""),
+							it.getCustomer_name(), "MUA BÁN", Objects.toString(it.getCountry_name(), ""),
+							it.getContract_foreign_total_amount(), it.getContract_total_amount(),
+							Objects.toString(ToolTimeCustomer.convertDatetoString(it.getPayment_period()), ""),
+							Objects.toString(it.getDeclaration_code(), ""),
+							Objects.toString(ToolTimeCustomer.convertDatetoString(it.getDeclaration_date()), ""),
+							Objects.toString(it.getGoods(), ""), it.getDeclaration_quantity(),
+							it.getDeclaration_foreign_total_amount(), it.getDeclaration_total_amount(),
+							Objects.toString(it.getMethod_of_transportation(), ""), it.getVoucher_code(),
+							ToolTimeCustomer.convertDatetoString(it.getInvoice_date()), it.getDeclaration_quantity(),
+							it.getMaterial_name(), it.getForeign_total_amount(), it.getTotal_amount(),
+							Objects.toString(it.getPayment(), ""), Objects.toString(it.getPayment_voucher(), ""),
+							Objects.toString(ToolTimeCustomer.convertDatetoString(it.getPayment_voucher_date()), ""),
+							it.getPayment_voucher_foreign_total_amount(), it.getPayment_voucher_total_amount(),
+							Objects.toString(it.getPayment_report(), "") };
+					results.add(row);
+				}
+				ToolReport.printReportExcelRaw(results, "Bang_ke_hso_xk_thue_suat");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportIEInvoiceListByTaxValueZeroReport:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportIEInvoiceListByContNoReport() {
+		try {
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("from_date",
+					fromDateSearch == null ? "" : ToolTimeCustomer.convertDateToString(fromDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("to_date",
+					toDateSearch == null ? "" : ToolTimeCustomer.convertDateToString(toDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("customer_id", customerSearch == null ? 0 : customerSearch.getId());
+			jsonInfo.addProperty("invoice_code", invoiceCodeSearch);
+			jsonInfo.addProperty("product_id", productSearch == null ? 0 : productSearch.getId());
+			jsonInfo.addProperty("ie_categories_id", iECategoriesSearch == null ? 0 : iECategoriesSearch.getId());
+			jsonInfo.addProperty("contract_voucher_code", contractVoucherCode);
+			List<IEInvoiceListByContNoReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEInvoicListByContNoReport(JsonParserUtil.getGson().toJson(jsonInfo), list);
+			// xuat file excel.
+			if (list.size() > 0) {
+				List<Object[]> results = new ArrayList<Object[]>();
+				Object[] title = { "thành phố", "tên khách hàng", "cont_20_40", "cont_no", "nơi đến", "số cont",
+						"số lượng" };
+				results.add(title);
+				for (IEInvoiceListByContNoReport it : list) {
+
+					Object[] row = { Objects.toString(it.getCity_name(), ""), it.getCustomer_name(),
+							Objects.toString(it.getFt_container(), ""), it.getContainer_no(),
+							Objects.toString(it.getArrival_place(), ""), it.getContainer_number(),
+							it.getQuantity_export() / 1000 };
+					results.add(row);
+
+				}
+				ToolReport.printReportExcelRaw(results, "Bang_ke_cont_no");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportIEInvoiceListByContNoReport:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportIEInvoiceOrderListByProductCodeReport() {
+		try {
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("from_date",
+					fromDateSearch == null ? "" : ToolTimeCustomer.convertDateToString(fromDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("to_date",
+					toDateSearch == null ? "" : ToolTimeCustomer.convertDateToString(toDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("customer_id", customerSearch == null ? 0 : customerSearch.getId());
+			jsonInfo.addProperty("invoice_code", invoiceCodeSearch);
+			jsonInfo.addProperty("product_id", productSearch == null ? 0 : productSearch.getId());
+			jsonInfo.addProperty("ie_categories_id", iECategoriesSearch == null ? 0 : iECategoriesSearch.getId());
+			jsonInfo.addProperty("contract_voucher_code", contractVoucherCode);
+			List<IEInvoiceOrderListByProductCodeReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEInvoiceOrderListByProductCodeReport(JsonParserUtil.getGson().toJson(jsonInfo),
+					list);
+			// xuat file excel.
+			if (list.size() > 0) {
+				List<Object[]> results = new ArrayList<Object[]>();
+				Object[] title = { "Số ct", "ngày", "số hợp đồng", "makh", "tên khách hàng", "số xe", "thanh toán",
+						"htbocxep", "kho", "hệ số thuế", "edt", "tỉ giá", "đơn vi tiền", "ghi chú", "bill_no",
+						"tờ khai", "port no", "masp", "tên sản phẩm", "số lượng", "đơn giá ngoại tệ",
+						"tổng tiền ngoại tệ", "tài xế" };
+				results.add(title);
+				for (IEInvoiceOrderListByProductCodeReport it : list) {
+					Object[] row = { Objects.toString(it.getVoucher_code(), ""),
+							ToolTimeCustomer.convertDatetoString(it.getInvoice_date()),
+							Objects.toString(it.getContract_voucher_code(), ""), it.getCustomer_code(),
+							it.getCustomer_name(), Objects.toString(it.getLicense_plate(), ""),
+							Objects.toString(it.getPayment_name(), ""),
+							Objects.toString(it.getStevedore_content(), ""),
+							Objects.toString(it.getWarehouse_name(), ""), it.getTax_value(),
+							Objects.toString(ToolTimeCustomer.convertDatetoString(it.getEtd_date()), ""),
+							it.getExchange_rate(), Objects.toString(it.getCurrency_type(), ""),
+							Objects.toString(it.getNote(), ""), Objects.toString(it.getBill_no(), ""),
+							Objects.toString(it.getDeclaration_code(), ""),
+							Objects.toString(it.getPost_of_tran_code(), ""), it.getProduct_code(),
+							it.getProduct_name(), it.getQuantity_export(), it.getForeign_unit_price(),
+							it.getTotal_foreign_amount(), Objects.toString(it.getDriver_name(), "") };
+					results.add(row);
+				}
+				ToolReport.printReportExcelRaw(results, "Bang_ke_chi_tiet_don_hang_theo_san_pham");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportIEInvoiceOrderListByProductCodeReport:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportIEInvoiceOrderListByVoucherReport() {
+		try {
+			JsonObject jsonInfo = new JsonObject();
+			jsonInfo.addProperty("from_date",
+					fromDateSearch == null ? "" : ToolTimeCustomer.convertDateToString(fromDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("to_date",
+					toDateSearch == null ? "" : ToolTimeCustomer.convertDateToString(toDateSearch, "dd/MM/yyyy"));
+			jsonInfo.addProperty("customer_id", customerSearch == null ? 0 : customerSearch.getId());
+			jsonInfo.addProperty("invoice_code", invoiceCodeSearch);
+			jsonInfo.addProperty("product_id", productSearch == null ? 0 : productSearch.getId());
+			jsonInfo.addProperty("ie_categories_id", iECategoriesSearch == null ? 0 : iECategoriesSearch.getId());
+			jsonInfo.addProperty("contract_voucher_code", contractVoucherCode);
+			List<IEInvoiceOrderListByVoucherReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEInvoiceOrderListByVoucherReport(JsonParserUtil.getGson().toJson(jsonInfo), list);
+			// xuat file excel.
+			if (list.size() > 0) {
+				List<Object[]> results = new ArrayList<Object[]>();
+				Object[] title = { "Số ct", "ngày", "số hợp đồng", "makh", "tên khách hàng", "số xe", "thanh toán",
+						"htbocxep", "kho", "hệ số thuế", "edt", "tỉ giá", "đơn vi tiền", "ghi chú", "bill_no",
+						"tờ khai", "port no", "masp", "tên sản phẩm", "số lượng", "đơn giá ngoại tệ",
+						"tổng tiền ngoại tệ", "tài xế" };
+				results.add(title);
+				for (IEInvoiceOrderListByVoucherReport it : list) {
+					Object[] row = { Objects.toString(it.getVoucher_code(), ""),
+							Objects.toString(ToolTimeCustomer.convertDatetoString(it.getInvoice_date()), ""),
+							Objects.toString(it.getContract_voucher_code(), ""), it.getCustomer_code(),
+							it.getCustomer_name(), Objects.toString(it.getLicense_plate(), ""),
+							Objects.toString(it.getPayment_name(), ""),
+							Objects.toString(it.getStevedore_content(), ""),
+							Objects.toString(it.getWarehouse_name(), ""), it.getTax_value(),
+							Objects.toString(ToolTimeCustomer.convertDatetoString(it.getEtd_date()), ""),
+							it.getExchange_rate(), Objects.toString(it.getCurrency_type(), ""),
+							Objects.toString(it.getNote(), ""), Objects.toString(it.getBill_no(), ""),
+							Objects.toString(it.getDeclaration_code(), ""),
+							Objects.toString(it.getPost_of_tran_code(), ""), it.getProduct_code(),
+							it.getProduct_name(), it.getQuantity_export(), it.getForeign_unit_price(),
+							it.getTotal_foreign_amount(), Objects.toString(it.getDriver_name(), "") };
+					results.add(row);
+				}
+				ToolReport.printReportExcelRaw(results, "Bang_ke_chi_tiet_don_hang_theo_chung_tu");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportIEInvoiceOrderListByVoucherReport:" + e.getMessage(), e);
+		}
+	}
+
+	public void saveOrUpdate() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (iEInvoiceCrud != null) {
+				// kiểm tra dữ liệu có đầy đủ không
+				Customer customer = iEInvoiceCrud.getCustomer();
+				Date invoiceDate = iEInvoiceCrud.getInvoice_date();
+				IECategories ieCategories = iEInvoiceCrud.getIe_categories();
+				if (customer != null && invoiceDate != null && ieCategories != null) {
+					WrapDataIEInvoiceReqInfo t = new WrapDataIEInvoiceReqInfo(iEInvoiceCrud, listIEInvoiceDetail,
+							account.getMember().getId(), account.getMember().getName());
+					WrapDataIEInvoiceReqInfo cloned = t.clone();
+					Message message = new Message();
+					if (iEInvoiceCrud.getId() == 0) {
+						if (allowSave(new Date())) {
+							int code = processLogicIEInvoiceService.insertOrUpdateIEInvoice(cloned, message);
+							switch (code) {
+							case 0:
+								// load lại đơn hàng
+								IEInvoiceReqInfo ieInvoiceReqInfo = new IEInvoiceReqInfo();
+								iEInvoiceService.selectById(cloned.getIe_invoice().getId(), ieInvoiceReqInfo);
+
+								carIEIVService.saveOrUpdate(cars, ieInvoiceReqInfo.getIe_invoice());
+								driverIEIVService.saveOrUpdate(drivers, ieInvoiceReqInfo.getIe_invoice());
+
+								// nếu thành công thêm đơn hàng xuất khẩu vào
+								// danh sách
+								listIEInvoice.add(0, ieInvoiceReqInfo.getIe_invoice());
+								iEInvoiceCrud = ieInvoiceReqInfo.getIe_invoice();
+								// nếu có danh sách chi tiết đơn hàng thì copy
+								if (listIEInvoiceDetail != null && listIEInvoiceDetail.size() > 0) {
+									// load chi tiết đơn hàng xuất xuất khẩu
+									listIEInvoiceDetail = new ArrayList<>();
+									iEInvoiceService.selectIEInvoideDetailByInvoice(iEInvoiceCrud.getId(),
+											listIEInvoiceDetail);
+									success();
+									changeIEInvoice = false;
+									// saveOrUpdateApiFoxIEInvoice();
+									// cap nhat chi tietfoxpro
+									// for (int i = 0; i <
+									// listIEInvoiceDetail.size(); i++) {
+									// saveOrUpdateApiFoxInvoiceDetail(listIEInvoiceDetail.get(i).getId(),
+									// false);
+									// }
+								} else {
+									success();
+									changeIEInvoice = false;
+								}
+								break;
+
+							default:
+								String m = message.getUser_message() + " \\n" + message.getInternal_message();
+								noticeError(m);
+								break;
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+						}
+					} else {
+						if (allowUpdate(new Date())) {
+							// long invoice_id =
+							// processLogicIEInvoiceService.checkforward(iEInvoiceCrud.getId());
+							// if (invoice_id > 0) {
+							// invoiceBean.deleteInvoiceFromBean(invoice_id);
+							// }
+							IEInvoice ieInvoiceOld = iEInvoiceService.selectById(cloned.getIe_invoice().getId());
+							int code = processLogicIEInvoiceService.insertOrUpdateIEInvoice(cloned, message);
+							switch (code) {
+							case 0:
+								// nếu cập nhật thành công thì cập nhật lại danh
+								// load lại đơn hàng
+								IEInvoiceReqInfo ieInvoiceReqInfo = new IEInvoiceReqInfo();
+								iEInvoiceService.selectById(cloned.getIe_invoice().getId(), ieInvoiceReqInfo);
+
+								carIEIVService.saveOrUpdate(cars, ieInvoiceReqInfo.getIe_invoice());
+								driverIEIVService.saveOrUpdate(drivers, ieInvoiceReqInfo.getIe_invoice());
+
+								boolean capnhatlaitygia = false;
+								if (ieInvoiceOld.getExchange_rate() != iEInvoiceCrud.getExchange_rate()) {
+									capnhatlaitygia = true;
+								}
+								// nếu thành công thì cập nhật đơn hàng xuất
+								// khẩu vào danh sách
+								if (listIEInvoice == null)
+									listIEInvoice = new ArrayList<IEInvoice>();
+								if (listIEInvoice.indexOf(iEInvoiceCrud) != -1)
+									listIEInvoice.set(listIEInvoice.indexOf(iEInvoiceCrud),
+											ieInvoiceReqInfo.getIe_invoice());
+								iEInvoiceCrud = ieInvoiceReqInfo.getIe_invoice().clone();
+								// load lại chi tiết đơn hàng
+								listIEInvoiceDetail = new ArrayList<>();
+								iEInvoiceService.selectIEInvoideDetailByInvoice(iEInvoiceCrud.getId(),
+										listIEInvoiceDetail);
+								success();
+								sumUSD();
+								changeIEInvoice = false;
+
+								// Luu lai chi tiet khi cap nhat ty gia
+								if (capnhatlaitygia) {
+									tinhLaiTienVietKhiThayDoiTyGia(true);
+								}
+
+								break;
+
+							default:
+								String m = message.getUser_message() + " \\n" + message.getInternal_message();
+								noticeError(m);
+								break;
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+						}
+					}
+				} else {
+					noticeError("Nhập đầy đủ thông tin (khách hàng, ngày, loại nhập xuất");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.saveOrUpdate:" + e.getMessage(), e);
+		}
+	}
+
+	public void saveOrUpdateDetail() {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (changeIEInvoice) {
+				notify.warning("Đơn hàng chưa lưu!");
+			}
+			if (iEInvoiceDetailCrud != null) {
+				// kiểm tra số liệu
+				changeAmountOrProduct();
+				Product product = iEInvoiceDetailCrud.getProduct();
+				double quantity = iEInvoiceDetailCrud.getQuantity_export();
+				// double foreignUnitPrice =
+				// iEInvoiceDetailCrud.getForeign_unit_price();
+				if (product != null && quantity != 0) {
+					IEInvoiceDetail ieInvoiceDetail = iEInvoiceDetailCrud.clone();
+					WrapIEInvoiceDetailReqInfo t = new WrapIEInvoiceDetailReqInfo(ieInvoiceDetail, account.getMember()
+							.getName());
+					Message message = new Message();
+					if (iEInvoiceDetailCrud.getId() == 0) {
+						if (allowSave(new Date())) {
+							if (processLogicIEInvoiceService.insertOrUpdateIEInvoiceDetail(t, message) == 0) {
+								// thêm vào danh sách.
+								IEInvoiceDetailReqInfo ieInvoiceDetailReqInfo = new IEInvoiceDetailReqInfo();
+								iEInvoiceService.selectDetailById(t.getIe_invoice_detail().getId(),
+										ieInvoiceDetailReqInfo);
+								listIEInvoiceDetail.add(ieInvoiceDetailReqInfo.getIe_invoice_detail());
+								notify.success("Lưu thành công!");
+								// refesh lại dialog
+								String order_no = iEInvoiceDetailCrud.getOrder_no();
+								String cont_no = iEInvoiceDetailCrud.getContainer_no();
+								int cont_num = iEInvoiceDetailCrud.getContainer_number();
+								String so_seal = iEInvoiceDetailCrud.getSeal_number();
+								String cont_ft = iEInvoiceDetailCrud.getFt_container();
+								String arr_place = iEInvoiceDetailCrud.getArrival_place();
+								boolean capnhatdsphieu = ieInvoiceDetail.isCapnhatdsphieu();
+								iEInvoiceDetailCrud = new IEInvoiceDetail();
+								iEInvoiceDetailCrud.setIe_invoice(iEInvoiceCrud);
+								iEInvoiceDetailCrud.setOrder_no(order_no);
+								iEInvoiceDetailCrud.setContainer_no(cont_no);
+								iEInvoiceDetailCrud.setContainer_number(cont_num);
+								iEInvoiceDetailCrud.setSeal_number(so_seal);
+								iEInvoiceDetailCrud.setFt_container(cont_ft);
+								iEInvoiceDetailCrud.setArrival_place(arr_place);
+								if (capnhatdsphieu) {
+									for (int i = 0; i < listIEInvoiceDetail.size(); i++) {
+										listIEInvoiceDetail.get(i).setIe_invoice(iEInvoiceCrud);
+										listIEInvoiceDetail.get(i).setOrder_no(order_no);
+										listIEInvoiceDetail.get(i).setContainer_no(cont_no);
+										// listIEInvoiceDetail.get(i).setContainer_number(cont_num);
+										listIEInvoiceDetail.get(i).setSeal_number(so_seal);
+										listIEInvoiceDetail.get(i).setFt_container(cont_ft);
+										listIEInvoiceDetail.get(i).setArrival_place(arr_place);
+										processLogicIEInvoiceService.update(listIEInvoiceDetail.get(i));
+									}
+								}
+								// call api foxpro
+								// saveOrUpdateApiFoxInvoiceDetail(ieInvoiceDetailReqInfo.getIe_invoice_detail().getId(),
+								// false);
+							} else {
+								String m = message.getUser_message() + " \\n" + message.getInternal_message();
+								current.executeScript("swaldesignclose('Xảy ra lỗi', '" + m + "','warning');");
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+						}
+					} else {
+						if (allowUpdate(new Date())) {
+							ieInvoiceDetail.setLast_modifed_by(account.getMember().getName());
+							ieInvoiceDetail.setLast_modifed_date(new Date());
+							if (processLogicIEInvoiceService.insertOrUpdateIEInvoiceDetail(t, message) == 0) {
+								// cập nhật lại danh sách
+								IEInvoiceDetailReqInfo ieInvoiceDetailReqInfo = new IEInvoiceDetailReqInfo();
+								iEInvoiceService.selectDetailById(iEInvoiceDetailCrud.getId(), ieInvoiceDetailReqInfo);
+								listIEInvoiceDetail.set(listIEInvoiceDetail.indexOf(iEInvoiceDetailCrud),
+										ieInvoiceDetailReqInfo.getIe_invoice_detail());
+								if (ieInvoiceDetail.isCapnhatdsphieu()) {
+									String order_no = ieInvoiceDetail.getOrder_no();
+									String cont_no = ieInvoiceDetail.getContainer_no();
+									int cont_num = ieInvoiceDetail.getContainer_number();
+									String so_seal = ieInvoiceDetail.getSeal_number();
+									String cont_ft = ieInvoiceDetail.getFt_container();
+									String arr_place = ieInvoiceDetail.getArrival_place();
+									for (int i = 0; i < listIEInvoiceDetail.size(); i++) {
+										listIEInvoiceDetail.get(i).setIe_invoice(iEInvoiceCrud);
+										listIEInvoiceDetail.get(i).setOrder_no(order_no);
+										listIEInvoiceDetail.get(i).setContainer_no(cont_no);
+										// listIEInvoiceDetail.get(i).setContainer_number(cont_num);
+										listIEInvoiceDetail.get(i).setSeal_number(so_seal);
+										listIEInvoiceDetail.get(i).setFt_container(cont_ft);
+										listIEInvoiceDetail.get(i).setArrival_place(arr_place);
+										processLogicIEInvoiceService.update(listIEInvoiceDetail.get(i));
+									}
+								}
+								notify.success("Cập nhật thành công!");
+								if (message.getCode() == 1) {
+									notify.warning("Vui lòng kiểm tra ủy nhiệm chi. Chưa thanh toán đủ tiền hàng.");
+								}
+								// call api foxpro
+								// saveOrUpdateApiFoxInvoiceDetail(ieInvoiceDetailReqInfo.getIe_invoice_detail().getId(),
+								// true);
+							} else {
+								String m = message.getUser_message() + " \\n" + message.getInternal_message();
+								current.executeScript("swaldesignclose('Xảy ra lỗi', '" + m + "','warning');");
+							}
+						} else {
+							current.executeScript("swaldesigntimer('Cảnh báo!', 'Tài khoản này không có quyền thực hiện hoặc tháng đã khoá!','warning',2000);");
+						}
+					}
+				} else {
+					notify.warning("Thông tin không đầy đủ!");
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.saveOrUpdateDetail:" + e.getMessage(), e);
+		}
+		sumUSD();
+	}
+
+	// private void createApiInvoiceFox(long iEinvoiceID) {
+	// PrimeFaces current = PrimeFaces.current();
+	// try {
+	// // lấy danh sách hóa đơn từ đơn hàng từ đơn hàng tổng
+	// List<lixco.com.reqfox.Invoice> list = new ArrayList<>();
+	// invoiceService.getListDataInvoiceFoxByIEInvoice(iEinvoiceID, list);
+	// if (list.size() > 0) {
+	// AccountDatabase accountDatabase =
+	// accountDatabaseService.findByName("foxproapi");
+	// BindUser bindUser =
+	// bindUserService.getBindUser(account.getMember().getId());
+	// if (bindUser == null) {
+	// current.executeScript("swaldesignclose2('Cảnh báo!', 'Tài khoản chưa liên kết tài liệu với foxpro','warning');");
+	// } else {
+	// try {
+	// WrapDataInvoice wrapDataInvoice = new WrapDataInvoice(null,
+	// iEInvoiceCrud.getIdfox(), list);
+	// Call call =
+	// ApiCallClient.getListObjectWithParam(accountDatabase.getAddressPublic(),
+	// "invoice",
+	// "sa", JsonParserUtil.getGson().toJson(wrapDataInvoice));
+	// Response response = call.execute();
+	// String body = response.body().string();
+	// JsonObject result = JsonParserUtil.getGson().fromJson(body,
+	// JsonObject.class);
+	// if (response.isSuccessful() && result.get("err").getAsInt() == 0) {
+	// // cập nhật idfox bảng hóa đơn và chi tiết hóa đơn
+	// WrapDataInvoice wrapResult =
+	// JsonParserUtil.getGson().fromJson(result.get("dt"),
+	// WrapDataInvoice.class);
+	// lixco.com.reqfox.Invoice mResult = wrapResult.getList_invoice().get(0);
+	// invoiceService.updateInvoiceFox(mResult.getId(), mResult.getIdfox());
+	// for (lixco.com.reqfox.InvoiceDetail d : mResult.getListInvoiceDetail()) {
+	// invoiceService.updateInvoiceDetailFox(d.getId(), d.getIdfox());
+	// }
+	// } else {
+	// String mesages = result.get("msg").getAsString();
+	// current.executeScript("swaldesignclose2('Cảnh báo!', '" + mesages +
+	// "','warning');");
+	// }
+	// } catch (Exception e) {
+	// current.executeScript("swaldesignclose2('Cảnh báo!', 'Không thực hiện liên kết dữ liệu foxpro','warning');");
+	// }
+	// }
+	// }
+	// } catch (Exception e) {
+	// logger.error("IEInvoiceBean.createApiInvoiceFox:" + e.getMessage(), e);
+	// }
+	// }
+
+	// public void showIEInvoice() {
+	// try {
+	// checkAll=false;
+	// changeIEInvoice=false;
+	// if (iEInvoiceSelect != null) {
+	// iEInvoiceCrud = iEInvoiceSelect.clone();
+	// // load chi tiết đơn hàng xuất xuất khẩu
+	// listIEInvoiceDetail = new ArrayList<>();
+	// iEInvoiceService.selectIEInvoideDetailByInvoice(iEInvoiceCrud.getId(),
+	// listIEInvoiceDetail);
+	// sumUSD();
+	// listIEInvoiceDetailOut=new ArrayList<>();
+	// // if(iEInvoiceSelect.isCheck()){
+	// listIEInvoiceDetailOut=new ArrayList<>();
+	// //load danh sách đã check vào
+	// listIEInvoiceDetailOut=new ArrayList<>();
+	// iEInvoiceService.selectIEInvoideDetailByInvoice(iEInvoiceCrud.getId(),
+	// listIEInvoiceDetailOut);
+	//
+	// // for(IEInvoiceDetail ie:listIEInvoiceDetailSelectOut){
+	// // if(ie.getIe_invoice().equals(iEInvoiceSelect)){
+	// // listIEInvoiceDetailOut.add(ie);
+	// // if(ie.isCheck()){
+	// // checkAll=true;
+	// // }
+	// // }
+	// // }
+	//
+	// // }
+	// }
+	// } catch (Exception e) {
+	// logger.error("IEInvoiceBean.showIEInvoice:" + e.getMessage(), e);
+	// }
+	// }
+	@Getter
+	@Setter
+	List<Car> cars;
+	@Getter
+	@Setter
+	List<Driver> drivers;
+	@Inject
+	CarIEIVService carIEIVService;
+	@Inject
+	DriverIEIVService driverIEIVService;
+
+	public void showIEInvoice() {
+		try {
+			long startTime = System.nanoTime();
+			checkAll = false;
+			changeIEInvoice = false;
+			if (iEInvoiceSelect != null) {
+				iEInvoiceCrud = iEInvoiceSelect.clone();
+				// load chi tiết đơn hàng xuất xuất khẩu
+				listIEInvoiceDetail = new ArrayList<>();
+				iEInvoiceService.selectIEInvoideDetailByInvoice(iEInvoiceCrud.getId(), listIEInvoiceDetail);
+				cars = carIEIVService.findByIEInv(iEInvoiceCrud.getId());
+				drivers = driverIEIVService.findByIEInv(iEInvoiceCrud.getId());
+				sumUSD();
+				listIEInvoiceDetailOut = new ArrayList<>();
+				if (iEInvoiceSelect.isCheck()) {
+					listIEInvoiceDetailOut = new ArrayList<>();
+					// load danh sách đã check vào
+					for (IEInvoiceDetail ie : listIEInvoiceDetailSelectOut) {
+						if (ie.getIe_invoice().equals(iEInvoiceSelect)) {
+							listIEInvoiceDetailOut.add(ie);
+							if (ie.isCheck()) {
+								checkAll = true;
+							}
+						}
+					}
+
+				}
+			}
+			long endTime = System.nanoTime();
+			long duration = endTime - startTime;
+			System.out.println("Thời gian chạy showEditXK(): " + (duration / 1_000_000) + " milliseconds");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.showIEInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	public List<Customer> completeCustomer(String text) {
+		try {
+			List<Customer> list = new ArrayList<Customer>();
+			customerService.complete(formatHandler.converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.completeCustomer:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public List<Product> completeProduct(String text) {
+		try {
+			List<Product> list = new ArrayList<>();
+			productService.complete3(formatHandler.converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.completeProduct:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public List<Car> completeCar(String text) {
+		try {
+			if (text != null && !"".equals(text)) {
+				List<Car> list = new ArrayList<>();
+				carService.complete(formatHandler.converViToEn(text), list);
+				return list;
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.completeCar:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Inject
+	DriverService driverService;
+
+	public List<Driver> completeDriver(String text) {
+		try {
+			if (text != null && !"".equals(text)) {
+				List<Driver> list = new ArrayList<>();
+				driverService.complete(formatHandler.converViToEn(text), list);
+				return list;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	public List<Contract> completeContract(String text) {
+		try {
+			List<Contract> list = new ArrayList<>();
+			contractService.complete(formatHandler.converViToEn(text), list);
+			return list;
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.completeContract:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	public void showDialogPrint() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0 && listIEInvoiceDetail != null
+					&& listIEInvoiceDetail.size() > 0) {
+				current.executeScript("PF('idlg2').show();");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.showDialogPrint:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogEditIEInvoiceDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			quantityContract = 0;
+			quantityContractProcessed = 0;
+			quantityBatchInvCurr = 0;
+			quantityBatchInvCal = 0;
+			if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0) {
+				if (changeIEInvoice) {
+					notify.warning("Đơn hàng chưa lưu!");
+					return;
+				}
+				if (iEInvoiceDetailSelect != null && iEInvoiceCrud.getId() != 0) {
+					iEInvoiceDetailCrud = iEInvoiceDetailSelect.clone();
+					iEInvoiceDetailCrud.setIe_invoice(iEInvoiceCrud);
+					Contract contract = iEInvoiceCrud.getContract();
+					if (contract != null) {
+
+						JsonObject json = new JsonObject();
+						json.addProperty("contract_id", contract.getId());
+						json.addProperty("product_id", iEInvoiceDetailCrud.getProduct().getId());
+						List<Object[]> list = new ArrayList<>();
+						contractService.processContractIEInvoice2(JsonParserUtil.getGson().toJson(json), list);
+						if (list.size() > 0) {
+							for (Object[] p : list) {
+								quantityContract += Double.parseDouble(Objects.toString(p[1], "0"));
+								quantityContractProcessed += Double.parseDouble(Objects.toString(p[2], "0"));
+							}
+						}
+					}
+					// thực hiện xem tồn lô hàng
+					quantityBatchInvCurr = batchService.getQuantityRemaining(iEInvoiceDetailCrud.getProduct().getId());
+					// thực hiện tính tồn kho của sản phẩm đó.
+					quantityBatchInvCal = inventoryService.getInventoryCurrentOfProduct(iEInvoiceDetailCrud
+							.getProduct().getId());
+					current.executeScript("PF('idlg1').show();");
+				} else {
+					notify.warning("Chưa chọn chi tiết để chỉnh sửa!");
+				}
+			} else {
+				notify.warning("Đơn hàng không tồn tại!");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.showDialogEditIEInvoiceDetail:" + e.getMessage(), e);
+		}
+	}
+
+	public void copyIEInvoice() {
+		try {
+			if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0 && listIEInvoiceDetail != null
+					&& listIEInvoiceDetail.size() > 0) {
+				iEInvoiceCrud.setId(0);
+				iEInvoiceCrud.setInvoice_code(null);
+				iEInvoiceCrud.setVoucher_code(null);
+				iEInvoiceCrud.setIdfox(null);
+				iEInvoiceCrud.setInvoice(null);
+				for (IEInvoiceDetail item : listIEInvoiceDetail) {
+					item.setId(0);
+					item.setIe_invoice(null);
+					item.setLast_modifed_by(null);
+					item.setLast_modifed_date(null);
+					item.setIdfox(null);
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.copyContract:" + e.getMessage(), e);
+		}
+	}
+
+	public void resetIEInvoiceDetail() {
+		iEInvoiceDetailCrud = new IEInvoiceDetail();
+		quantityContract = 0;
+		quantityContractProcessed = 0;
+		quantityBatchInvCurr = 0;// số lượng lô hàng tồn hiện tại
+		quantityBatchInvCal = 0;//
+		if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0) {
+			iEInvoiceDetailCrud.setIe_invoice(iEInvoiceCrud);
+		} else {
+			warning("Chưa lưu đơn hàng chính");
+		}
+	}
+
+	public void showDialogAddIEInvoiceDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0) {
+				if (changeIEInvoice == true) {
+					notify.warning("Đơn hàng chưa được lưu!");
+					return;
+				}
+				resetIEInvoiceDetail();
+				current.executeScript("PF('idlg1').show();");
+			} else {
+				warning("Chưa lưu đơn hàng chính");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.showDialogAddIEInvoiceDetail:" + e.getMessage(), e);
+		}
+	}
+
+	public void deleteIEInvoice() {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (iEInvoiceSelect != null && iEInvoiceSelect.getId() != 0) {
+				if (allowDelete(new Date())) {
+					if (iEInvoiceService.deleteById(iEInvoiceSelect.getId()) >= 0) {
+						listIEInvoice.remove(iEInvoiceSelect);
+						notify.success("Xóa thành công!");
+						// call api delete đơn hàng xuất khẩu Foxpro
+						// deleteApiFoxIEInvoice(iEInvoiceSelect.getIdfox());
+					} else {
+						notify.warning("Xóa thất bại!");
+					}
+				} else {
+					notify.warning("Tài khoản chưa được phân quyền!");
+				}
+			} else {
+				notify.warning("Chưa chọn dòng để xóa!");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.deleteIEInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	public void deleteIEInvoiceDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			if (changeIEInvoice || (iEInvoiceCrud != null && iEInvoiceCrud.getId() == 0)) {
+				notify.warning("Đơn hàng chưa lưu không được thao tác");
+				return;
+			}
+			if (iEInvoiceDetailSelect != null && iEInvoiceDetailSelect.getId() != 0) {
+				if (allowDelete(new Date())) {
+					Message message = new Message();
+					if (processLogicIEInvoiceService.deleteIEInvoiceDetail(iEInvoiceDetailSelect.getId(), message) == 0) {
+						listIEInvoiceDetail.remove(iEInvoiceDetailSelect);
+						notify.success("Xóa thành công!");
+						sumUSD();
+						// call api delete chi tiết đơn hàng xuất khẩu foxrpo
+						// deleteApiFoxIEInvoiceDetail(iEInvoiceDetailSelect.getIdfox());
+						iEInvoiceDetailSelect = null;
+					} else {
+						String m = message.getUser_message() + " \\n" + message.getInternal_message();
+						current.executeScript("swaldesignclose('Xảy ra lỗi', '" + m + "','warning');");
+					}
+				} else {
+					notify.warning("Tài khoản chưa được phân quyền!");
+				}
+			} else {
+				notify.warning("Chưa chọn dòng chi tiết để xóa!");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.deleteIEInvoiceDetail:" + e.getMessage(), e);
+		}
+	}
+
+	public void createNew() {
+		try {
+			iEInvoiceCrud = new IEInvoice();
+			iEInvoiceCrud.setInvoice_date(new Date());
+			iEInvoiceCrud.setCreated_by(account.getMember().getName());
+			iEInvoiceCrud.setCreated_by_id(account.getMember().getId());
+			listIEInvoiceDetail = new ArrayList<>();
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.createNew:" + e.getMessage(), e);
+		}
+	}
+
+	public void sumUSD() {
+		try {
+			sumUSD = listIEInvoiceDetail.stream().mapToDouble(f -> f.getTotal_foreign_amount()).sum();
+			sumUSD = (double) MyMath.round(sumUSD * 100) / 100;
+			sumUSDXK = sumUSD;
+			sumVND = (long) MyMath.round(sumUSDXK * iEInvoiceCrud.getExchange_rate());
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.createNew:" + e.getMessage(), e);
+		}
+	}
+
+	// public void changeForeUnitPrice() {
+	// try {
+	// if (iEInvoiceDetailCrud != null && iEInvoiceDetailCrud.getProduct() !=
+	// null) {
+	// // tính số lượng làm tròn 2 chử số
+	// double quantity = (double)
+	// MyMath.roundCustom(iEInvoiceDetailCrud.getQuantity_export(), 2);
+	// iEInvoiceDetailCrud.setQuantity(quantity);
+	// // tính toán đơn giá VNĐ
+	// double unitPrice =
+	// BigDecimal.valueOf(iEInvoiceDetailCrud.getForeign_unit_price())
+	// .multiply(BigDecimal.valueOf(iEInvoiceCrud.getExchange_rate())).doubleValue();
+	// iEInvoiceDetailCrud.setUnit_price(MyMath.round(unitPrice));
+	//
+	// // tính toán số tiền ngoại tệ
+	// double totalForeignAmount = BigDecimal.valueOf(quantity)
+	// .multiply(BigDecimal.valueOf(iEInvoiceDetailCrud.getForeign_unit_price())).doubleValue();
+	// iEInvoiceDetailCrud.setTotal_foreign_amount(MyMath.roundCustom(totalForeignAmount,
+	// 2));
+	// iEInvoiceDetailCrud.setTotal_export_foreign_amount(iEInvoiceDetailCrud.getTotal_foreign_amount());
+	//
+	// // tính toán số tiền vnd
+	// double totalAmount = (double)
+	// MyMath.round(iEInvoiceDetailCrud.getQuantity_export()
+	// * iEInvoiceDetailCrud.getUnit_price());
+	// iEInvoiceDetailCrud.setTotal_amount(totalAmount);
+	// }
+	// } catch (Exception e) {
+	// logger.error("IEInvoiceBean.changeForeUnitPrice:" + e.getMessage(), e);
+	// }
+	// }
+
+	public void changeForeTotalAmount() {
+		try {
+			if (iEInvoiceDetailCrud != null && iEInvoiceDetailCrud.getProduct() != null) {
+				tinhLaiTienVietKhiThayDoiTyGia(false);
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.changeForeTotalAmount:" + e.getMessage(), e);
+		}
+	}
+
+	private void tinhLaiTienVietKhiThayDoiTyGia(boolean tinhlaidanhsach) {
+		try {
+
+			if (tinhlaidanhsach) {
+				for (int i = 0; i < listIEInvoiceDetail.size(); i++) {
+
+					// tính toán số tiền vnd
+					double totalAmount = (double) MyMath.round(listIEInvoiceDetail.get(i).getTotal_foreign_amount()
+							* iEInvoiceCrud.getExchange_rate());
+					listIEInvoiceDetail.get(i).setTotal_amount(totalAmount);
+					if (i + 1 == listIEInvoiceDetail.size()) {
+						// tinh lai so tiền chênh lệch cộng vào dòng hiện tại
+						sumUSD();
+						double totalevent = listIEInvoiceDetail.stream().mapToDouble(f -> f.getTotal_amount()).sum();
+						double chenhlech = sumVND - totalevent;
+						listIEInvoiceDetail.get(i).setTotal_amount(
+								listIEInvoiceDetail.get(i).getTotal_amount() + chenhlech);
+					}
+					// tính toán đơn giá vnđ
+					double unitPrice = listIEInvoiceDetail.get(i).getTotal_amount()
+							/ listIEInvoiceDetail.get(i).getQuantity_export();
+					listIEInvoiceDetail.get(i).setUnit_price(MyMath.round(unitPrice));
+
+					// Cap nhat lai don gia, tong tien VN
+					iEInvoiceService.capNhatDG_TTVND(listIEInvoiceDetail.get(i));
+
+				}
+			} else {
+				if (iEInvoiceDetailCrud != null && iEInvoiceDetailCrud.getProduct() != null) {
+					// tính số lượng, đơn giá, số tiền
+					// tính số lượng làm tròn 2 chữ số
+					double quantity = (double) MyMath.roundCustom(iEInvoiceDetailCrud.getQuantity_export(), 3);
+					iEInvoiceDetailCrud.setQuantity((double) MyMath.roundCustom(
+							iEInvoiceDetailCrud.getQuantity_export(), 2));
+					// tính toán số tiền ngoại tệ
+					double totalForeignAmount = BigDecimal.valueOf(quantity)
+							.multiply(BigDecimal.valueOf(iEInvoiceDetailCrud.getForeign_unit_price())).doubleValue();
+					iEInvoiceDetailCrud.setTotal_foreign_amount(MyMath.roundCustom(totalForeignAmount, 2));
+
+					// tính số lượng số tiền ngoại tệ xuất khẩu
+					iEInvoiceDetailCrud.setTotal_export_foreign_amount(iEInvoiceDetailCrud.getTotal_foreign_amount());
+
+					// tính toán số tiền vnd
+					double totalAmount = (double) MyMath.round(iEInvoiceDetailCrud.getTotal_foreign_amount()
+							* iEInvoiceCrud.getExchange_rate());
+					iEInvoiceDetailCrud.setTotal_amount(totalAmount);
+					// tinh lai so tiền chênh lệch cộng vào dòng hiện tại
+					if (iEInvoiceDetailCrud.getId() != 0) {
+						int index = listIEInvoiceDetail.indexOf(iEInvoiceDetailCrud);
+						listIEInvoiceDetail.set(index, iEInvoiceDetailCrud);
+						if (index == listIEInvoiceDetail.size() - 1) {
+							sumUSD();
+							double totalevent = listIEInvoiceDetail.stream().mapToDouble(f -> f.getTotal_amount())
+									.sum();
+							double chenhlech = sumVND - totalevent;
+							iEInvoiceDetailCrud.setTotal_amount(iEInvoiceDetailCrud.getTotal_amount() + chenhlech);
+						}
+					}
+					// tính toán đơn giá vnđ
+					double unitPrice = iEInvoiceDetailCrud.getTotal_amount() / iEInvoiceDetailCrud.getQuantity();
+					iEInvoiceDetailCrud.setUnit_price(MyMath.round(unitPrice));
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.changeForeTotalAmount:" + e.getMessage(), e);
+		}
+	}
+
+	public void changeAmountOrProduct() {
+		try {
+			quantityContract = 0;
+			quantityContractProcessed = 0;
+			if (iEInvoiceDetailCrud != null && iEInvoiceDetailCrud.getProduct() != null) {
+				// thực hiện xem số lượng thực hiện của hợp đồng
+				if (iEInvoiceCrud.getContract() != null) {
+					// lấy số lượng hợp đồng
+					/* {contract_id:0,product_id:0} */
+					JsonObject json = new JsonObject();
+					json.addProperty("contract_id", iEInvoiceCrud.getContract().getId());
+					json.addProperty("product_id", iEInvoiceDetailCrud.getProduct().getId());
+					List<ContractDetail> listContractDetail = new ArrayList<>();
+					contractService.selectContractDetail(JsonParserUtil.getGson().toJson(json), listContractDetail);
+					List<Long> listProductId = new ArrayList<>();
+					if (listContractDetail.size() > 0) {
+						for (ContractDetail d : listContractDetail) {
+							listProductId.add(d.getProduct().getId());
+							quantityContract = d.getQuantity();// số lượng hợp
+																// đồng
+							// lấy đơn giá ngoại tệ
+							iEInvoiceDetailCrud.setForeign_unit_price(d.getUnit_price());
+						}
+					} else {
+						iEInvoiceDetailCrud.setForeign_unit_price(0);
+					}
+					/* {list_product_id:[],contract_id:0} */
+					List<Object[]> list = new ArrayList<>();
+					contractService.processContractIEInvoice2(JsonParserUtil.getGson().toJson(json), list);
+					if (list.size() > 0) {
+						for (Object[] p : list) {
+							quantityContractProcessed += Double.parseDouble(Objects.toString(p[2], "0"));
+						}
+					}
+				}
+				// thực hiện xem tồn lô hàng
+				// quantityBatchInvCurr =
+				// batchService.getQuantityRemaining(iEInvoiceDetailCrud.getProduct().getId());
+				// thực hiện tính tồn kho
+				quantityBatchInvCal = inventoryService.getInventoryCurrentOfProduct(iEInvoiceDetailCrud.getProduct()
+						.getId());
+			}
+			changeForeTotalAmount();
+
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.changeAmount:" + e.getMessage(), e);
+		}
+	}
+
+	@Getter
+	@Setter
+	private boolean hdkhuyenmai = false;
+
+	public void processPrintPDFReport() {
+		try {
+			if (reportTypeIEInVoiceSelect != null) {
+				long id = reportTypeIEInVoiceSelect.getId();
+				if (id == 1) {
+					exportPDFIEInvocie();
+				} else if (id == 2) {
+					exportCommercialInvoice();
+				} else if (id == 3) {
+					exportIEExportReport();
+				} else if (id == 4) {
+					exportProformaInvoice();
+				} else if (id == 5) {
+					exportOrderFormReport();
+				} else if (id == 6) {
+					exportPackingList();
+				} else if (id == 8) {
+					exportVanningReport();
+				} else if (id == 9) {
+					exportCommercialInvoiceMau2();
+				} else if (id == 10) {
+					exportPackingListMau2();
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.processPrintReport:" + e.getMessage(), e);
+		}
+	}
+
+	public void processPrintWordReport() {
+		try {
+			if (reportTypeIEInVoiceSelect != null) {
+				long id = reportTypeIEInVoiceSelect.getId();
+				if (id == 1) {
+					exportWordIEInvocie();
+				} else if (id == 2) {
+					exportCommercialInvoiceWord();
+				} else if (id == 3) {
+					exportWordIEExportReport();
+				} else if (id == 4) {
+					exportWordProformaInvoice();
+				} else if (id == 5) {
+					exportWordOrderFormReport();
+				} else if (id == 6) {
+					exportWordPackingList();
+				} else if (id == 8) {
+					exportVanningReportWord();
+				} else if (id == 9) {
+					exportCommercialInvoiceWordMau2();
+				} else if (id == 10) {
+					exportWordPackingListMau2();
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.processPrintReport:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportWordOrderFormReport() {
+		try {
+
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/indonhang.jasper");
+			String reportPath2 = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/indonhangS.jasper");
+
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("license_plate", iEInvoiceCrud.getCar() == null ? "" : iEInvoiceCrud.getCar()
+					.getLicense_plate());
+			String customerName = iEInvoiceCrud.getCustomer().getCustomer_name();
+			// slipt 40 ký tự
+			String line1 = "";
+			String line2 = "";
+			if (customerName.length() > 40) {
+				String customer40 = customerName.substring(0, 40);
+				char last = customerName.charAt(40);
+				if (last != ' ') {
+					// tìm last space trong đoạn 40
+					int space = customer40.lastIndexOf(' ');
+					line1 = customer40.substring(0, space);
+					line2 = customerName.substring(space);
+				} else {
+					line1 = customer40;
+					line2 = customerName.substring(40);
+				}
+			} else {
+				line1 = customerName;
+			}
+			importParam.put("customer_name1", line1);
+			importParam.put("customer_name2", line2);
+			importParam.put("customer_code", iEInvoiceCrud.getCustomer().getCustomer_code());
+			importParam.put("note", iEInvoiceCrud.getNote());
+			List<IEOrderFormReport> listData = new ArrayList<>();
+			iEInvoiceService.selectOrderFormReport(iEInvoiceCrud.getId(), listData);
+			for (IEOrderFormReport p : listData) {
+				BatchReqInfo br = new BatchReqInfo();
+				batchService.selectByCode(p.getBatch_code(), br);
+				if (br.getBatch() != null) {
+					p.setManufacture_date(br.getBatch().getManufacture_date());
+				}
+			}
+			importParam.put("list_data", listData);
+			List<JasperPrint> jasperPrints = new ArrayList<>();
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			jasperPrints.add(jasperPrint);
+			JasperPrint jasperPrint2 = JasperFillManager.fillReport(reportPath2, importParam, new JREmptyDataSource());
+			jasperPrints.add(jasperPrint2);
+			HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+					.getExternalContext().getResponse();
+			httpServletResponse.addHeader("Content-disposition", "attachment; filename=donhang.docx");
+			ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+			JRDocxExporter docxExporter = new JRDocxExporter();
+			docxExporter.setParameter(JRExporterParameter.JASPER_PRINT_LIST, jasperPrints);
+			docxExporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+			docxExporter.exportReport();
+			FacesContext.getCurrentInstance().responseComplete();
+			try {
+				servletOutputStream.close();
+			} catch (Exception e) {
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportWordOrderFormReport:" + e.getMessage(), e);
+		}
+
+	}
+
+	private void exportWordProformaInvoice() {
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/proformainvoice.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEProformaInvocieReportInfo> list = new ArrayList<>();
+			iEInvoiceService.selectIEProformaInvoiceReport(iEInvoiceCrud.getId(), list);
+
+			importParam.put("list_data", list);
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("payment", iEInvoiceCrud.getPayment());
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery()
+					+ (iEInvoiceCrud.getPost_of_tran() != null ? " " + iEInvoiceCrud.getPost_of_tran().getHarbor_name()
+							: ""));
+			importParam.put("account_no", iEInvoiceCrud.getAccount_b());
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				importParam.put("harbor_en_name", iEInvoiceCrud.getHarbor_category().getHarbor_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			String totalQuantityUSD = "USD " + formatHandler.getNumberFormatEn(sumUSDXK, 100);
+			importParam.put("total_amount_usd", totalQuantityUSD);
+			String wordsTotalAmountUSD = NumberWordConverter.getMoneyIntoWords(sumUSDXK);
+			importParam.put("works_total_amount_usd", wordsTotalAmountUSD);
+			// tổng thùng
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+			for (IEProformaInvocieReportInfo ie : list) {
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+				if ("KG".equals(ie.getUnit())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+			}
+			importParam.put("total_cartons", totalBox);
+
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			String printFileName = JasperFillManager.fillReportToFile(reportPath, importParam, new JREmptyDataSource());
+			JRDocxExporter exporter = new JRDocxExporter();
+			exporter.setParameter(JRExporterParameter.INPUT_FILE_NAME, printFileName);
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+					.getExternalContext().getResponse();
+			httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "ProformaInvoice.docx");
+			ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+			exporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+			exporter.exportReport();
+			facesContext.responseComplete();
+			try {
+				servletOutputStream.close();
+			} catch (Exception e) {
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportProformaInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportWordIEExportReport() {
+		List<JasperPrint> jasperPrints = new ArrayList<>();
+
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/phieuxuatkho.jasper");
+			String reportPath2 = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/biennhanhanghoa.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEExportReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEExportReport(iEInvoiceCrud.getId(), list);
+
+			importParam.put("list_data", list);
+			Date invoiceDate = iEInvoiceCrud.getInvoice_date();
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			int day = ToolTimeCustomer.getDayM(invoiceDate);
+			int month = ToolTimeCustomer.getMonthM(invoiceDate);
+			int year = ToolTimeCustomer.getYearM(invoiceDate);
+			importParam.put("day", day);
+			importParam.put("month", month);
+			importParam.put("year", year);
+			importParam.put("department_name", iEInvoiceCrud.getDepartment_name());
+			importParam.put("warehouse_name", "LIX");
+			Car car = iEInvoiceCrud.getCar();
+			importParam.put("license_plate", car == null ? "" : car.getLicense_plate());
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+			}
+			// tổng thùng
+			double totalQuantityExport = 0;
+			double totalAmount = 0;
+			double totalBox = 0;
+			for (IEExportReport ie : list) {
+				// số lượng và tổng tiền
+				totalQuantityExport = BigDecimal.valueOf(totalQuantityExport)
+						.add(BigDecimal.valueOf(ie.getQuantity_export())).doubleValue();
+				totalAmount = BigDecimal.valueOf(totalAmount).add(BigDecimal.valueOf(ie.getTotal_amount()))
+						.doubleValue();
+				double box = BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL128).doubleValue();
+				totalBox = BigDecimal.valueOf(totalBox).add(BigDecimal.valueOf(box)).doubleValue();
+			}
+			// làm tròn
+			totalAmount = MyMath.roundCustom(totalAmount, 3);
+			totalQuantityExport = MyMath.roundCustom(totalQuantityExport, 3);
+
+			importParam.put("total_quantity", totalQuantityExport);
+			importParam.put("total_amount", totalAmount);
+			importParam.put("words_total_amount", ConvertNumberToText.docSo(totalAmount, "ĐỒNG"));
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			jasperPrints.add(jasperPrint);
+			importParam.put("total_box", totalBox);
+			JasperPrint jasperPrint2 = JasperFillManager.fillReport(reportPath2, importParam, new JREmptyDataSource());
+			jasperPrints.add(jasperPrint2);
+			HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+					.getExternalContext().getResponse();
+			httpServletResponse.addHeader("Content-disposition",
+					"attachment; filename=phieuxuatkhovabiennhanhanghoa.docx");
+			ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+			JRDocxExporter docxExporter = new JRDocxExporter();
+			docxExporter.setParameter(JRExporterParameter.JASPER_PRINT_LIST, jasperPrints);
+			// docxExporter.setParameter(JRExporterParameter.JASPER_PRINT,
+			// jasperPrint);
+			docxExporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+			docxExporter.exportReport();
+			FacesContext.getCurrentInstance().responseComplete();
+			try {
+				servletOutputStream.close();
+			} catch (Exception e) {
+			}
+
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportWordIEExportReport:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportWordIEInvocie() {
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/inhoadon.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEInvoiceReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEInvoiceReport(iEInvoiceCrud.getId(), list);
+			importParam.put("list_data", list);
+			Date invoiceDate = iEInvoiceCrud.getInvoice_date();
+			if (invoiceDate != null) {
+				int day = ToolTimeCustomer.getDayM(invoiceDate);
+				int month = ToolTimeCustomer.getMonthM(invoiceDate);
+				int year = ToolTimeCustomer.getYearM(invoiceDate);
+				String titleDay = "Ngày(day) " + String.format("%02d", day) + " tháng(month) "
+						+ String.format("%02d", month) + " năm(year) " + year;
+				importParam.put("title_day", titleDay);
+			}
+
+			importParam.put("created_by", iEInvoiceCrud.getCreated_by());
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+				importParam.put("phone_number", customer.getHome_phone());
+			} else {
+				importParam.put("customer_name", "");
+				importParam.put("address", "");
+				importParam.put("phone_number", "");
+			}
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+				importParam.put("contract_date", contract.getContract_date());
+			} else {
+				importParam.put("contract_voucher_code", "");
+				importParam.put("contract_date", null);
+			}
+			PaymentMethod method = iEInvoiceCrud.getPayment_method();
+			importParam.put("payment_method_name", method == null ? "" : method.getMethod_name());
+			importParam.put("place_delivery", iEInvoiceCrud.getPlace_delivery());
+			importParam.put("place_discharge", iEInvoiceCrud.getPlace_discharge());
+			importParam.put("bl_no", "");
+			importParam.put("truck_no", "");
+			String totalQuantityUSD = "USD " + formatHandler.getNumberFormat2(sumUSDXK, 100);
+			importParam.put("total_amount_usd", totalQuantityUSD);
+			String wordsTotalAmountUSD = ConvertNumberToText.docSo(sumUSDXK, "USD");
+			importParam.put("works_total_amount_usd", wordsTotalAmountUSD);
+			String exchangeRate = formatHandler.getNumberFormat2(iEInvoiceCrud.getExchange_rate(), 1000) + " VND/USD";
+			importParam.put("exchange_rate", exchangeRate);
+			String totalQuantityVND = formatHandler.getNumberFormat2(sumVND, 1000) + " đồng";
+			importParam.put("total_amount_vnd", totalQuantityVND);
+			String wordsTotalQuantityVND = ConvertNumberToText.docSo(sumVND, "ĐỒNG");
+			importParam.put("works_total_amount_vnd", wordsTotalQuantityVND);
+			// slipt 40 ký tự
+			String printFileName = JasperFillManager.fillReportToFile(reportPath, importParam, new JREmptyDataSource());
+			JRDocxExporter exporter = new JRDocxExporter();
+			exporter.setParameter(JRExporterParameter.INPUT_FILE_NAME, printFileName);
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+					.getExternalContext().getResponse();
+			httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "inhoadon.docx");
+			ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+			exporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+			exporter.exportReport();
+			facesContext.responseComplete();
+			try {
+				servletOutputStream.close();
+			} catch (Exception e) {
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportWordIEInvocie:" + e.getMessage(), e);
+		}
+	}
+
+	public void processExportPdfOutReport() {
+		try {
+			if (reportPdfOutSelect != null) {
+				long id = reportPdfOutSelect.getId();
+				if (id == 1) {
+					exportCommercialInvoiceOut();
+				} else if (id == 2) {
+					exportProformaInvoiceOut();
+				} else if (id == 3) {
+					exportPackingListOut();
+				}
+				if (id == 4) {
+					exportVanningReportOut();
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.processExportPdfOutReport:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportPDFIEInvocie() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/inhoadon.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEInvoiceReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEInvoiceReport(iEInvoiceCrud.getId(), list);
+			importParam.put("list_data", list);
+			Date invoiceDate = iEInvoiceCrud.getInvoice_date();
+			if (invoiceDate != null) {
+				int day = ToolTimeCustomer.getDayM(invoiceDate);
+				int month = ToolTimeCustomer.getMonthM(invoiceDate);
+				int year = ToolTimeCustomer.getYearM(invoiceDate);
+				String titleDay = "Ngày(day) " + String.format("%02d", day) + " tháng(month) "
+						+ String.format("%02d", month) + " năm(year) " + year;
+				importParam.put("title_day", titleDay);
+			}
+
+			importParam.put("created_by", iEInvoiceCrud.getCreated_by());
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+				importParam.put("phone_number", customer.getHome_phone());
+			} else {
+				importParam.put("customer_name", "");
+				importParam.put("address", "");
+				importParam.put("phone_number", "");
+			}
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+				importParam.put("contract_date", contract.getContract_date());
+			} else {
+				importParam.put("contract_voucher_code", "");
+				importParam.put("contract_date", null);
+			}
+			PaymentMethod method = iEInvoiceCrud.getPayment_method();
+			importParam.put("payment_method_name", method == null ? "" : method.getMethod_name());
+			importParam.put("place_delivery", iEInvoiceCrud.getPlace_delivery());
+			importParam.put("place_discharge", iEInvoiceCrud.getPlace_discharge());
+			importParam.put("bl_no", "");
+			importParam.put("truck_no", "");
+			String totalQuantityUSD = "USD " + formatHandler.getNumberFormat2(sumUSDXK, 100);
+			importParam.put("total_amount_usd", totalQuantityUSD);
+			String wordsTotalAmountUSD = ConvertNumberToText.docSo(sumUSDXK, "USD");
+			importParam.put("works_total_amount_usd", wordsTotalAmountUSD);
+			String exchangeRate = formatHandler.getNumberFormat2(iEInvoiceCrud.getExchange_rate(), 1000) + " VND/USD";
+			importParam.put("exchange_rate", exchangeRate);
+			String totalQuantityVND = formatHandler.getNumberFormat2(sumVND, 1000) + " đồng";
+			importParam.put("total_amount_vnd", totalQuantityVND);
+			String wordsTotalQuantityVND = ConvertNumberToText.docSo(sumVND, "ĐỒNG");
+			importParam.put("works_total_amount_vnd", wordsTotalQuantityVND);
+			// slipt 40 ký tự
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("OrderLixBean.exportPDF:" + e.getMessage(), e);
+		}
+
+	}
+
+	// String[] maspincartons = { "L4001", "L4002", "L4003", "L4004", "L4101",
+	// "L4102", "L4103", "L4104", "L4201",
+	// "L4202", "L4203", "L4301", "L4302", "L4303", "17607", "17707", "17807",
+	// "17905", "17906", "ZB103", "ZB203",
+	// "VOTHU", "MCTRL", "MBGIA" };
+	@Inject
+	DVTXuatKhauService dvtXuatKhauService;
+
+	private void exportCommercialInvoice() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/commercialinvoice.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IECommercialInvoiceReportInfo> list = new ArrayList<>();
+			iEInvoiceService.selectCommercialInvoiceReport(iEInvoiceCrud.getId(), list);
+			List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+			String order_no = null;
+			for (int i = 0; i < list.size(); i++) {
+				list.get(i).setHdkhuyenmai(hdkhuyenmai);
+				for (int j = 0; j < dvtxks.size(); j++) {
+					if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+						list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+						list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+						break;
+					}
+				}
+				if (order_no == null || "".equals(order_no))
+					order_no = list.get(i).getOrderno();
+			}
+
+			importParam.put("list_data", list);
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+			importParam.put("payment", iEInvoiceCrud.getPayment_method() != null ? iEInvoiceCrud.getPayment_method()
+					.getPayment() : "");
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery());
+			importParam.put("term_of_delivery_tran",
+					iEInvoiceCrud.getTerm_of_delivery()
+							+ (iEInvoiceCrud.getHarbor_category() != null ? " "
+									+ iEInvoiceCrud.getHarbor_category().getHarbor_name() : ""));
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", hr.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			importParam.put("order_no", order_no);
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+			/*
+			 * @23-3-2023
+			 * 
+			 * @Huyền XK yêu cầu chuyển sang định dạng #,###,##0.##
+			 */
+			// String totalQuantityUSD =
+			// formatHandler.getNumberFormat2(sumUSDXK, 100) + " USD";
+			String totalQuantityUSD = formatHandler.getNumberFormatEn(sumUSDXK, 100) + " USD";
+			importParam.put("total_amount_usd", totalQuantityUSD);
+			String wordsTotalAmountUSD = NumberWordConverter.getMoneyIntoWords(sumUSDXK);
+			importParam.put("works_total_amount_usd", wordsTotalAmountUSD);
+			// tổng thùng
+			String totalUnitStr = "";
+			double totalUnit = 0;
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+			for (IECommercialInvoiceReportInfo ie : list) {
+				totalUnitStr = ie.getUnit();
+				totalUnit += ie.getQuantity_export();
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+
+				if ("KG".equals(ie.getUnit_p())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+			}
+			importParam.put("hdkhuyenmai", hdkhuyenmai);
+			importParam.put("total_unitStr", totalUnitStr);
+			importParam.put("total_unit", totalUnit);
+			importParam.put("total_cartons", totalBox);
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			// slipt 40 ký tự
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportCommercialInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportCommercialInvoiceMau2() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/commercialinvoice2.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IECommercialInvoiceReportInfo> list = new ArrayList<>();
+			iEInvoiceService.selectCommercialInvoiceReport(iEInvoiceCrud.getId(), list);
+			List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+			String order_no = null;
+			for (int i = 0; i < list.size(); i++) {
+				list.get(i).setHdkhuyenmai(hdkhuyenmai);
+				for (int j = 0; j < dvtxks.size(); j++) {
+					if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+						list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+						list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+						break;
+					}
+				}
+				if (order_no == null || "".equals(order_no))
+					order_no = list.get(i).getOrderno();
+			}
+
+			importParam.put("list_data", list);
+			importParam.put("invoice_date",iEInvoiceCrud.getInvoice_date());
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+			importParam.put("payment", iEInvoiceCrud.getPayment_method() != null ? iEInvoiceCrud.getPayment_method()
+					.getPayment() : "");
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery());
+			importParam.put("term_of_delivery_tran",
+					iEInvoiceCrud.getTerm_of_delivery()
+							+ (iEInvoiceCrud.getHarbor_category() != null ? " "
+									+ iEInvoiceCrud.getHarbor_category().getHarbor_name() : ""));
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", hr.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+				importParam.put("homephone", customer.getHome_phone());
+				importParam.put("fax", customer.getFax());
+			}
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			importParam.put("order_no", order_no);
+			importParam.put("productionDes", iEInvoiceCrud.getProductionDes());
+			importParam.put("LC_NO", iEInvoiceCrud.getLC_NO());
+			importParam.put("etd", iEInvoiceCrud.getETD());
+
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+			/*
+			 * @23-3-2023
+			 * 
+			 * @Huyền XK yêu cầu chuyển sang định dạng #,###,##0.##
+			 */
+			// String totalQuantityUSD =
+			// formatHandler.getNumberFormat2(sumUSDXK, 100) + " USD";
+			String totalQuantityUSD = formatHandler.getNumberFormatEn(sumUSDXK, 100);
+			importParam.put("total_amount_usd", totalQuantityUSD);
+			importParam.put("total_amount", sumUSDXK);
+			String wordsTotalAmountUSD = NumberWordConverter.getMoneyIntoWords(sumUSDXK);
+			importParam.put("works_total_amount_usd", wordsTotalAmountUSD);
+			// tổng thùng
+			String totalUnitStr = "";
+			double totalUnit = 0;
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+			for (IECommercialInvoiceReportInfo ie : list) {
+				totalUnitStr = ie.getUnit();
+				totalUnit += ie.getQuantity_export();
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+
+				if ("KG".equals(ie.getUnit_p())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+			}
+			importParam.put("hdkhuyenmai", hdkhuyenmai);
+			importParam.put("total_unitStr", totalUnitStr);
+			importParam.put("total_unit", totalUnit);
+			importParam.put("total_cartons", totalBox);
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			// slipt 40 ký tự
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportCommercialInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportCommercialInvoiceWord() {
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/commercialinvoice.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IECommercialInvoiceReportInfo> list = new ArrayList<>();
+			iEInvoiceService.selectCommercialInvoiceReport(iEInvoiceCrud.getId(), list);
+			List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+			String order_no = null;
+			for (int i = 0; i < list.size(); i++) {
+				list.get(i).setHdkhuyenmai(hdkhuyenmai);
+				for (int j = 0; j < dvtxks.size(); j++) {
+					if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+						list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+						list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+						break;
+					}
+				}
+				if (order_no == null || "".equals(order_no))
+					order_no = list.get(i).getOrderno();
+			}
+			importParam.put("list_data", list);
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+			importParam.put("payment", iEInvoiceCrud.getPayment_method() != null ? iEInvoiceCrud.getPayment_method()
+					.getPayment() : "");
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery());
+			importParam.put("term_of_delivery_tran",
+					iEInvoiceCrud.getTerm_of_delivery()
+							+ (iEInvoiceCrud.getHarbor_category() != null ? " "
+									+ iEInvoiceCrud.getHarbor_category().getHarbor_name() : ""));
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", iEInvoiceCrud.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			importParam.put("order_no", order_no);
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+			String totalQuantityUSD = formatHandler.getNumberFormatEn(sumUSDXK, 100) + " USD";
+			importParam.put("total_amount_usd", totalQuantityUSD);
+			String wordsTotalAmountUSD = NumberWordConverter.getMoneyIntoWords(sumUSDXK);
+			importParam.put("works_total_amount_usd", wordsTotalAmountUSD);
+			// tổng thùng
+			String totalUnitStr = "";
+			double totalUnit = 0;
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+			for (IECommercialInvoiceReportInfo ie : list) {
+				totalUnitStr = ie.getUnit();
+				totalUnit += ie.getQuantity_export();
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+				if ("KG".equals(ie.getUnit_p())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+			}
+			importParam.put("hdkhuyenmai", hdkhuyenmai);
+			importParam.put("total_unitStr", totalUnitStr);
+			importParam.put("total_unit", totalUnit);
+			importParam.put("total_cartons", totalBox);
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			String printFileName = JasperFillManager.fillReportToFile(reportPath, importParam, new JREmptyDataSource());
+			JRDocxExporter exporter = new JRDocxExporter();
+			exporter.setParameter(JRExporterParameter.INPUT_FILE_NAME, printFileName);
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+					.getExternalContext().getResponse();
+			httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "commercialinvoice.docx");
+			ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+			exporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+			exporter.exportReport();
+			facesContext.responseComplete();
+			try {
+				servletOutputStream.close();
+			} catch (Exception e) {
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportWordCommercialInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportCommercialInvoiceWordMau2() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/commercialinvoice2.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IECommercialInvoiceReportInfo> list = new ArrayList<>();
+			iEInvoiceService.selectCommercialInvoiceReport(iEInvoiceCrud.getId(), list);
+			List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+			String order_no = null;
+			for (int i = 0; i < list.size(); i++) {
+				list.get(i).setHdkhuyenmai(hdkhuyenmai);
+				for (int j = 0; j < dvtxks.size(); j++) {
+					if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+						list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+						list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+						break;
+					}
+				}
+				if (order_no == null || "".equals(order_no))
+					order_no = list.get(i).getOrderno();
+			}
+
+			importParam.put("list_data", list);
+			importParam.put("invoice_date",iEInvoiceCrud.getInvoice_date());
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+			importParam.put("payment", iEInvoiceCrud.getPayment_method() != null ? iEInvoiceCrud.getPayment_method()
+					.getPayment() : "");
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery());
+			importParam.put("term_of_delivery_tran",
+					iEInvoiceCrud.getTerm_of_delivery()
+							+ (iEInvoiceCrud.getHarbor_category() != null ? " "
+									+ iEInvoiceCrud.getHarbor_category().getHarbor_name() : ""));
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", hr.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+				importParam.put("homephone", customer.getHome_phone());
+				importParam.put("fax", customer.getFax());
+			}
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			importParam.put("order_no", order_no);
+			importParam.put("productionDes", iEInvoiceCrud.getProductionDes());
+			importParam.put("LC_NO", iEInvoiceCrud.getLC_NO());
+			importParam.put("etd", iEInvoiceCrud.getETD());
+
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+			/*
+			 * @23-3-2023
+			 * 
+			 * @Huyền XK yêu cầu chuyển sang định dạng #,###,##0.##
+			 */
+			// String totalQuantityUSD =
+			// formatHandler.getNumberFormat2(sumUSDXK, 100) + " USD";
+			String totalQuantityUSD = formatHandler.getNumberFormatEn(sumUSDXK, 100);
+			importParam.put("total_amount_usd", totalQuantityUSD);
+			importParam.put("total_amount", sumUSDXK);
+			String wordsTotalAmountUSD = NumberWordConverter.getMoneyIntoWords(sumUSDXK);
+			importParam.put("works_total_amount_usd", wordsTotalAmountUSD);
+			// tổng thùng
+			String totalUnitStr = "";
+			double totalUnit = 0;
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+			for (IECommercialInvoiceReportInfo ie : list) {
+				totalUnitStr = ie.getUnit();
+				totalUnit += ie.getQuantity_export();
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+
+				if ("KG".equals(ie.getUnit_p())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+			}
+			importParam.put("hdkhuyenmai", hdkhuyenmai);
+			importParam.put("total_unitStr", totalUnitStr);
+			importParam.put("total_unit", totalUnit);
+			importParam.put("total_cartons", totalBox);
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			String printFileName = JasperFillManager.fillReportToFile(reportPath, importParam, new JREmptyDataSource());
+			JRDocxExporter exporter = new JRDocxExporter();
+			exporter.setParameter(JRExporterParameter.INPUT_FILE_NAME, printFileName);
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+					.getExternalContext().getResponse();
+			httpServletResponse
+					.addHeader("Content-disposition", "attachment; filename=" + "commercialinvoicemau2.docx");
+			ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+			exporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+			exporter.exportReport();
+			facesContext.responseComplete();
+			try {
+				servletOutputStream.close();
+			} catch (Exception e) {
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportCommercialInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportCommercialInvoiceOut() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			// kiểm tra danh sách đơn hàng xuất xuất khẩu chọn để gọp in có cùng
+			// mã khách hàng hợp đồng và bill no hay không.
+			IEInvoice iEInvoiceFirst = null;
+			String invoice_voucher_code = "";
+			if (listIEInvoiceOut.size() > 0 && listIEInvoiceDetailSelectOut.size() > 0) {
+				iEInvoiceFirst = listIEInvoiceOut.get(0);
+				String customerCode = iEInvoiceFirst.getCustomer().getCustomer_code();
+				Contract contract = iEInvoiceFirst.getContract();
+				String contractVoucherCode = contract == null ? "" : contract.getVoucher_code();
+				String billNo = iEInvoiceFirst.getBill_no();
+				for (IEInvoice iv : listIEInvoiceOut) {
+					if (!"".equals(invoice_voucher_code))
+						invoice_voucher_code += ",";
+					invoice_voucher_code += iv.getVoucher_code();
+					Contract con = iv.getContract();
+					String bill = iv.getBill_no();
+					boolean kt0 = customerCode.equals(iv.getCustomer().getCustomer_code());
+					boolean kt1 = (contract == null && con == null)
+							|| (contract != null && con != null && ((contractVoucherCode == null && con
+									.getVoucher_code() == null) || (contractVoucherCode != null
+									&& con.getVoucher_code() != null && contractVoucherCode.equals(con
+									.getVoucher_code()))));
+					boolean kt2 = (billNo == null && bill == null)
+							|| (billNo != null && bill != null && billNo.equals(bill));
+					if (kt0 && kt1 && kt2) {
+
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Danh sách đơn hàng chọn không cùng mã khách hàng, số hợp đồng hoặc bill no !','warning',2000);");
+						return;
+					}
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/commercialinvoice.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IECommercialInvoiceReportInfo> list = new ArrayList<>();
+			// lấy danh sách id chi tiết đơn hàng xuất xuất khẩu.
+			List<Long> listID = new ArrayList<>();
+			double sumUSD = 0;
+			double sumUSDXK = 0;
+			for (IEInvoiceDetail p : listIEInvoiceDetailSelectOut) {
+				if (p.isCheck()) {
+					listID.add(p.getId());
+					BigDecimal bg = BigDecimal.valueOf(p.getQuantity_export()).multiply(
+							BigDecimal.valueOf(p.getForeign_unit_price()));
+					sumUSD = BigDecimal.valueOf(sumUSD).add(bg).doubleValue();
+				}
+			}
+			if (listID.size() == 0) {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			sumUSD = (double) MyMath.roundCustom(sumUSD, 2);
+			sumUSDXK = sumUSD;
+			JsonObject json = new JsonObject();
+			json.add("list_ie_invoice_detail_id", JsonParserUtil.getGson().toJsonTree(listID));
+			iEInvoiceService.selectCommercialInvoiceReport(JsonParserUtil.getGson().toJson(json), list);
+			List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+			String order_no = null;
+			for (int i = 0; i < list.size(); i++) {
+				list.get(i).setHdkhuyenmai(false);
+				for (int j = 0; j < dvtxks.size(); j++) {
+					if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+						list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+						list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+						break;
+					}
+				}
+				if (order_no == null || "".equals(order_no))
+					order_no = list.get(i).getOrderno();
+			}
+
+			importParam.put("list_data", list);
+
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceFirst.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("shipped_per", iEInvoiceFirst.getShipped_per());
+			importParam.put("shipping_mark", iEInvoiceFirst.getShipping_mark());
+			importParam.put("payment", iEInvoiceFirst.getPayment_method() != null ? iEInvoiceFirst.getPayment_method()
+					.getPayment() : "");
+			importParam.put("term_of_delivery", iEInvoiceFirst.getTerm_of_delivery());
+			importParam.put("term_of_delivery_tran",
+					iEInvoiceFirst.getTerm_of_delivery()
+							+ (iEInvoiceFirst.getHarbor_category() != null ? " "
+									+ iEInvoiceFirst.getHarbor_category().getHarbor_name() : ""));
+			HarborCategory harborCategory = iEInvoiceFirst.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				String harbor_en_name = iEInvoiceFirst.getHarbor_category() == null ? "" : iEInvoiceFirst
+						.getHarbor_category().getHarbor_name();
+				String country_en_name = harborCategory.getCountry() == null ? "" : harborCategory.getCountry()
+						.getEn_name();
+				importParam.put("harbor_en_name", harbor_en_name == null ? "" : harbor_en_name);
+				importParam.put("country_en_name", country_en_name == null ? "" : country_en_name);
+			}
+
+			Customer customer = iEInvoiceFirst.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			importParam.put("voucher_code", invoice_voucher_code);
+			importParam.put("order_no", order_no);
+			Contract contract = iEInvoiceFirst.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+			String totalQuantityUSD = formatHandler.getNumberFormat2(sumUSDXK, 100) + " USD";
+			importParam.put("total_amount_usd", totalQuantityUSD);
+			String wordsTotalAmountUSD = NumberWordConverter.getMoneyIntoWords(sumUSDXK);
+			importParam.put("works_total_amount_usd", wordsTotalAmountUSD);
+			// tổng thùng
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+			for (IECommercialInvoiceReportInfo ie : list) {
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+				if ("KG".equals(ie.getUnit_p())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+			}
+			importParam.put("hdkhuyenmai", false);
+			importParam.put("total_cartons", totalBox);
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			// slipt 40 ký tự
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportCommercialInvoiceOut:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportProformaInvoiceOut() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			// kiểm tra danh sách đơn hàng xuất xuất khẩu chọn để gọp in có cùng
+			// mã khách hàng hợp đồng và bill no hay không.
+			IEInvoice iEInvoiceFirst = null;
+			if (listIEInvoiceOut.size() > 0 && listIEInvoiceDetailSelectOut.size() > 0) {
+				iEInvoiceFirst = listIEInvoiceOut.get(0);
+				String customerCode = iEInvoiceFirst.getCustomer().getCustomer_code();
+				Contract contract = iEInvoiceFirst.getContract();
+				String contractVoucherCode = contract == null ? "" : contract.getVoucher_code();
+				String billNo = iEInvoiceFirst.getBill_no();
+				for (IEInvoice iv : listIEInvoiceOut) {
+					Contract con = iv.getContract();
+					String bill = iv.getBill_no();
+					boolean kt0 = customerCode.equals(iv.getCustomer().getCustomer_code());
+					boolean kt1 = (contract == null && con == null)
+							|| (contract != null && con != null && ((contractVoucherCode == null && con
+									.getVoucher_code() == null) || (contractVoucherCode != null
+									&& con.getVoucher_code() != null && contractVoucherCode.equals(con
+									.getVoucher_code()))));
+					boolean kt2 = (billNo == null && bill == null)
+							|| (billNo != null && bill != null && billNo.equals(bill));
+					if (kt0 && kt1 && kt2) {
+
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Danh sách đơn hàng chọn không cùng mã khách hàng, số hợp đồng hoặc bill no !','warning',2000);");
+						return;
+					}
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/proformainvoice.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEProformaInvocieReportInfo> list = new ArrayList<>();
+			// lấy danh sách id chi tiết đơn hàng xuất xuất khẩu.
+			List<Long> listID = new ArrayList<>();
+			double sumUSD = 0;
+			double sumUSDXK = 0;
+			for (IEInvoiceDetail p : listIEInvoiceDetailSelectOut) {
+				if (p.isCheck()) {
+					listID.add(p.getId());
+					BigDecimal bg = BigDecimal.valueOf(p.getQuantity_export()).multiply(
+							BigDecimal.valueOf(p.getForeign_unit_price()));
+					sumUSD = BigDecimal.valueOf(sumUSD).add(bg).doubleValue();
+				}
+			}
+			if (listID.size() == 0) {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			sumUSD = (double) MyMath.roundCustom(sumUSD, 2);
+			sumUSDXK = sumUSD;
+			JsonObject json = new JsonObject();
+			json.add("list_ie_invoice_detail_id", JsonParserUtil.getGson().toJsonTree(listID));
+			iEInvoiceService.selectIEProformaInvoiceReport(JsonParserUtil.getGson().toJson(json), list);
+
+			importParam.put("list_data", list);
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceFirst.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("payment", iEInvoiceFirst.getPayment());
+			importParam.put("term_of_delivery", iEInvoiceFirst.getTerm_of_delivery()
+					+ (iEInvoiceCrud.getPost_of_tran() != null ? " " + iEInvoiceCrud.getPost_of_tran().getHarbor_name()
+							: ""));
+			importParam.put("account_no", iEInvoiceFirst.getAccount_b());
+			HarborCategory harborCategory = iEInvoiceFirst.getHarbor_category();
+			if (harborCategory != null) {
+				importParam.put("harbor_en_name", iEInvoiceFirst.getHarbor_category().getHarbor_name());
+			}
+
+			Customer customer = iEInvoiceFirst.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			String totalQuantityUSD = "USD " + formatHandler.getNumberFormatEn(sumUSDXK, 100);
+			importParam.put("total_amount_usd", totalQuantityUSD);
+			String wordsTotalAmountUSD = NumberWordConverter.getMoneyIntoWords(sumUSDXK);
+			importParam.put("works_total_amount_usd", wordsTotalAmountUSD);
+			// tổng thùng
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+			for (IEProformaInvocieReportInfo ie : list) {
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+				if ("KG".equals(ie.getUnit())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+			}
+			importParam.put("total_cartons", totalBox);
+
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			// slipt 40 ký tự
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportProformaInvoiceOut:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportProformaInvoice() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/proformainvoice.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEProformaInvocieReportInfo> list = new ArrayList<>();
+			iEInvoiceService.selectIEProformaInvoiceReport(iEInvoiceCrud.getId(), list);
+
+			importParam.put("list_data", list);
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("payment", iEInvoiceCrud.getPayment());
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery()
+					+ (iEInvoiceCrud.getPost_of_tran() != null ? " " + iEInvoiceCrud.getPost_of_tran().getHarbor_name()
+							: ""));
+			importParam.put("account_no", iEInvoiceCrud.getAccount_b());
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				importParam.put("harbor_en_name", iEInvoiceCrud.getHarbor_category().getHarbor_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			String totalQuantityUSD = "USD " + formatHandler.getNumberFormatEn(sumUSDXK, 100);
+			importParam.put("total_amount_usd", totalQuantityUSD);
+			String wordsTotalAmountUSD = NumberWordConverter.getMoneyIntoWords(sumUSDXK);
+			importParam.put("works_total_amount_usd", wordsTotalAmountUSD);
+			// tổng thùng
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+			for (IEProformaInvocieReportInfo ie : list) {
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+				if ("KG".equals(ie.getUnit())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+			}
+			importParam.put("total_cartons", totalBox);
+
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			// slipt 40 ký tự
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportProformaInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportPackingList() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/packinglist.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEPackingListReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEPackingListReport(iEInvoiceCrud.getId(), list);
+			List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+			String order_no = null;
+			for (int i = 0; i < list.size(); i++) {
+				list.get(i).setHdkhuyenmai(hdkhuyenmai);
+				for (int j = 0; j < dvtxks.size(); j++) {
+					if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+						list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+						list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+						break;
+					}
+				}
+				if (order_no == null || "".equals(order_no))
+					order_no = list.get(i).getOrderno();
+			}
+
+			importParam.put("list_data", list);
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			importParam.put("order_no", order_no);
+			importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			// importParam.put("term_of_delivery",
+			// iEInvoiceCrud.getTerm_of_delivery()
+			// + (iEInvoiceCrud.getHarbor_category() != null ? " "
+			// + iEInvoiceCrud.getHarbor_category().getHarbor_name() : ""));
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery());
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", iEInvoiceCrud.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+
+			// tổng thùng
+			String totalUnitStr = "";
+			double totalUnit = 0;
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+
+			double totalCartons = 0;
+			double totalNetWeight = 0;
+			double totalGrossWeight = 0;
+
+			for (IEPackingListReport ie : list) {
+				totalUnitStr = ie.getUnit();
+				totalUnit += ie.getQuantity_export();
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+				if ("KG".equals(ie.getUnit_p())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+
+				// số thùng
+				double box = ie.getQuantity_export() / ie.getSpecification();
+				totalCartons = totalCartons + box;
+				// FormatHandler.getInstance().getNumberFormat2En(($F{quantity_export}*$F{product.factor}/1000),1000000)+"
+				// MTS"
+				double netWeight = ie.getQuantity_export() * ie.getFactor();
+				double mlNetWeight = netWeight / 1000;
+				totalNetWeight = totalNetWeight + mlNetWeight;
+				// FormatHandler.getInstance().getNumberFormat2En((($F{quantity_export}*$F{product.factor})+($F{quantity_export}/$F{product.specification}*$F{product.tare})),1000000)+"
+				// KGS"
+				double boxPackedWeight = ie.getQuantity_export() * ie.getFactor() + ie.getQuantity_export()
+						/ ie.getSpecification() * ie.getTare();
+				totalGrossWeight = totalGrossWeight + boxPackedWeight;
+
+			}
+			importParam.put("hdkhuyenmai", hdkhuyenmai);
+			importParam.put("total_unitStr", totalUnitStr);
+			importParam.put("total_unit", totalUnit);
+			importParam.put("total_cartons", totalBox);
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			importParam.put("total_cartons", totalCartons);
+			importParam.put("total_net_weight", totalNetWeight);
+			importParam.put("total_gross_weight", totalGrossWeight);
+			// slipt 40 ký tự
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportPackingList:" + e.getMessage(), e);
+		}
+	}
+	private void exportPackingListMau2() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/packinglistmau2.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEPackingListReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEPackingListReport(iEInvoiceCrud.getId(), list);
+			List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+			String order_no = null;
+			String container_no=null;
+			String ft_container=null;
+			for (int i = 0; i < list.size(); i++) {
+				list.get(i).setHdkhuyenmai(hdkhuyenmai);
+				for (int j = 0; j < dvtxks.size(); j++) {
+					if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+						list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+						list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+						break;
+					}
+				}
+				if (order_no == null || "".equals(order_no))
+					order_no = list.get(i).getOrderno();
+				if (container_no == null || "".equals(container_no))
+					container_no = list.get(i).getContainer_no();
+				if (ft_container == null || "".equals(ft_container))
+					ft_container = list.get(i).getFt_container();
+			}
+
+			importParam.put("list_data", list);
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			importParam.put("order_no", order_no);
+			importParam.put("container_no", container_no);
+			importParam.put("ft_container", ft_container);
+			importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+			importParam.put("invoice_date",iEInvoiceCrud.getInvoice_date());
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			importParam.put("payment", iEInvoiceCrud.getPayment_method() != null ? iEInvoiceCrud.getPayment_method()
+					.getPayment() : "");
+			// importParam.put("term_of_delivery",
+			// iEInvoiceCrud.getTerm_of_delivery()
+			// + (iEInvoiceCrud.getHarbor_category() != null ? " "
+			// + iEInvoiceCrud.getHarbor_category().getHarbor_name() : ""));
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery());
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", iEInvoiceCrud.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+				importParam.put("homephone", customer.getHome_phone());
+				importParam.put("fax", customer.getFax());
+			}
+			importParam.put("productionDes", iEInvoiceCrud.getProductionDes());
+			importParam.put("LC_NO", iEInvoiceCrud.getLC_NO());
+			importParam.put("etd", iEInvoiceCrud.getETD());
+
+			// tổng thùng
+			String totalUnitStr = "";
+			double totalUnit = 0;
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+
+			double totalCartons = 0;
+			double totalNetWeight = 0;
+			double totalGrossWeight = 0;
+			double totalMeasu = 0;
+
+			for (IEPackingListReport ie : list) {
+				totalUnitStr = ie.getUnit();
+				totalUnit += ie.getQuantity_export();
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+				if ("KG".equals(ie.getUnit_p())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+
+				// số thùng
+				double box = ie.getQuantity_export() / ie.getSpecification();
+				totalCartons = totalCartons + box;
+				// FormatHandler.getInstance().getNumberFormat2En(($F{quantity_export}*$F{product.factor}/1000),1000000)+"
+				// MTS"
+				double netWeight = ie.getQuantity_export() * ie.getFactor();
+				double mlNetWeight = netWeight;
+				totalNetWeight = totalNetWeight + mlNetWeight;
+				// FormatHandler.getInstance().getNumberFormat2En((($F{quantity_export}*$F{product.factor})+($F{quantity_export}/$F{product.specification}*$F{product.tare})),1000000)+"
+				// KGS"
+				double boxPackedWeight = ie.getQuantity_export() * ie.getFactor() + ie.getQuantity_export()
+						/ ie.getSpecification() * ie.getTare();
+				totalGrossWeight = totalGrossWeight + boxPackedWeight;
+				
+				totalMeasu+=MyMath.roundCustom(box*ie.getCbm(),2);
+				
+
+			}
+			importParam.put("hdkhuyenmai", hdkhuyenmai);
+			importParam.put("total_unitStr", totalUnitStr);
+			importParam.put("total_unit", totalUnit);
+			importParam.put("total_cartons", totalBox);
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			importParam.put("total_cartons", totalCartons);
+			importParam.put("total_net_weight", totalNetWeight);
+			importParam.put("total_gross_weight", totalGrossWeight);
+			importParam.put("total_measu", totalMeasu);
+			// slipt 40 ký tự
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportPackingList:" + e.getMessage(), e);
+		}
+	}
+	private void exportWordPackingListMau2() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/packinglistmau2.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEPackingListReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEPackingListReport(iEInvoiceCrud.getId(), list);
+			List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+			String order_no = null;
+			String container_no=null;
+			String ft_container=null;
+			for (int i = 0; i < list.size(); i++) {
+				list.get(i).setHdkhuyenmai(hdkhuyenmai);
+				for (int j = 0; j < dvtxks.size(); j++) {
+					if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+						list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+						list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+						break;
+					}
+				}
+				if (order_no == null || "".equals(order_no))
+					order_no = list.get(i).getOrderno();
+				if (container_no == null || "".equals(container_no))
+					container_no = list.get(i).getContainer_no();
+				if (ft_container == null || "".equals(ft_container))
+					ft_container = list.get(i).getFt_container();
+			}
+
+			importParam.put("list_data", list);
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			importParam.put("order_no", order_no);
+			importParam.put("container_no", container_no);
+			importParam.put("ft_container", ft_container);
+			importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			// importParam.put("term_of_delivery",
+			// iEInvoiceCrud.getTerm_of_delivery()
+			// + (iEInvoiceCrud.getHarbor_category() != null ? " "
+			// + iEInvoiceCrud.getHarbor_category().getHarbor_name() : ""));
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery());
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", iEInvoiceCrud.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+				importParam.put("homephone", customer.getHome_phone());
+				importParam.put("fax", customer.getFax());
+			}
+			importParam.put("productionDes", iEInvoiceCrud.getProductionDes());
+			importParam.put("LC_NO", iEInvoiceCrud.getLC_NO());
+			importParam.put("etd", iEInvoiceCrud.getETD());
+
+			// tổng thùng
+			String totalUnitStr = "";
+			double totalUnit = 0;
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+
+			double totalCartons = 0;
+			double totalNetWeight = 0;
+			double totalGrossWeight = 0;
+			double totalMeasu = 0;
+
+			for (IEPackingListReport ie : list) {
+				totalUnitStr = ie.getUnit();
+				totalUnit += ie.getQuantity_export();
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+				if ("KG".equals(ie.getUnit_p())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+
+				// số thùng
+				double box = ie.getQuantity_export() / ie.getSpecification();
+				totalCartons = totalCartons + box;
+				// FormatHandler.getInstance().getNumberFormat2En(($F{quantity_export}*$F{product.factor}/1000),1000000)+"
+				// MTS"
+				double netWeight = ie.getQuantity_export() * ie.getFactor();
+				double mlNetWeight = netWeight;
+				totalNetWeight = totalNetWeight + mlNetWeight;
+				// FormatHandler.getInstance().getNumberFormat2En((($F{quantity_export}*$F{product.factor})+($F{quantity_export}/$F{product.specification}*$F{product.tare})),1000000)+"
+				// KGS"
+				double boxPackedWeight = ie.getQuantity_export() * ie.getFactor() + ie.getQuantity_export()
+						/ ie.getSpecification() * ie.getTare();
+				totalGrossWeight = totalGrossWeight + boxPackedWeight;
+				
+				totalMeasu+=MyMath.roundCustom(box*ie.getCbm(),2);
+				
+
+			}
+			importParam.put("hdkhuyenmai", hdkhuyenmai);
+			importParam.put("total_unitStr", totalUnitStr);
+			importParam.put("total_unit", totalUnit);
+			importParam.put("total_cartons", totalBox);
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			importParam.put("total_cartons", totalCartons);
+			importParam.put("total_net_weight", totalNetWeight);
+			importParam.put("total_gross_weight", totalGrossWeight);
+			importParam.put("total_measu", totalMeasu);
+
+
+			String printFileName = JasperFillManager.fillReportToFile(reportPath, importParam,
+					new JREmptyDataSource());
+			JRDocxExporter exporter = new JRDocxExporter();
+			exporter.setParameter(JRExporterParameter.INPUT_FILE_NAME, printFileName);
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+					.getExternalContext().getResponse();
+			httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "packing_list"
+					+ iEInvoiceCrud.getVoucher_code() + ".docx");
+			ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+			exporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+			exporter.exportReport();
+			facesContext.responseComplete();
+			try {
+				servletOutputStream.close();
+			} catch (Exception e) {
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportPackingList:" + e.getMessage(), e);
+		}
+	}
+
+	public void exportPackingListWord() {
+		// PrimeFaces current = PrimeFaces.current();
+		try {
+			if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0 && listIEInvoiceDetail.size() > 0) {
+				String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+						.getRealPath("/resources/reports/ieinvocie/packinglist.jasper");
+				Map<String, Object> importParam = new HashMap<String, Object>();
+				Locale locale = new Locale("en", "US");
+				importParam.put(JRParameter.REPORT_LOCALE, locale);
+				importParam.put(
+						"logo",
+						FacesContext.getCurrentInstance().getExternalContext()
+								.getRealPath("/resources/gfx/lixco_logo.png"));
+				List<IEPackingListReport> list = new ArrayList<>();
+				iEInvoiceService.selectIEPackingListReport(iEInvoiceCrud.getId(), list);
+				List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+				String order_no = null;
+				for (int i = 0; i < list.size(); i++) {
+					list.get(i).setHdkhuyenmai(hdkhuyenmai);
+					for (int j = 0; j < dvtxks.size(); j++) {
+						if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+							list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+							list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+							break;
+						}
+					}
+					if (order_no == null || "".equals(order_no))
+						order_no = list.get(i).getOrderno();
+				}
+				importParam.put("list_data", list);
+				importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+				importParam.put("order_no", order_no);
+				importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+				Contract contract = iEInvoiceCrud.getContract();
+				if (contract != null) {
+					importParam.put("contract_voucher_code", contract.getVoucher_code());
+				}
+				importParam.put("invoice_date",
+						ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+				importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+				importParam.put("term_of_delivery",
+						iEInvoiceCrud.getTerm_of_delivery()
+								+ (iEInvoiceCrud.getHarbor_category() != null ? " "
+										+ iEInvoiceCrud.getHarbor_category().getHarbor_name() : ""));
+				HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+				if (harborCategory != null) {
+					HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+					harborCategoryService.selectById(harborCategory.getId(), hr);
+					harborCategory = hr.getHarbor_category();
+					importParam.put("harbor_en_name", iEInvoiceCrud.getHarbor_category().getHarbor_name());
+					importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+							.getCountry().getEn_name());
+				}
+
+				Customer customer = iEInvoiceCrud.getCustomer();
+				if (customer != null) {
+					importParam.put("customer_name", customer.getCustomer_name());
+					importParam.put("address", customer.getAddress());
+				}
+				// tổng thùng
+				String totalUnitStr = "";
+				double totalUnit = 0;
+				double totalBox = 0;
+				double tons_pcs = 0;
+				double tons_mts = 0;
+
+				double totalCartons = 0;
+				double totalNetWeight = 0;
+				double totalGrossWeight = 0;
+
+				for (IEPackingListReport ie : list) {
+					totalUnitStr = ie.getUnit();
+					totalUnit += ie.getQuantity_export();
+					totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+							.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+					if ("KG".equals(ie.getUnit_p())) {
+						tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+								.doubleValue();
+					} else {
+						tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+								.doubleValue();
+					}
+
+					// số thùng
+					// BigDecimal box =
+					// BigDecimal.valueOf(ie.getQuantity_export()).divide(
+					// BigDecimal.valueOf(ie.getSpecification()),
+					// MathContext.DECIMAL32);
+					// totalCartons =
+					// BigDecimal.valueOf(totalCartons).add(box).doubleValue();
+					// //
+					// FormatHandler.getInstance().getNumberFormat2En(($F{quantity_export}*$F{product.factor}/1000),1000000)+"
+					// // MTS"
+					// double netWeight =
+					// BigDecimal.valueOf(ie.getQuantity_export())
+					// .multiply(BigDecimal.valueOf(ie.getFactor())).doubleValue();
+					// double mlNetWeight = netWeight / 1000;
+					// totalNetWeight =
+					// BigDecimal.valueOf(totalNetWeight).add(BigDecimal.valueOf(mlNetWeight))
+					// .doubleValue();
+					// //
+					// FormatHandler.getInstance().getNumberFormat2En((($F{quantity_export}*$F{product.factor})+($F{quantity_export}/$F{product.specification}*$F{product.tare})),1000000)+"
+					// // KGS"
+					// double boxPackedWeight =
+					// (BigDecimal.valueOf(ie.getQuantity_export()).multiply(
+					// BigDecimal.valueOf(ie.getFactor()),
+					// MathContext.DECIMAL32)).add(
+					// BigDecimal.valueOf(ie.getQuantity_export())
+					// .divide(BigDecimal.valueOf(ie.getSpecification()),
+					// MathContext.DECIMAL32)
+					// .multiply(BigDecimal.valueOf(ie.getTare()))).doubleValue();
+					// totalGrossWeight =
+					// BigDecimal.valueOf(totalGrossWeight).add(BigDecimal.valueOf(boxPackedWeight))
+					// .doubleValue();
+
+					// số thùng
+					double box = ie.getQuantity_export() / ie.getSpecification();
+					totalCartons = totalCartons + box;
+					// FormatHandler.getInstance().getNumberFormat2En(($F{quantity_export}*$F{product.factor}/1000),1000000)+"
+					// MTS"
+					double netWeight = ie.getQuantity_export() * ie.getFactor();
+					double mlNetWeight = netWeight / 1000;
+					totalNetWeight = totalNetWeight + mlNetWeight;
+					// FormatHandler.getInstance().getNumberFormat2En((($F{quantity_export}*$F{product.factor})+($F{quantity_export}/$F{product.specification}*$F{product.tare})),1000000)+"
+					// KGS"
+					double boxPackedWeight = ie.getQuantity_export() * ie.getFactor() + ie.getQuantity_export()
+							/ ie.getSpecification() * ie.getTare();
+					totalGrossWeight = totalGrossWeight + boxPackedWeight;
+
+				}
+				importParam.put("hdkhuyenmai", hdkhuyenmai);
+				importParam.put("total_unitStr", totalUnitStr);
+				importParam.put("total_unit", totalUnit);
+				importParam.put("total_cartons", totalBox);
+				importParam.put("ton_mts", tons_mts);
+				importParam.put("ton_pcs", tons_pcs);
+
+				importParam.put("total_cartons", totalCartons);
+				importParam.put("total_net_weight", totalNetWeight);
+				importParam.put("total_gross_weight", totalGrossWeight);
+				String printFileName = JasperFillManager.fillReportToFile(reportPath, importParam,
+						new JREmptyDataSource());
+				// JasperPrint jasperPrint =
+				// JasperFillManager.fillReportToFile)(reportPath, importParam,
+				// new JREmptyDataSource());
+				JRDocxExporter exporter = new JRDocxExporter();
+				exporter.setParameter(JRExporterParameter.INPUT_FILE_NAME, printFileName);
+				FacesContext facesContext = FacesContext.getCurrentInstance();
+				HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+						.getExternalContext().getResponse();
+				httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "packing_list"
+						+ iEInvoiceCrud.getVoucher_code() + ".docx");
+				ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+				exporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+				exporter.exportReport();
+				facesContext.responseComplete();
+				try {
+					servletOutputStream.close();
+				} catch (Exception e) {
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportPackingList:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportPackingListOut() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			// kiểm tra danh sách đơn hàng xuất xuất khẩu chọn để gọp in có cùng
+			// mã khách hàng hợp đồng và bill no hay không.
+			IEInvoice iEInvoiceFirst = null;
+			String invoice_voucher_code = "";
+			if (listIEInvoiceOut.size() > 0 && listIEInvoiceDetailSelectOut.size() > 0) {
+				iEInvoiceFirst = listIEInvoiceOut.get(0);
+				String customerCode = iEInvoiceFirst.getCustomer().getCustomer_code();
+				Contract contract = iEInvoiceFirst.getContract();
+				String contractVoucherCode = contract == null ? "" : contract.getVoucher_code();
+				String billNo = iEInvoiceFirst.getBill_no();
+
+				for (IEInvoice iv : listIEInvoiceOut) {
+					if (!"".equals(invoice_voucher_code))
+						invoice_voucher_code += ",";
+					invoice_voucher_code += iv.getVoucher_code();
+					Contract con = iv.getContract();
+					String bill = iv.getBill_no();
+					boolean kt0 = customerCode.equals(iv.getCustomer().getCustomer_code());
+					boolean kt1 = (contract == null && con == null)
+							|| (contract != null && con != null && ((contractVoucherCode == null && con
+									.getVoucher_code() == null) || (contractVoucherCode != null
+									&& con.getVoucher_code() != null && contractVoucherCode.equals(con
+									.getVoucher_code()))));
+					boolean kt2 = (billNo == null && bill == null)
+							|| (billNo != null && bill != null && billNo.equals(bill));
+					if (kt0 && kt1 && kt2) {
+
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Danh sách đơn hàng chọn không cùng mã khách hàng, số hợp đồng hoặc bill no !','warning',2000);");
+						return;
+					}
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/packinglist.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEPackingListReport> list = new ArrayList<>();
+			// lấy danh sách id chi tiết đơn hàng xuất xuất khẩu.
+			List<Long> listID = new ArrayList<>();
+			for (IEInvoiceDetail p : listIEInvoiceDetailSelectOut) {
+				if (p.isCheck()) {
+					listID.add(p.getId());
+				}
+			}
+			if (listID.size() == 0) {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			JsonObject json = new JsonObject();
+			json.add("list_ie_invoice_detail_id", JsonParserUtil.getGson().toJsonTree(listID));
+			iEInvoiceService.selectIEPackingListReport(JsonParserUtil.getGson().toJson(json), list);
+			List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+			String order_no = null;
+			for (int i = 0; i < list.size(); i++) {
+				list.get(i).setHdkhuyenmai(false);
+				for (int j = 0; j < dvtxks.size(); j++) {
+					if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+						list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+						list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+						break;
+					}
+				}
+				if (order_no == null || "".equals(order_no))
+					order_no = list.get(i).getOrderno();
+			}
+			importParam.put("list_data", list);
+			importParam.put("voucher_code", invoice_voucher_code);
+			importParam.put("order_no", order_no);
+			importParam.put("shipping_mark", iEInvoiceFirst.getShipping_mark());
+			Contract contract = iEInvoiceFirst.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceFirst.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery());
+			HarborCategory harborCategory = iEInvoiceFirst.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", iEInvoiceFirst.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceFirst.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			// tổng thùng
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+
+			double totalCartons = 0;
+			double totalNetWeight = 0;
+			double totalGrossWeight = 0;
+
+			for (IEPackingListReport ie : list) {
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+				if ("KG".equals(ie.getUnit_p())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+
+				// số thùng
+				double box = ie.getQuantity_export() / ie.getSpecification();
+				totalCartons = totalCartons + box;
+				// FormatHandler.getInstance().getNumberFormat2En(($F{quantity_export}*$F{product.factor}/1000),1000000)+"
+				// MTS"
+				double netWeight = ie.getQuantity_export() * ie.getFactor();
+				double mlNetWeight = netWeight / 1000;
+				totalNetWeight = totalNetWeight + mlNetWeight;
+				// FormatHandler.getInstance().getNumberFormat2En((($F{quantity_export}*$F{product.factor})+($F{quantity_export}/$F{product.specification}*$F{product.tare})),1000000)+"
+				// KGS"
+				double boxPackedWeight = ie.getQuantity_export() * ie.getFactor() + ie.getQuantity_export()
+						/ ie.getSpecification() * ie.getTare();
+				totalGrossWeight = totalGrossWeight + boxPackedWeight;
+
+			}
+			importParam.put("hdkhuyenmai", false);
+			importParam.put("total_cartons", totalBox);
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			importParam.put("total_cartons", totalCartons);
+			importParam.put("total_net_weight", totalNetWeight);
+			importParam.put("total_gross_weight", totalGrossWeight);
+			// slipt 40 ký tự
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportPackingListOut:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportWordPackingList() {
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/packinglist.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEPackingListReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEPackingListReport(iEInvoiceCrud.getId(), list);
+
+			List<DVTXuatKhau> dvtxks = dvtXuatKhauService.selectAll();
+			String order_no = null;
+			for (int i = 0; i < list.size(); i++) {
+				for (int j = 0; j < dvtxks.size(); j++) {
+					if (list.get(i).getUnit().equals(dvtxks.get(j).getDvtsp())) {
+						list.get(i).setDvtPac(dvtxks.get(j).getDvtPac());
+						list.get(i).setDvtTons(dvtxks.get(j).getDvtTons());
+						break;
+					}
+				}
+				if (order_no == null || "".equals(order_no))
+					order_no = list.get(i).getOrderno();
+			}
+			importParam.put("list_data", list);
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			importParam.put("order_no", order_no);
+			importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			// importParam.put("term_of_delivery",
+			// iEInvoiceCrud.getTerm_of_delivery()
+			// + (iEInvoiceCrud.getHarbor_category() != null ? " "
+			// + iEInvoiceCrud.getHarbor_category().getHarbor_name() : ""));
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery());
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", iEInvoiceCrud.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			// tổng thùng
+			double totalBox = 0;
+			double tons_pcs = 0;
+			double tons_mts = 0;
+
+			double totalCartons = 0;
+			double totalNetWeight = 0;
+			double totalGrossWeight = 0;
+
+			for (IEPackingListReport ie : list) {
+				totalBox += BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+				if ("KG".equals(ie.getUnit_p())) {
+					tons_mts = BigDecimal.valueOf(tons_mts).add(BigDecimal.valueOf(ie.getQuantity_export() / 1000))
+							.doubleValue();
+				} else {
+					tons_pcs = BigDecimal.valueOf(tons_pcs).add(BigDecimal.valueOf(ie.getQuantity_export()))
+							.doubleValue();
+				}
+				// số thùng
+				double box = ie.getQuantity_export() / ie.getSpecification();
+				totalCartons = totalCartons + box;
+				// FormatHandler.getInstance().getNumberFormat2En(($F{quantity_export}*$F{product.factor}/1000),1000000)+"
+				// MTS"
+				double netWeight = ie.getQuantity_export() * ie.getFactor();
+				double mlNetWeight = netWeight / 1000;
+				totalNetWeight = totalNetWeight + mlNetWeight;
+				// FormatHandler.getInstance().getNumberFormat2En((($F{quantity_export}*$F{product.factor})+($F{quantity_export}/$F{product.specification}*$F{product.tare})),1000000)+"
+				// KGS"
+				double boxPackedWeight = ie.getQuantity_export() * ie.getFactor() + ie.getQuantity_export()
+						/ ie.getSpecification() * ie.getTare();
+				totalGrossWeight = totalGrossWeight + boxPackedWeight;
+
+			}
+			importParam.put("total_cartons", totalBox);
+			importParam.put("ton_mts", tons_mts);
+			importParam.put("ton_pcs", tons_pcs);
+
+			importParam.put("total_cartons", totalCartons);
+			importParam.put("total_net_weight", totalNetWeight);
+			importParam.put("total_gross_weight", totalGrossWeight);
+			// slipt 40 ký tự
+			String printFileName = JasperFillManager.fillReportToFile(reportPath, importParam, new JREmptyDataSource());
+			JRDocxExporter exporter = new JRDocxExporter();
+			exporter.setParameter(JRExporterParameter.INPUT_FILE_NAME, printFileName);
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+					.getExternalContext().getResponse();
+			httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "PackingList.docx");
+			ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+			exporter.setParameter(JRExporterParameter.OUTPUT_STREAM, servletOutputStream);
+			exporter.exportReport();
+			facesContext.responseComplete();
+			try {
+				servletOutputStream.close();
+			} catch (Exception e) {
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportWordPackingList:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportVanningReport() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/vanningreport.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEVanningReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEVanningReport(iEInvoiceCrud.getId(), list);
+
+			importParam.put("list_data", list);
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+			importParam.put("payment", iEInvoiceCrud.getPayment_method() != null ? iEInvoiceCrud.getPayment_method()
+					.getPayment() : "");
+			importParam.put("created_by", iEInvoiceCrud.getCreated_by());
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery()
+					+ (iEInvoiceCrud.getPost_of_tran() != null ? " " + iEInvoiceCrud.getPost_of_tran().getHarbor_name()
+							: ""));
+			importParam.put("load_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getUp_goods_date(), "dd/MM/yyyy"));
+			importParam.put("cont_no", list.get(0).getContainer_no());
+			importParam.put("order_no", list.get(0).getOrderno());
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", iEInvoiceCrud.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportVanningReport:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportVanningReportWord() {
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/vanningreport.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEVanningReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEVanningReport(iEInvoiceCrud.getId(), list);
+
+			importParam.put("list_data", list);
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("shipped_per", iEInvoiceCrud.getShipped_per());
+			importParam.put("shipping_mark", iEInvoiceCrud.getShipping_mark());
+			importParam.put("payment", iEInvoiceCrud.getPayment_method() != null ? iEInvoiceCrud.getPayment_method()
+					.getPayment() : "");
+			importParam.put("created_by", iEInvoiceCrud.getCreated_by());
+			importParam.put("term_of_delivery", iEInvoiceCrud.getTerm_of_delivery()
+					+ (iEInvoiceCrud.getPost_of_tran() != null ? " " + iEInvoiceCrud.getPost_of_tran().getHarbor_name()
+							: ""));
+			importParam.put("load_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getUp_goods_date(), "dd/MM/yyyy"));
+			importParam.put("cont_no", list.get(0).getContainer_no());
+			importParam.put("order_no", list.get(0).getOrderno());
+			HarborCategory harborCategory = iEInvoiceCrud.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", iEInvoiceCrud.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			Contract contract = iEInvoiceCrud.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+
+			String printFileName = JasperFillManager.fillReportToFile(reportPath, importParam, new JREmptyDataSource());
+			JRDocxExporter exporter = new JRDocxExporter();
+			exporter.setExporterInput(new SimpleExporterInput(printFileName));
+			FacesContext facesContext = FacesContext.getCurrentInstance();
+			HttpServletResponse httpServletResponse = (HttpServletResponse) FacesContext.getCurrentInstance()
+					.getExternalContext().getResponse();
+			httpServletResponse.addHeader("Content-disposition", "attachment; filename=" + "VanningReport.docx");
+			ServletOutputStream servletOutputStream = httpServletResponse.getOutputStream();
+			exporter.setExporterOutput(new SimpleOutputStreamExporterOutput(servletOutputStream));
+			SimpleDocxReportConfiguration cf = new SimpleDocxReportConfiguration();
+			cf.setFramesAsNestedTables(true);
+			exporter.setConfiguration(cf);
+			exporter.exportReport();
+			facesContext.responseComplete();
+			try {
+				servletOutputStream.close();
+			} catch (Exception e) {
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportWordVanningReport:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportVanningReportOut() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			// kiểm tra danh sách đơn hàng xuất xuất khẩu chọn để gọp in có cùng
+			// mã khách hàng hợp đồng và bill no hay không.
+			IEInvoice iEInvoiceFirst = null;
+			String invoice_voucher_code = "";
+			if (listIEInvoiceOut.size() > 0 && listIEInvoiceDetailSelectOut.size() > 0) {
+				iEInvoiceFirst = listIEInvoiceOut.get(0);
+				String customerCode = iEInvoiceFirst.getCustomer().getCustomer_code();
+				Contract contract = iEInvoiceFirst.getContract();
+				String contractVoucherCode = contract == null ? "" : contract.getVoucher_code();
+				String billNo = iEInvoiceFirst.getBill_no();
+				for (IEInvoice iv : listIEInvoiceOut) {
+
+					if (!"".equals(invoice_voucher_code))
+						invoice_voucher_code += ",";
+					invoice_voucher_code += iv.getVoucher_code();
+					Contract con = iv.getContract();
+					String bill = iv.getBill_no();
+					boolean kt0 = customerCode.equals(iv.getCustomer().getCustomer_code());
+					boolean kt1 = (contract == null && con == null)
+							|| (contract != null && con != null && ((contractVoucherCode == null && con
+									.getVoucher_code() == null) || (contractVoucherCode != null
+									&& con.getVoucher_code() != null && contractVoucherCode.equals(con
+									.getVoucher_code()))));
+					boolean kt2 = (billNo == null && bill == null)
+							|| (billNo != null && bill != null && billNo.equals(bill));
+					if (kt0 && kt1 && kt2) {
+
+					} else {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Danh sách đơn hàng chọn không cùng mã khách hàng, số hợp đồng hoặc bill no !','warning',2000);");
+						return;
+					}
+				}
+			} else {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/vanningreport.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("en", "US");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEVanningReport> list = new ArrayList<>();
+			// lấy danh sách id chi tiết đơn hàng xuất xuất khẩu.
+			List<Long> listID = new ArrayList<>();
+			for (IEInvoiceDetail p : listIEInvoiceDetailSelectOut) {
+				if (p.isCheck()) {
+					listID.add(p.getId());
+				}
+			}
+			if (listID.size() == 0) {
+				current.executeScript("swaldesigntimer('Cảnh báo!', 'Chưa chọn dòng để xuất file!','warning',2000);");
+				return;
+			}
+			JsonObject json = new JsonObject();
+			json.add("list_ie_invoice_detail_id", JsonParserUtil.getGson().toJsonTree(listID));
+			iEInvoiceService.selectIEVanningReport(JsonParserUtil.getGson().toJson(json), list);
+
+			importParam.put("list_data", list);
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceFirst.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("shipped_per", iEInvoiceFirst.getShipped_per());
+			importParam.put("shipping_mark", iEInvoiceFirst.getShipping_mark());
+			importParam.put("payment", iEInvoiceFirst.getPayment_method() != null ? iEInvoiceFirst.getPayment_method()
+					.getPayment() : "");
+			importParam.put("created_by", iEInvoiceFirst.getCreated_by());
+			importParam.put("term_of_delivery",
+					iEInvoiceFirst.getTerm_of_delivery()
+							+ (iEInvoiceFirst.getPost_of_tran() != null ? " "
+									+ iEInvoiceFirst.getPost_of_tran().getHarbor_name() : ""));
+			importParam.put("load_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceFirst.getUp_goods_date(), "dd/MM/yyyy"));
+			importParam.put("cont_no", list.get(0).getContainer_no());
+			importParam.put("order_no", list.get(0).getOrderno());
+			HarborCategory harborCategory = iEInvoiceFirst.getHarbor_category();
+			if (harborCategory != null) {
+				HarborCategoryReqInfo hr = new HarborCategoryReqInfo();
+				harborCategoryService.selectById(harborCategory.getId(), hr);
+				harborCategory = hr.getHarbor_category();
+				importParam.put("harbor_en_name", iEInvoiceFirst.getHarbor_category().getHarbor_name());
+				importParam.put("country_en_name", harborCategory.getCountry() == null ? "" : harborCategory
+						.getCountry().getEn_name());
+			}
+
+			Customer customer = iEInvoiceFirst.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+				importParam.put("address", customer.getAddress());
+			}
+			importParam.put("voucher_code", invoice_voucher_code);
+			Contract contract = iEInvoiceFirst.getContract();
+			if (contract != null) {
+				importParam.put("contract_voucher_code", contract.getVoucher_code());
+			}
+
+			// slipt 40 ký tự
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			String ba = Base64.getEncoder().encodeToString(data);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportVanningReportOut:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportOrderFormReport() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/indonhang.jasper");
+			String reportPath2 = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/indonhangS.jasper");
+
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			importParam.put("invoice_date",
+					ToolTimeCustomer.convertDateToString(iEInvoiceCrud.getInvoice_date(), "dd/MM/yyyy"));
+			importParam.put("license_plate", iEInvoiceCrud.getCar() == null ? "" : iEInvoiceCrud.getCar()
+					.getLicense_plate());
+			String customerName = iEInvoiceCrud.getCustomer().getCustomer_name();
+			// slipt 40 ký tự
+			String line1 = "";
+			String line2 = "";
+			if (customerName.length() > 40) {
+				String customer40 = customerName.substring(0, 40);
+				char last = customerName.charAt(40);
+				if (last != ' ') {
+					// tìm last space trong đoạn 40
+					int space = customer40.lastIndexOf(' ');
+					line1 = customer40.substring(0, space);
+					line2 = customerName.substring(space);
+				} else {
+					line1 = customer40;
+					line2 = customerName.substring(40);
+				}
+			} else {
+				line1 = customerName;
+			}
+			importParam.put("customer_name1", line1);
+			importParam.put("customer_name2", line2);
+			importParam.put("customer_code", iEInvoiceCrud.getCustomer().getCustomer_code());
+			importParam.put("note", iEInvoiceCrud.getNote());
+			List<IEOrderFormReport> listData = new ArrayList<>();
+			iEInvoiceService.selectOrderFormReport(iEInvoiceCrud.getId(), listData);
+			for (IEOrderFormReport p : listData) {
+				BatchReqInfo br = new BatchReqInfo();
+				batchService.selectByCode(p.getBatch_code(), br);
+				if (br.getBatch() != null) {
+					p.setManufacture_date(br.getBatch().getManufacture_date());
+				}
+			}
+			importParam.put("list_data", listData);
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			List<byte[]> listByte = new ArrayList<>();
+			listByte.add(data);
+			JasperPrint jasperPrint2 = JasperFillManager.fillReport(reportPath2, importParam, new JREmptyDataSource());
+			byte[] data2 = JasperExportManager.exportReportToPdf(jasperPrint2);
+			listByte.add(data2);
+			byte[] lastData = mergePDF(listByte);
+			String ba = Base64.getEncoder().encodeToString(lastData);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportOrderFormReport:" + e.getMessage(), e);
+		}
+
+	}
+
+	private void exportIEExportReport() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			String reportPath = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/phieuxuatkho.jasper");
+			String reportPath2 = FacesContext.getCurrentInstance().getExternalContext()
+					.getRealPath("/resources/reports/ieinvocie/biennhanhanghoa.jasper");
+			Map<String, Object> importParam = new HashMap<String, Object>();
+			Locale locale = new Locale("vi", "VI");
+			importParam.put(JRParameter.REPORT_LOCALE, locale);
+			importParam
+					.put("logo",
+							FacesContext.getCurrentInstance().getExternalContext()
+									.getRealPath("/resources/gfx/lixco_logo.png"));
+			List<IEExportReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEExportReport(iEInvoiceCrud.getId(), list);
+
+			importParam.put("list_data", list);
+			Date invoiceDate = iEInvoiceCrud.getInvoice_date();
+			importParam.put("voucher_code", iEInvoiceCrud.getVoucher_code());
+			int day = ToolTimeCustomer.getDayM(invoiceDate);
+			int month = ToolTimeCustomer.getMonthM(invoiceDate);
+			int year = ToolTimeCustomer.getYearM(invoiceDate);
+			importParam.put("day", day);
+			importParam.put("month", month);
+			importParam.put("year", year);
+			importParam.put("department_name", iEInvoiceCrud.getDepartment_name());
+			importParam.put("warehouse_name", "LIX");
+			Car car = iEInvoiceCrud.getCar();
+			importParam.put("license_plate", car == null ? "" : car.getLicense_plate());
+
+			Customer customer = iEInvoiceCrud.getCustomer();
+			if (customer != null) {
+				importParam.put("customer_name", customer.getCustomer_name());
+			}
+			// tổng thùng
+			double totalQuantityExport = 0.0;
+			double totalAmount = 0;
+			double totalBox = 0;
+			for (IEExportReport ie : list) {
+				// số lượng và tổng tiền
+				totalQuantityExport = BigDecimal.valueOf(totalQuantityExport)
+						.add(BigDecimal.valueOf(ie.getQuantity_export())).doubleValue();
+
+				totalAmount = BigDecimal.valueOf(totalAmount).add(BigDecimal.valueOf(ie.getTotal_amount()))
+						.doubleValue();
+
+				double box = BigDecimal.valueOf(ie.getQuantity_export())
+						.divide(BigDecimal.valueOf(ie.getSpecification()), MathContext.DECIMAL32).doubleValue();
+
+				totalBox = BigDecimal.valueOf(totalBox).add(BigDecimal.valueOf(box)).doubleValue();
+			}
+
+			importParam.put("total_quantity", totalQuantityExport);
+			importParam.put("total_amount", totalAmount);
+			importParam.put("words_total_amount", ConvertNumberToText.docSo(totalAmount, "ĐỒNG"));
+			JasperPrint jasperPrint = JasperFillManager.fillReport(reportPath, importParam, new JREmptyDataSource());
+			byte[] data = JasperExportManager.exportReportToPdf(jasperPrint);
+			List<byte[]> listByte = new ArrayList<>();
+			listByte.add(data);
+			importParam.put("total_box", totalBox);
+			JasperPrint jasperPrint2 = JasperFillManager.fillReport(reportPath2, importParam, new JREmptyDataSource());
+			byte[] data2 = JasperExportManager.exportReportToPdf(jasperPrint2);
+			listByte.add(data2);
+			byte[] lastData = mergePDF(listByte);
+			String ba = Base64.getEncoder().encodeToString(lastData);
+			current.executeScript("utility.printPDF('" + ba + "')");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportIEExportReport:" + e.getMessage(), e);
+		}
+	}
+
+	public void exportExcel() {
+		try {
+			// if (reportTypeIEInVoiceSelect != null) {
+			// long id = reportTypeIEInVoiceSelect.getId();
+			// if(id==1){
+			// exportExcelRawIEInvoice();
+			// }
+			// }
+			if (iEInvoiceCrud != null && iEInvoiceCrud.getId() != 0) {
+				exportExcelRawIEInvoice();
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportExcel:" + e.getMessage(), e);
+		}
+	}
+
+	public void exportExcelList() {
+		try {
+			List<Long> idInvoices = new ArrayList<Long>();
+			int size = listIEInvoice.size();
+			for (int i = 0; i < size; i++) {
+				idInvoices.add(listIEInvoice.get(i).getId());
+			}
+			List<Object[]> datas = iEInvoiceService.selectAllExcel(idInvoices);
+			// xuat file excel.
+			if (datas.size() > 0) {
+				List<Object[]> results = new ArrayList<Object[]>();
+				Object[] title = { "IdPhieuXuat", "SoCT", "Ngay", "MaKH", "TenKH", "SoXe", "HTThanhToan", "MaNX",
+						"ChiChu", "LySoXuat", "BocXep", "SoHopDong", "HTLenHang", "NgayTauChay", "NgayTauDen",
+						"DueDate", "DaThanhToan", "DaGiaoHang", "TyGia", "BillNo", "MaToKhai", "CangXuat", "DonViTien",
+						"Reference_no", "shipped_per", "term_of_delivery", "shipping_mark", "Phi", "TenTaiXe",
+						"DiemGiaoHang", "DiemNhanHang", "IDChiTiet", "MaSP", "TenSp", "SL", "SoTienNT", "DonGiaNT",
+						"SoTienNTXK", "DonGia", "SoTien", "MaDH", "MaCont", "KichThuoc", "SoCont", "SoSeal", "MaLH",
+						"ND", "SoLuong(Thung)", "SoLuong(KG)" };
+				results.add(title);
+				for (Object[] it : datas) {
+					results.add(it);
+				}
+				ToolReport.printReportExcelRawXLSX(results, "don_xuat_khau");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportIEInvoiceListByContNoReport:" + e.getMessage(), e);
+		}
+	}
+
+	public void showDialogExportFileOutner() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			current.executeScript("PF('idlg3').show();");
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.showDialogExportFileOutner:" + e.getMessage(), e);
+		}
+	}
+
+	private void exportExcelRawIEInvoice() {
+		Notify notify = new Notify(FacesContext.getCurrentInstance());
+		try {
+			List<IEInvoiceReport> list = new ArrayList<>();
+			iEInvoiceService.selectIEInvoiceReport(iEInvoiceCrud.getId(), list);
+			if (list.size() > 0) {
+				List<Object[]> results = new ArrayList<Object[]>();
+				Object[] title = { "SỐ hóa đơn", "ngày", "địa chỉ", "điện thoại", "số hợp đồng", "htttoan",
+						"tên sản phẩm", "dvt", "số lượng ", "đơn giá(nt)", "thành tiền(nt)", "số tiền", "tỉ  giá",
+						"số tiền chữ", "số tiền usd" };
+				results.add(title);
+				Customer customer = iEInvoiceCrud.getCustomer();
+				String httoan = iEInvoiceCrud.getPayment_method().getMethod_name();
+				Contract contract = iEInvoiceCrud.getContract();
+				String contractVoucherCode = contract == null ? null : contract.getVoucher_code();
+				for (IEInvoiceReport it : list) {
+					double ex = BigDecimal.valueOf(iEInvoiceCrud.getExchange_rate())
+							.multiply(BigDecimal.valueOf(it.getForeign_unit_price())).doubleValue();
+					double totalAmount = BigDecimal.valueOf(ex).multiply(BigDecimal.valueOf(it.getQuantity_export()))
+							.doubleValue();
+					totalAmount = (double) MyMath.roundCustom(totalAmount, 3);
+					Object[] row = { Objects.toString(iEInvoiceCrud.getVoucher_code(), ""),
+							MyUtil.chuyensangStr(iEInvoiceCrud.getInvoice_date()),
+							customer.getAddress() == null ? "" : customer.getAddress(),
+							customer.getHome_phone() == null ? "" : customer.getHome_phone(),
+							contractVoucherCode == null ? "" : contractVoucherCode, httoan == null ? "" : httoan,
+							it.getProduct_name(), it.getUnit(), it.getQuantity_export(), it.getForeign_unit_price(),
+							it.getTotal_export_foreign_amount(), totalAmount, iEInvoiceCrud.getExchange_rate(), "", "" };
+					results.add(row);
+				}
+				Object[] rowLast = { "", "", "", "", "", "", "Tổng cộng", "", "", "", "", sumVND, "",
+						ConvertNumberToText.docSo(sumVND, "ĐỒNG"), NumberWordConverter.getMoneyIntoWords(sumUSDXK) };
+				results.add(rowLast);
+				String titleEx = "Hoa_don_xuat_khau_" + iEInvoiceCrud.getVoucher_code();
+				ToolReport.printReportExcelRaw(results, titleEx);
+			} else {
+				notify.message("Không có dữ liệu");
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.exportExcelRawIEInvoice:" + e.getMessage(), e);
+		}
+	}
+
+	private byte[] mergePDF(List<byte[]> pdfFilesAsByteArray) throws DocumentException, IOException {
+
+		ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+		Document document = null;
+		PdfCopy writer = null;
+		for (byte[] pdfByteArray : pdfFilesAsByteArray) {
+
+			try {
+				PdfReader reader = new PdfReader(pdfByteArray);
+				int numberOfPages = reader.getNumberOfPages();
+
+				if (document == null) {
+					document = new Document(reader.getPageSizeWithRotation(1));
+					writer = new PdfCopy(document, outStream); // new
+					document.open();
+				}
+				PdfImportedPage page;
+				for (int i = 0; i < numberOfPages;) {
+					++i;
+					page = writer.getImportedPage(reader, i);
+					writer.addPage(page);
+				}
+			} catch (Exception e) {
+			}
+
+		}
+		document.close();
+		outStream.close();
+		return outStream.toByteArray();
+
+	}
+
+	public void updateIEInvoiceDetail() {
+		try {
+
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.updateIEInvoiceDetail", e.getMessage(), e);
+		}
+	}
+
+	@Getter
+	@Setter
+	boolean chonhet = false;
+
+	public void selectIEInvoiceAll() {
+		try {
+			this.checkAll = false;
+			if (chonhet) {
+				List<Long> idIeInvoices = new ArrayList<Long>();
+				for (int i = 0; i < listIEInvoice.size(); i++) {
+					listIEInvoiceOut.add(listIEInvoice.get(i));
+					idIeInvoices.add(listIEInvoice.get(i).getId());
+					listIEInvoice.get(i).setCheck(true);
+				}
+				// load list chi tiết đơn hàng xuất xuất khẩu
+				listIEInvoiceDetailOut = new ArrayList<>();
+				iEInvoiceService.selectIEInvoideDetailByInvoices(idIeInvoices, listIEInvoiceDetailOut);
+				listIEInvoiceDetailSelectOut.addAll(listIEInvoiceDetailOut);
+			} else {
+				for (int i = 0; i < listIEInvoice.size(); i++) {
+					listIEInvoice.get(i).setCheck(true);
+				}
+				listIEInvoiceOut.clear();
+				listIEInvoiceDetailOut = new ArrayList<>();
+				listIEInvoiceDetailSelectOut.clear();
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.selectIEInvoice", e.getMessage(), e);
+		}
+	}
+
+	public void selectIEInvoice(boolean checkbox, IEInvoice item) {
+		try {
+			this.checkAll = false;
+			if (checkbox) {
+				listIEInvoiceOut.add(item);
+				// load list chi tiết đơn hàng xuất xuất khẩu
+				listIEInvoiceDetailOut = new ArrayList<>();
+				iEInvoiceService.selectIEInvoideDetailByInvoice(item.getId(), listIEInvoiceDetailOut);
+				for (IEInvoiceDetail d : listIEInvoiceDetailOut) {
+					d.setIe_invoice(item);
+
+				}
+				listIEInvoiceDetailSelectOut.addAll(listIEInvoiceDetailOut);
+			} else {
+				// remove detail chứa hóa đơn đó
+				Iterator<IEInvoiceDetail> itr = listIEInvoiceDetailSelectOut.iterator();
+				while (itr.hasNext()) {
+					try {
+						IEInvoiceDetail x = (IEInvoiceDetail) itr.next();
+						if (x.getIe_invoice().equals(item))
+							itr.remove();
+					} catch (Exception e) {
+					}
+
+				}
+				listIEInvoiceOut.remove(item);
+				listIEInvoiceDetailOut = new ArrayList<>();
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.selectIEInvoice", e.getMessage(), e);
+		}
+	}
+
+	public void changeDataIEInvoice() {
+		this.changeIEInvoice = true;
+	}
+
+	public void changeExchangeRate() {
+		try {
+			changeIEInvoice = true;
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.changeExchangeRate:" + e.getMessage(), e);
+		}
+	}
+
+	public void changeCustomerIEInvoice() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			changeIEInvoice = true;
+			// khi thay đổi khách hàng
+			if (iEInvoiceCrud != null) {
+				Customer customer = iEInvoiceCrud.getCustomer();
+				Contract contract = iEInvoiceCrud.getContract();
+				if (customer != null && contract != null) {
+					ContractReqInfo t = new ContractReqInfo();
+					contractService.selectById(contract.getId(), t);
+					Contract contractTrans = t.getContract();
+					// nếu khách hàng trong hợp đồng và khách hàng trên đơn hàng
+					// khách nhau thì không được thay đổi
+					if (!customer.equals(contractTrans.getCustomer())) {
+						current.executeScript("swaldesigntimer('Cảnh báo!', 'Khách hàng không thuộc hợp đồng:"
+								+ contractTrans.getVoucher_code() + "','warning',2000);");
+						iEInvoiceCrud.setCustomer(null);
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.changeCustomerIEInvoice:", e.getMessage(), e);
+		}
+	}
+
+	public void changeContractIEInvoice() {
+		try {
+			changeIEInvoice = true;
+			// khi thay đổi contract
+			if (iEInvoiceCrud != null) {
+				Contract contract = iEInvoiceCrud.getContract();
+				if (contract != null) {
+					ContractReqInfo t = new ContractReqInfo();
+					contractService.selectById(contract.getId(), t);
+					Contract contractTrans = t.getContract();
+					// thay đổi luôn khách hàng trên đơn hàng cho tương xứng
+					iEInvoiceCrud.setCustomer(contractTrans.getCustomer());
+				}
+			}
+		} catch (Exception e) {
+			logger.error("IEInvoiceBean.changeCustomerIEInvoice", e.getMessage(), e);
+		}
+	}
+
+	// public void selectIEInvoiceDetail(boolean checkbox,IEInvoiceDetail item){
+	// try{
+	// if(checkbox){
+	// listIEInvoiceDetailSelectOut.add(item);
+	// if(item.)
+	// }else{
+	// listIEInvoiceDetailSelectOut.remove(item);
+	// }
+	// }catch (Exception e) {
+	// logger.error("IEInvoiceBean.selectIEInvoiceDetail",e.getMessage(),e);
+	// }
+	// }
+	@Inject
+	private InvoiceTempService invoiceTempService;
+	@Getter
+	@Setter
+	private IEInvoice selectedIEInvoice;
+
+	public void chuyenSangPhieuXuatTam() {
+		try {
+			if (iEInvoiceSelect == null) {
+				FacesContext.getCurrentInstance().addMessage(null,
+						new FacesMessage(FacesMessage.SEVERITY_WARN, "Cảnh báo", "Chưa chọn đơn hàng để chuyển."));
+				return;
+			}
+
+			// Kiểm tra đã được chuyển chưa
+			boolean daChuyen = invoiceTempService.existsInvoiceTempByIEInvoiceId(iEInvoiceSelect.getId());
+			if (daChuyen) {
+				FacesContext.getCurrentInstance().addMessage(
+						null,
+						new FacesMessage(FacesMessage.SEVERITY_WARN, "Cảnh báo",
+								"Đơn hàng này đã được chuyển sang phiếu xuất tạm."));
+				return;
+			}
+
+			IEInvoice invoiceFull = invoiceTempService.findByIdWithDetailsTemp(iEInvoiceSelect.getId());
+
+			// 2. Map sang InvoiceTemp
+			InvoiceTemp invoiceTemp = new InvoiceTemp();
+			invoiceTemp.setVoucher_code(invoiceFull.getVoucher_code());
+			invoiceTemp.setCreated_date(invoiceFull.getCreated_date());
+			invoiceTemp.setCustomer(invoiceFull.getCustomer());
+			invoiceTemp.setCreated_by(invoiceFull.getCreated_by());
+			invoiceTemp.setCreated_by_id(invoiceFull.getCreated_by_id());
+			invoiceTemp.setStatus(0);
+			invoiceTemp.setIe_categories(invoiceFull.getIe_categories());
+			invoiceTemp.setWarehouse(invoiceFull.getWarehouse());
+			invoiceTemp.setCar(invoiceFull.getCar());
+			invoiceTemp.setInvoice_temp_date(invoiceFull.getInvoice_date());
+			invoiceTemp.setIeInvoice(invoiceFull);
+
+			// 3. Map chi tiết
+			List<InvoiceDetailTemp> detailTemps = new ArrayList<>();
+			if (invoiceFull.getList_ie_invoice_detail() != null && !invoiceFull.getList_ie_invoice_detail().isEmpty()) {
+				for (IEInvoiceDetail detail : invoiceFull.getList_ie_invoice_detail()) {
+					InvoiceDetailTemp detailTemp = new InvoiceDetailTemp();
+					detailTemp.setProductdh_code(detail.getProduct().getProduct_code());
+					detailTemp.setProductdh_name(detail.getProduct().getProduct_name());
+					detailTemp.setQuantity(detail.getQuantity());
+					detailTemp.setProduct(detail.getProduct());
+					detailTemp.setCreated_by(detail.getCreated_by());
+					detailTemp.setCreated_date(detail.getCreated_date());
+					detailTemp.setTotal(detail.getTotal_amount());
+					detailTemp.setUnit_price(detail.getUnit_price());
+					detailTemps.add(detailTemp);
+				}
+			}
+
+			// 4. Persist
+			invoiceTempService.createInvoiceTemp(invoiceTemp, detailTemps);
+
+			FacesContext.getCurrentInstance().addMessage(null,
+					new FacesMessage(FacesMessage.SEVERITY_INFO, "Thành công", "Đã chuyển sang phiếu xuất tạm."));
+		} catch (Exception e) {
+			FacesContext.getCurrentInstance().addMessage(null,
+					new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Không thể chuyển sang phiếu xuất tạm."));
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	protected Logger getLogger() {
+		return logger;
+	}
+
+	public List<PaymentMethod> getListPaymentMethod() {
+		return listPaymentMethod;
+	}
+
+	public void setListPaymentMethod(List<PaymentMethod> listPaymentMethod) {
+		this.listPaymentMethod = listPaymentMethod;
+	}
+
+	public IEInvoice getiEInvoiceCrud() {
+		return iEInvoiceCrud;
+	}
+
+	public void setiEInvoiceCrud(IEInvoice iEInvoiceCrud) {
+		this.iEInvoiceCrud = iEInvoiceCrud;
+	}
+
+	public IEInvoice getiEInvoiceSelect() {
+		return iEInvoiceSelect;
+	}
+
+	public void setiEInvoiceSelect(IEInvoice iEInvoiceSelect) {
+		this.iEInvoiceSelect = iEInvoiceSelect;
+	}
+
+	public List<IEInvoice> getListIEInvoice() {
+		return listIEInvoice;
+	}
+
+	public void setListIEInvoice(List<IEInvoice> listIEInvoice) {
+		this.listIEInvoice = listIEInvoice;
+	}
+
+	public IEInvoiceDetail getiEInvoiceDetailCrud() {
+		return iEInvoiceDetailCrud;
+	}
+
+	public void setiEInvoiceDetailCrud(IEInvoiceDetail iEInvoiceDetailCrud) {
+		this.iEInvoiceDetailCrud = iEInvoiceDetailCrud;
+	}
+
+	public IEInvoiceDetail getiEInvoiceDetailSelect() {
+		return iEInvoiceDetailSelect;
+	}
+
+	public void setiEInvoiceDetailSelect(IEInvoiceDetail iEInvoiceDetailSelect) {
+		this.iEInvoiceDetailSelect = iEInvoiceDetailSelect;
+	}
+
+	public List<IEInvoiceDetail> getListIEInvoiceDetail() {
+		return listIEInvoiceDetail;
+	}
+
+	public void setListIEInvoiceDetail(List<IEInvoiceDetail> listIEInvoiceDetail) {
+		this.listIEInvoiceDetail = listIEInvoiceDetail;
+	}
+
+	public Date getFromDateSearch() {
+		return fromDateSearch;
+	}
+
+	public void setFromDateSearch(Date fromDateSearch) {
+		this.fromDateSearch = fromDateSearch;
+	}
+
+	public Date getToDateSearch() {
+		return toDateSearch;
+	}
+
+	public void setToDateSearch(Date toDateSearch) {
+		this.toDateSearch = toDateSearch;
+	}
+
+	public Customer getCustomerSearch() {
+		return customerSearch;
+	}
+
+	public void setCustomerSearch(Customer customerSearch) {
+		this.customerSearch = customerSearch;
+	}
+
+	public String getInvoiceCodeSearch() {
+		return invoiceCodeSearch;
+	}
+
+	public void setInvoiceCodeSearch(String invoiceCodeSearch) {
+		this.invoiceCodeSearch = invoiceCodeSearch;
+	}
+
+	public String getVoucherCodeSearch() {
+		return voucherCodeSearch;
+	}
+
+	public void setVoucherCodeSearch(String voucherCodeSearch) {
+		this.voucherCodeSearch = voucherCodeSearch;
+	}
+
+	public Product getProductSearch() {
+		return productSearch;
+	}
+
+	public void setProductSearch(Product productSearch) {
+		this.productSearch = productSearch;
+	}
+
+	public IECategories getiECategoriesSearch() {
+		return iECategoriesSearch;
+	}
+
+	public void setiECategoriesSearch(IECategories iECategoriesSearch) {
+		this.iECategoriesSearch = iECategoriesSearch;
+	}
+
+	public String getContractVoucherCode() {
+		return contractVoucherCode;
+	}
+
+	public void setContractVoucherCode(String contractVoucherCode) {
+		this.contractVoucherCode = contractVoucherCode;
+	}
+
+	public int getPageSize() {
+		return pageSize;
+	}
+
+	public void setPageSize(int pageSize) {
+		this.pageSize = pageSize;
+	}
+
+	public NavigationInfo getNavigationInfo() {
+		return navigationInfo;
+	}
+
+	public void setNavigationInfo(NavigationInfo navigationInfo) {
+		this.navigationInfo = navigationInfo;
+	}
+
+	public List<Integer> getListRowPerPage() {
+		return listRowPerPage;
+	}
+
+	public void setListRowPerPage(List<Integer> listRowPerPage) {
+		this.listRowPerPage = listRowPerPage;
+	}
+
+	public FormatHandler getFormatHandler() {
+		return formatHandler;
+	}
+
+	public void setFormatHandler(FormatHandler formatHandler) {
+		this.formatHandler = formatHandler;
+	}
+
+	public IProductService getProductService() {
+		return productService;
+	}
+
+	public void setProductService(IProductService productService) {
+		this.productService = productService;
+	}
+
+	public List<Currency> getListCurrency() {
+		return listCurrency;
+	}
+
+	public void setListCurrency(List<Currency> listCurrency) {
+		this.listCurrency = listCurrency;
+	}
+
+	public List<FormUpGoods> getListFormUpGoods() {
+		return listFormUpGoods;
+	}
+
+	public void setListFormUpGoods(List<FormUpGoods> listFormUpGoods) {
+		this.listFormUpGoods = listFormUpGoods;
+	}
+
+	public double getSumUSD() {
+		return sumUSD;
+	}
+
+	public void setSumUSD(double sumUSD) {
+		this.sumUSD = sumUSD;
+	}
+
+	public double getSumUSDXK() {
+		return sumUSDXK;
+	}
+
+	public void setSumUSDXK(double sumUSDXK) {
+		this.sumUSDXK = sumUSDXK;
+	}
+
+	public double getSumVND() {
+		return sumVND;
+	}
+
+	public double getQuantityContract() {
+		return quantityContract;
+	}
+
+	public void setQuantityContract(double quantityContract) {
+		this.quantityContract = quantityContract;
+	}
+
+	public double getQuantityContractProcessed() {
+		return quantityContractProcessed;
+	}
+
+	public void setQuantityContractProcessed(double quantityContractProcessed) {
+		this.quantityContractProcessed = quantityContractProcessed;
+	}
+
+	public double getQuantityBatchInvCurr() {
+		return quantityBatchInvCurr;
+	}
+
+	public void setQuantityBatchInvCurr(double quantityBatchInvCurr) {
+		this.quantityBatchInvCurr = quantityBatchInvCurr;
+	}
+
+	public double getQuantityBatchInvCal() {
+		return quantityBatchInvCal;
+	}
+
+	public void setQuantityBatchInvCal(double quantityBatchInvCal) {
+		this.quantityBatchInvCal = quantityBatchInvCal;
+	}
+
+	public List<ReportTypeIEInVoice> getListSelectReport() {
+		return listSelectReport;
+	}
+
+	public void setListSelectReport(List<ReportTypeIEInVoice> listSelectReport) {
+		this.listSelectReport = listSelectReport;
+	}
+
+	public ReportTypeIEInVoice getReportTypeIEInVoiceSelect() {
+		return reportTypeIEInVoiceSelect;
+	}
+
+	public void setReportTypeIEInVoiceSelect(ReportTypeIEInVoice reportTypeIEInVoiceSelect) {
+		this.reportTypeIEInVoiceSelect = reportTypeIEInVoiceSelect;
+	}
+
+	public List<ReportTypeIEInVoice> getListSelectExcel() {
+		return listSelectExcel;
+	}
+
+	public void setListSelectExcel(List<ReportTypeIEInVoice> listSelectExcel) {
+		this.listSelectExcel = listSelectExcel;
+	}
+
+	public ReportTypeIEInVoice getReportTypeExcelSelect() {
+		return reportTypeExcelSelect;
+	}
+
+	public void setReportTypeExcelSelect(ReportTypeIEInVoice reportTypeExcelSelect) {
+		this.reportTypeExcelSelect = reportTypeExcelSelect;
+	}
+
+	public List<IEInvoiceDetail> getListIEInvoiceDetailOut() {
+		return listIEInvoiceDetailOut;
+	}
+
+	public void setListIEInvoiceDetailOut(List<IEInvoiceDetail> listIEInvoiceDetailOut) {
+		this.listIEInvoiceDetailOut = listIEInvoiceDetailOut;
+	}
+
+	public List<IEInvoiceDetail> getListIEInvoiceDetailSelectOut() {
+		return listIEInvoiceDetailSelectOut;
+	}
+
+	public void setListIEInvoiceDetailSelectOut(List<IEInvoiceDetail> listIEInvoiceDetailSelectOut) {
+		this.listIEInvoiceDetailSelectOut = listIEInvoiceDetailSelectOut;
+	}
+
+	public List<IEInvoice> getListIEInvoiceOut() {
+		return listIEInvoiceOut;
+	}
+
+	public void setListIEInvoiceOut(List<IEInvoice> listIEInvoiceOut) {
+		this.listIEInvoiceOut = listIEInvoiceOut;
+	}
+
+	public List<ReportTypeIEInVoice> getListReportPdfOut() {
+		return listReportPdfOut;
+	}
+
+	public void setListReportPdfOut(List<ReportTypeIEInVoice> listReportPdfOut) {
+		this.listReportPdfOut = listReportPdfOut;
+	}
+
+	public ReportTypeIEInVoice getReportPdfOutSelect() {
+		return reportPdfOutSelect;
+	}
+
+	public void setReportPdfOutSelect(ReportTypeIEInVoice reportPdfOutSelect) {
+		this.reportPdfOutSelect = reportPdfOutSelect;
+	}
+
+	public List<ReportTypeIEInVoice> getListReportHarborOut() {
+		return listReportHarborOut;
+	}
+
+	public void setListReportHarborOut(List<ReportTypeIEInVoice> listReportHarborOut) {
+		this.listReportHarborOut = listReportHarborOut;
+	}
+
+	public ReportTypeIEInVoice getReportHarborOutSelect() {
+		return reportHarborOutSelect;
+	}
+
+	public void setReportHarborOutSelect(ReportTypeIEInVoice reportHarborOutSelect) {
+		this.reportHarborOutSelect = reportHarborOutSelect;
+	}
+
+	public Car getCarCrud() {
+		return carCrud;
+	}
+
+	public void setCarCrud(Car carCrud) {
+		this.carCrud = carCrud;
+	}
+
+	public Car getCarSelect() {
+		return carSelect;
+	}
+
+	public void setCarSelect(Car carSelect) {
+		this.carSelect = carSelect;
+	}
+
+	public List<Car> getListCar() {
+		return listCar;
+	}
+
+	public void setListCar(List<Car> listCar) {
+		this.listCar = listCar;
+	}
+
+	public List<CarType> getListCarType() {
+		return listCarType;
+	}
+
+	public void setListCarType(List<CarType> listCarType) {
+		this.listCarType = listCarType;
+	}
+
+	public List<CarOwner> getListCarOwner() {
+		return listCarOwner;
+	}
+
+	public void setListCarOwner(List<CarOwner> listCarOwner) {
+		this.listCarOwner = listCarOwner;
+	}
+
+	public CarType getCarTypeSearch() {
+		return carTypeSearch;
+	}
+
+	public void setCarTypeSearch(CarType carTypeSearch) {
+		this.carTypeSearch = carTypeSearch;
+	}
+
+	public CarOwner getCarOwnerSearch() {
+		return carOwnerSearch;
+	}
+
+	public void setCarOwnerSearch(CarOwner carOwnerSearch) {
+		this.carOwnerSearch = carOwnerSearch;
+	}
+
+	public String getLicensePlateSearch() {
+		return licensePlateSearch;
+	}
+
+	public void setLicensePlateSearch(String licensePlateSearch) {
+		this.licensePlateSearch = licensePlateSearch;
+	}
+
+	public String getPhoneNumberSearch() {
+		return phoneNumberSearch;
+	}
+
+	public void setPhoneNumberSearch(String phoneNumberSearch) {
+		this.phoneNumberSearch = phoneNumberSearch;
+	}
+
+	public boolean isCheckAll() {
+		return checkAll;
+	}
+
+	public void setCheckAll(boolean checkAll) {
+		this.checkAll = checkAll;
+	}
+
+	public List<ProcessContractIEInvoice> getListProcessContractIEInvocie() {
+		return listProcessContractIEInvocie;
+	}
+
+	public void setListProcessContractIEInvocie(List<ProcessContractIEInvoice> listProcessContractIEInvocie) {
+		this.listProcessContractIEInvocie = listProcessContractIEInvocie;
+	}
+
+	public List<ProcessContractIEInvoice> getListProcessContractIEInvocieFilter() {
+		return listProcessContractIEInvocieFilter;
+	}
+
+	public void setListProcessContractIEInvocieFilter(List<ProcessContractIEInvoice> listProcessContractIEInvocieFilter) {
+		this.listProcessContractIEInvocieFilter = listProcessContractIEInvocieFilter;
+	}
+
+	public boolean isChangeIEInvoice() {
+		return changeIEInvoice;
+	}
+
+	public void setChangeIEInvoice(boolean changeIEInvoice) {
+		this.changeIEInvoice = changeIEInvoice;
+	}
+
+	public List<Stevedore> getListStevedore() {
+		return listStevedore;
+	}
+
+	public void setListStevedore(List<Stevedore> listStevedore) {
+		this.listStevedore = listStevedore;
+	}
+
+	public double[] getArrValueContract() {
+		return arrValueContract;
+	}
+
+	public void setArrValueContract(double[] arrValueContract) {
+		this.arrValueContract = arrValueContract;
+	}
+
+}

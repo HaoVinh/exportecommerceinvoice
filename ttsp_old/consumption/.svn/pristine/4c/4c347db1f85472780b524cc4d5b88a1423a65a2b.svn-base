@@ -1,0 +1,320 @@
+package lixco.com.service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+import javax.annotation.Resource;
+import javax.ejb.SessionContext;
+import javax.ejb.Stateless;
+import javax.ejb.TransactionAttribute;
+import javax.ejb.TransactionAttributeType;
+import javax.ejb.TransactionManagement;
+import javax.ejb.TransactionManagementType;
+import javax.inject.Inject;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.ParameterExpression;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+
+import lixco.com.commom_ejb.HolderParser;
+import lixco.com.commom_ejb.JsonParserUtil;
+import lixco.com.entity.Car;
+import lixco.com.entity.CarOwner;
+import lixco.com.entity.CarType;
+import lixco.com.interfaces.ICarService;
+import lixco.com.reqInfo.CarReqInfo;
+
+import org.jboss.logging.Logger;
+
+import com.google.gson.JsonObject;
+
+@Stateless
+@TransactionManagement(value = TransactionManagementType.CONTAINER)
+public class CarService implements ICarService {
+	@Inject
+	private EntityManager em;
+	@Inject
+	private Logger logger;
+	@Resource
+	private SessionContext ct;
+
+	@Override
+	public lixco.com.reqfox.Car getCarFoxPro(long carId) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<lixco.com.reqfox.Car> cq = cb.createQuery(lixco.com.reqfox.Car.class);
+			Root<Car> root = cq.from(Car.class);
+			Join<Car, CarOwner> carOwn_ = root.join("car_owner", JoinType.LEFT);
+			Join<Car, CarType> carType_ = root.join("car_type", JoinType.LEFT);
+			// Car(String soxe, String tenxe, String nhomxe, String masochuxe,
+			// String dienthoai,
+			cq.select(
+					cb.construct(lixco.com.reqfox.Car.class, root.get("id"), root.get("license_plate"),
+							root.get("driver"), carType_.get("code"), carOwn_.get("code"), root.get("phone_number"),
+							root.get("idfox"))).where(cb.equal(root.get("id"), carId));
+			TypedQuery<lixco.com.reqfox.Car> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			// logger.error("CarService.getCarFoxPro:"+e.getMessage(),e);
+		}
+		return null;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int selectAll(List<Car> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Car> cq = cb.createQuery(Car.class);
+			Root<Car> root = cq.from(Car.class);
+			cq.select(root);
+			TypedQuery<Car> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("CarService.selectAll:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int insert(CarReqInfo t) {
+		int res = -1;
+		try {
+			Car p = t.getCar();
+			if (p != null) {
+				em.persist(p);
+				if (p.getId() > 0) {
+					res = 0;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("CarService.insert:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int update(CarReqInfo t) {
+		int res = -1;
+		try {
+			Car p = t.getCar();
+			if (p != null) {
+				p = em.merge(p);
+				if (p != null) {
+					selectById(p.getId(), t);
+					res = 0;
+				}
+			}
+		} catch (Exception e) {
+			logger.error("CarService.update:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int selectById(long id, CarReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Car> cq = cb.createQuery(Car.class);
+			Root<Car> root = cq.from(Car.class);
+			root.fetch("car_owner", JoinType.LEFT);
+			root.fetch("car_type", JoinType.LEFT);
+			cq.select(root).where(cb.equal(root.get("id"), id));
+			TypedQuery<Car> query = em.createQuery(cq);
+			t.setCar(query.getSingleResult());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("CarService.selectById:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public Car selectById(long id) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Car> cq = cb.createQuery(Car.class);
+			Root<Car> root = cq.from(Car.class);
+			root.fetch("car_owner", JoinType.LEFT);
+			root.fetch("car_type", JoinType.LEFT);
+			cq.select(root).where(cb.equal(root.get("id"), id));
+			TypedQuery<Car> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			logger.error("CarService.selectById:" + e.getMessage(), e);
+		}
+		return null;
+	}
+
+	@Override
+	public int deleteById(long id) {
+		int res = -1;
+		try {
+			// JQPL
+			Query query = em.createQuery("delete from Car where id=:id ");
+			query.setParameter("id", id);
+			res = query.executeUpdate();
+		} catch (Exception e) {
+			logger.error("CarService.deleteById:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int search(String json, List<Car> list) {
+		int res = -1;
+		try {/*
+			 * { car_info:{car_owner_id:0,car_type_id:0,license_plate:
+			 * '',phone_number:''}, page:{page_index:0, page_size:0}}
+			 */
+			JsonObject j = JsonParserUtil.getGson().fromJson(json, JsonObject.class);
+			HolderParser hCarOwnerId = JsonParserUtil.getValueNumber(j.get("car_info"), "car_owner_id", null);
+			HolderParser hCarTypeId = JsonParserUtil.getValueNumber(j.get("car_info"), "car_type_id", null);
+			HolderParser hLicensePlate = JsonParserUtil.getValueString(j.get("car_info"), "license_plate", null);
+			HolderParser hPhoneNumber = JsonParserUtil.getValueString(j.get("car_info"), "phone_number", null);
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Car> cq = cb.createQuery(Car.class);
+			Root<Car> root_ = cq.from(Car.class);
+			root_.fetch("car_owner", JoinType.LEFT);
+			root_.fetch("car_type", JoinType.LEFT);
+			List<Predicate> predicates = new ArrayList<Predicate>();
+			ParameterExpression<Long> pCarOwnerId = cb.parameter(Long.class);
+			ParameterExpression<Long> pCarTypeId = cb.parameter(Long.class);
+			ParameterExpression<String> pLicensePlate = cb.parameter(String.class);
+			ParameterExpression<String> pLicensePlateLike = cb.parameter(String.class);
+			ParameterExpression<String> pPhoneNumber = cb.parameter(String.class);
+			ParameterExpression<String> pPhoneNumberLike = cb.parameter(String.class);
+			Predicate dis = cb.disjunction();
+			dis.getExpressions().add(cb.equal(pCarOwnerId, 0));
+			dis.getExpressions().add(cb.equal(root_.get("car_owner").get("id"), pCarOwnerId));
+			predicates.add(dis);
+			Predicate dis1 = cb.disjunction();
+			dis1.getExpressions().add(cb.equal(pCarTypeId, 0));
+			dis1.getExpressions().add(cb.equal(root_.get("car_type").get("id"), pCarTypeId));
+			predicates.add(dis1);
+			Predicate dis2 = cb.disjunction();
+			dis2.getExpressions().add(cb.isNull(pLicensePlate));
+			dis2.getExpressions().add(cb.equal(pLicensePlate, ""));
+			dis2.getExpressions().add(cb.like(root_.get("license_plate"), pLicensePlateLike));
+			predicates.add(dis2);
+			Predicate dis3 = cb.disjunction();
+			dis3.getExpressions().add(cb.isNull(pPhoneNumber));
+			dis3.getExpressions().add(cb.equal(pPhoneNumber, ""));
+			dis3.getExpressions().add(cb.like(root_.get("phone_number"), pPhoneNumberLike));
+			predicates.add(dis3);
+			cq.select(root_).where(cb.and(predicates.toArray(new Predicate[0])));
+			TypedQuery<Car> query = em.createQuery(cq);
+			query.setParameter(pCarOwnerId, Long.parseLong(Objects.toString(hCarOwnerId.getValue(), "0")));
+			query.setParameter(pCarTypeId, Long.parseLong(Objects.toString(hCarTypeId.getValue(), "0")));
+			query.setParameter(pLicensePlate, Objects.toString(hLicensePlate.getValue(), null));
+			query.setParameter(pLicensePlateLike, "%" + Objects.toString(hLicensePlate.getValue() + "%", null));
+			query.setParameter(pPhoneNumber, Objects.toString(hPhoneNumber.getValue(), null));
+			query.setParameter(pPhoneNumberLike, "%" + Objects.toString(hPhoneNumber.getValue() + "%", null));
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("CarService.search:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int selectByLicensePlate(String licensePlate, CarReqInfo t) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Car> cq = cb.createQuery(Car.class);
+			Root<Car> root = cq.from(Car.class);
+			cq.select(root).where(cb.equal(root.get("license_plate"), licensePlate));
+			TypedQuery<Car> query = em.createQuery(cq);
+			t.setCar(query.getSingleResult());
+			res = 0;
+		} catch (Exception e) {
+			// logger.error("CarService.selectByLicensePlate:"+e.getMessage(),e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int complete(String text, List<Car> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Car> cq = cb.createQuery(Car.class);
+			Root<Car> root = cq.from(Car.class);
+			cq.select(cb.construct(Car.class, root.get("id"), root.get("license_plate"), root.get("driver"))).where(
+					cb.like(root.get("license_plate"), "%" + text + "%"), cb.equal(root.get("disable"), false));
+			TypedQuery<Car> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("CarService.complete:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public int complete2(String text, List<Car> list) {
+		int res = -1;
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Car> cq = cb.createQuery(Car.class);
+			Root<Car> root = cq.from(Car.class);
+			Join<Car, CarOwner> carOwner_ = root.join("car_owner", JoinType.INNER);
+			cq.select(
+					cb.construct(Car.class, root.get("id"), root.get("license_plate"), carOwner_.get("id"),
+							carOwner_.get("name"))).where(cb.like(root.get("license_plate"), "%" + text + "%"),
+					cb.equal(root.get("disable"), false));
+			TypedQuery<Car> query = em.createQuery(cq);
+			list.addAll(query.getResultList());
+			res = 0;
+		} catch (Exception e) {
+			logger.error("CarService.complete2:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	public int updateIdFox(lixco.com.reqfox.Car car) {
+		int res = -1;
+		try {
+			Query query = em.createQuery("update Car set idfox=:f where id=:id ");
+			query.setParameter("f", car.getIdfox());
+			query.setParameter("id", car.getId());
+			res = query.executeUpdate();
+		} catch (Exception e) {
+			logger.error("CarService.updateIdFox:" + e.getMessage(), e);
+		}
+		return res;
+	}
+
+	@Override
+	@TransactionAttribute(TransactionAttributeType.SUPPORTS)
+	public Car selectByCode(String licensePlate) {
+		try {
+			CriteriaBuilder cb = em.getCriteriaBuilder();
+			CriteriaQuery<Car> cq = cb.createQuery(Car.class);
+			Root<Car> root = cq.from(Car.class);
+			cq.select(root).where(cb.equal(root.get("license_plate"), licensePlate));
+			TypedQuery<Car> query = em.createQuery(cq);
+			return query.getSingleResult();
+		} catch (Exception e) {
+			// logger.error("CarService.selectByLicensePlate:"+e.getMessage(),e);
+		}
+		return null;
+	}
+}

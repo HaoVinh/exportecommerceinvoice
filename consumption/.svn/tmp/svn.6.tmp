@@ -1,0 +1,2309 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml"
+	xmlns:a4j="http://richfaces.org/a4j">
+	<ui:define name="content">
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Đơn
+			hàng</h3>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<p:remoteCommand name="confirmChangePricingAndPromotion"
+					process="@this"
+					action="#{orderLixBean.confirmChangePricingAndPromotion()}"
+					update="menuformid:tabview1:ctdgia,menuformid:tabview1:ctkmai" />
+				<p:remoteCommand name="confirmChangePricing"
+					process="@this,menuformid:tabview1:tab2real"
+					action="#{orderLixBean.confirmChangePricing()}"
+					update="menuformid:tabview1:ctdgia,menuformid:tabview1:ctkmai" />
+				<p:remoteCommand name="confirmChangePromotion"
+					process="@this,menuformid:tabview1:tab2real"
+					action="#{orderLixBean.confirmChangePromotion()}"
+					update="menuformid:tabview1:ctdgia,menuformid:tabview1:ctkmai" />
+
+				<p:tabView id="tabview1" styleClass="clearfix label12 tabview_lix">
+					<p:ajax event="tabChange" listener="#{orderLixBean.onTabChange}" />
+					<p:tab id="tab2" title="Chi tiết đơn hàng">
+						<span
+							style="position: absolute; right: 14px; top: 10px; z-index: 1;">
+							<p:commandLink title="Prev"
+								update="menuformid:tabview1:tab2real,menuformid:tabview1:tongtien,menuformid:tabview1:tongtien"
+								styleClass="btnexportpos" action="#{orderLixBean.nextOrPrev(0)}"
+								style="margin-right:2px;">
+								<i class="fa fa-caret-left" aria-hidden="true"></i>
+							</p:commandLink> <p:commandLink title="Next"
+								update="menuformid:tabview1:tab2real,menuformid:tabview1:tongtien,menuformid:tabview1:tongtien"
+								styleClass="btnexportpos" action="#{orderLixBean.nextOrPrev(1)}">
+								<i class="fa fa-caret-right" aria-hidden="true"></i>
+							</p:commandLink>
+						</span>
+						<h:panelGroup id="tab2real" styleClass="clearfix"
+							style="background-color: #eeeeee;width: 100%;height: auto;padding-top: 20px;padding-right: 10px;display: inline-block;padding-left: 10px;padding-bottom: 20px;">
+							<div class="wrapdetail"
+								style="background-color: #eeeeee; width: 100%; height: auto;">
+								<div class="col-md-12"
+									style="padding-left: 0px !important; padding-right: 0px !important; background-color: white; padding-top: 15px;">
+									<div class="col-md-12"
+										style="padding-left: 0px !important; padding-right: 0px !important;">
+										<div class="row">
+											<div class="col-md-3">
+												<div class="row">
+													<div class="col-md-6 pdright3">
+														<label class="text-ellipsis" title="Số chứng từ(tự động)">Số
+															chứng từ(tự động)</label>
+														<p:inputText readonly="true"
+															value="#{orderLixBean.orderLixCrud.voucher_code}"
+															style="width:100%;" />
+													</div>
+													<div class="col-md-6 pdnone">
+														<label>ID<span style="color: red;"></span></label>
+														<p:inputText disabled="true"
+															value="#{orderLixBean.orderLixCrud.id}"
+															style="width:100%;" />
+													</div>
+
+												</div>
+												<div class="row">
+													<div class="col-md-6 pdright3">
+														<label>Ngày ĐH<span style="color: red;">*</span></label>
+														<p:calendar
+															value="#{orderLixBean.orderLixCrud.orderDateCreate}"
+															pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+															showButtonPanel="true">
+														</p:calendar>
+													</div>
+													<div class="col-md-6 pdnone">
+														<label>Đơn hàng tại<span style="color: red;">*</span></label>
+														<p:selectOneMenu
+															value="#{orderLixBean.orderLixCrud.brand}"
+															style="width:100%;">
+															<f:selectItem itemLabel="HỒ CHÍ MINH"
+																itemValue="HO CHI MINH" />
+															<f:selectItem itemLabel="BÌNH DƯƠNG"
+																itemValue="BINH DUONG" />
+															<f:selectItem itemLabel="BẮC NINH" itemValue="BAC NINH" />
+														</p:selectOneMenu>
+													</div>
+												</div>
+												<div class="row">
+													<div class="col-md-6 pdright3">
+														<label class="text-ellipsis">Ngày tính ĐG/KM<span
+															style="color: red;">*</span> <i
+															title="Ngày tính đơn giá, khuyến mãi."
+															class="fa fa-question-circle" aria-hidden="true"></i>
+														</label>
+														<p:calendar
+															value="#{orderLixBean.orderLixCrud.order_date}"
+															pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+															showButtonPanel="true">
+															<p:ajax event="change" process="@this"
+																listener="#{orderLixBean.changeOrderDate()}"
+																update="menuformid:tabview1:ctdgia,menuformid:tabview1:ctkmai"
+																delay="700" />
+															<p:ajax event="dateSelect" process="@this"
+																listener="#{orderLixBean.changeOrderDate()}"
+																update="menuformid:tabview1:ctdgia,menuformid:tabview1:ctkmai"
+																delay="700" />
+														</p:calendar>
+													</div>
+													<div class="col-md-6 pdnone">
+														<label class="text-ellipsis" title="Hạn giao hàng">Hạn
+															giao hàng</label>
+														<p:calendar
+															value="#{orderLixBean.orderLixCrud.delivery_date}"
+															pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+															showButtonPanel="true">
+														</p:calendar>
+													</div>
+
+												</div>
+												<div class="row">
+													<label>Khách hàng<span style="color: red;">*</span></label>
+													<div class="nhapdlg">
+														<span class="fa fa-search"></span>
+														<p:autoComplete style="width:100%;"
+															placeholder="Tìm khách hàng"
+															value="#{orderLixBean.orderLixCrud.customer}"
+															maxResults="100" converter="abstractConverter"
+															minQueryLength="2" queryDelay="900"
+															completeMethod="#{orderLixBean.completeCustomer}" var="p"
+															widgetVar="wkhachhang"
+															itemLabel="#{p.customer_code}-#{p.customer_name}"
+															itemValue="#{p}" moreText="true" forceSelection="true"
+															onclick="this.select();">
+															<p:column style="width:50px">
+																<h:outputText value="#{p.customer_code}" />
+															</p:column>
+															<p:column style="width:150px">
+																<h:outputText value="#{p.customer_name}" />
+															</p:column>
+															<p:ajax event="itemSelect"
+																listener="#{orderLixBean.customerChange()}"
+																update="menuformid:tabview1:ctdgia,menuformid:tabview1:ctkmai,menuformid:tabview1:luuykh,menuformid:tabview1:noighang" />
+															<p:ajax event="change"
+																listener="#{orderLixBean.customerChange()}"
+																update="menuformid:tabview1:ctdgia,menuformid:tabview1:ctkmai,menuformid:tabview1:luuykh,menuformid:tabview1:noighang"
+																onstart="if(PF('wkhachhang').panel.is(':visible')) return false;" />
+														</p:autoComplete>
+													</div>
+												</div>
+												<div class="row">
+													<div class="col-md-6 pdright3">
+														<label>CT.Đơn giá</label>
+														<div class="nhapdlg">
+															<span class="fa fa-search"></span>
+															<p:autoComplete id="ctdgia" style="width:100%;"
+																title="#{orderLixBean.orderLixCrud.pricing_program.program_code}"
+																value="#{orderLixBean.orderLixCrud.pricing_program}"
+																queryDelay="900" maxResults="35"
+																placeholder="Tìm đơn giá" size="80" widgetVar="ctdgia"
+																converter="abstractConverter" minQueryLength="2"
+																completeMethod="#{orderLixBean.completePricingProgram}"
+																var="p" itemLabel="#{p.program_code}" itemValue="#{p}"
+																forceSelection="true" onclick="this.select();">
+																<p:column>
+																	<h:outputText value="#{p.program_code}" />
+																</p:column>
+																<p:ajax event="itemSelect"
+																	listener="#{orderLixBean.changePricingProgramAction()}"
+																	update="menuformid:tabview1:ctdgia" />
+																<p:ajax event="change"
+																	listener="#{orderLixBean.changePricingProgramAction()}"
+																	update="menuformid:tabview1:ctdgia"
+																	onstart="if(PF('ctdgia').panel.is(':visible')) return false;" />
+															</p:autoComplete>
+														</div>
+													</div>
+													<div class="col-md-6 pdnone">
+														<label class="text-ellipsis"
+															title="Chương trình khuyến mãi">CT.Khuyến mãi</label>
+														<div class="nhapdlg">
+															<span class="fa fa-search"></span>
+															<p:autoComplete id="ctkmai" style="width:100%;"
+																title="#{orderLixBean.orderLixCrud.promotion_program.program_code}"
+																value="#{orderLixBean.orderLixCrud.promotion_program}"
+																queryDelay="900" maxResults="35"
+																placeholder="Tìm khuyến mãi" size="80"
+																widgetVar="ctkmai" converter="abstractConverter"
+																minQueryLength="2"
+																completeMethod="#{orderLixBean.completePromotionProgram}"
+																var="p" itemLabel="#{p.program_code}" itemValue="#{p}"
+																forceSelection="true" onclick="this.select();">
+																<p:column>
+																	<h:outputText value="#{p.program_code}" />
+																</p:column>
+																<p:ajax event="itemSelect"
+																	listener="#{orderLixBean.changePromotionProgramAction()}"
+																	update="tab2real" />
+																<p:ajax event="change"
+																	listener="#{orderLixBean.changePromotionProgramAction()}"
+																	update="tab2real"
+																	onstart="if(PF('ctkmai').panel.is(':visible')) return false;" />
+															</p:autoComplete>
+														</div>
+													</div>
+												</div>
+
+												<div class="row">
+													<label>Loại nhập xuất<span style="color: red;">*</span></label>
+													<p:autoComplete style="width:100%;"
+														value="#{orderLixBean.orderLixCrud.ie_categories}"
+														dropdown="true" converter="abstractConverter"
+														minQueryLength="1"
+														completeMethod="#{abstractAutoComplete.completeIECategoriesCode}"
+														var="p" itemLabel="#{p.content}" itemValue="#{p}"
+														forceSelection="true" onclick="this.select();">
+														<p:column>
+															<h:outputText value="#{p.code}" />
+														</p:column>
+														<p:column>
+															<h:outputText value="#{p.content}" />
+														</p:column>
+													</p:autoComplete>
+												</div>
+											</div>
+											<div class="col-md-3">
+												<div class="row">
+													<div class="col-md-6 pdright3">
+														<label>Tỉ lệ thuế</label>
+														<p:inputNumber onclick="this.select()"
+															value="#{orderLixBean.orderLixCrud.tax_value}"
+															styleClass="intputnumcc" style="width:100%;" minValue="0"
+															decimalPlaces="2" decimalSeparator="," maxValue="1000000"
+															emptyValue="0" thousandSeparator="." />
+													</div>
+													<div class="col-md-6 pdnone">
+														<label>Số hóa đơn</label>
+														<p:inputText
+															value="#{orderLixBean.orderLixCrud.invoice_no}"
+															style="width:100%;" />
+													</div>
+												</div>
+												<div class="row">
+													<div class="col-md-6 pdright3">
+														<label>Số serie</label>
+														<p:inputText value="#{orderLixBean.orderLixCrud.serie_no}"
+															style="width:100%;" />
+													</div>
+													<div class="col-md-6 pdnone">
+														<label class="text-ellipsis" title="Số chứng từ KH">Số
+															chứng từ KH</label>
+														<p:inputText
+															value="#{orderLixBean.orderLixCrud.cus_voucher}"
+															style="width:100%;" />
+													</div>
+												</div>
+												<div class="row">
+													<label>Ghi chú</label>
+													<p:inputTextarea styleClass="textarea45"
+														value="#{orderLixBean.orderLixCrud.note}" rows="2" />
+												</div>
+												<div class="row">
+													<label>Lưu ý</label>
+													<p:inputTextarea id="luuykh" rows="2"
+														styleClass="textarea45" />
+												</div>
+												<div class="row">
+													<div class="col-md-4 pdright3">
+														<label class="text-ellipsis"
+															style="margin-bottom: 2px !important;">CKĐH(%)<i
+															title="Chiết khấu được tính trực tiếp vào đơn giá"
+															class="fa fa-question-circle" aria-hidden="true"></i>
+														</label>
+														<p:inputNumber onclick="this.select()"
+															value="#{orderLixBean.orderLixCrud.chietkhau}"
+															styleClass="intputnumcc"
+															style="margin-top:5px;width:100%;" minValue="0"
+															decimalPlaces="1" decimalSeparator="," maxValue="100"
+															emptyValue="0" thousandSeparator="." />
+													</div>
+													<div class="col-md-8 pdnone">
+														<label>Lý do chiết khấu</label>
+														<p:selectOneMenu styleClass="selectEDT"
+															value="#{orderLixBean.orderLixCrud.lydochietkhau}"
+															effect="fade" style="width:100%;" editable="true">
+															<f:selectItem itemLabel="CK cho mã hàng mới"
+																itemValue="CK cho mã hàng mới" />
+															<f:selectItem itemLabel="CK đơn hàng khai trương"
+																itemValue="CK đơn hàng khai trương" />
+															<f:selectItem itemLabel="CK sinh nhật"
+																itemValue="CK sinh nhật" />
+															<f:selectItem itemLabel="CK mở rộng siêu thị"
+																itemValue="CK mở rộng siêu thị" />
+														</p:selectOneMenu>
+													</div>
+												</div>
+											</div>
+											<div class="col-md-3">
+												<div class="row">
+													<div class="col-md-6 pdright3">
+														<label>Số xe</label>
+														<div class="nhapdlg">
+															<span class="fa fa-search"></span>
+															<p:autoComplete style="width:100%;" id="carv"
+																value="#{orderLixBean.orderLixCrud.car}"
+																queryDelay="900" maxResults="35" placeholder="Tìm xe"
+																size="80" converter="abstractConverter"
+																minQueryLength="2"
+																completeMethod="#{orderLixBean.completeCar}" var="p"
+																itemLabel="#{p.license_plate}" itemValue="#{p}"
+																forceSelection="true" onclick="this.select();">
+																<p:column style="width:50px">
+																	<h:outputText value="#{p.license_plate}" />
+																</p:column>
+																<p:column style="width:150px">
+																	<h:outputText value="#{p.driver}" />
+																</p:column>
+															</p:autoComplete>
+															<p:commandLink update="tabcar" process="@this"
+																styleClass="btn_innerinput"
+																action="#{orderLixBean.showDialogCar()}">
+																<i class="fa fa-plus" aria-hidden="true"></i>
+															</p:commandLink>
+														</div>
+													</div>
+													<div class="col-md-6 pdnone">
+														<label class="text-ellipsis" title="Ngày giờ xe vào">Ngày
+															giờ xe vào</label>
+														<p:calendar
+															value="#{orderLixBean.orderLixCrud.ngaygioxevao}"
+															pattern="dd/MM/yyyy HH:mm" showOn="button"
+															mask="99/99/9999 99:99" showButtonPanel="true" />
+													</div>
+
+												</div>
+												<div class="row">
+													<div class="col-md-6 pdright3">
+														<label class="text-ellipsis" title="Ngày giờ lên hàng">Ngày
+															giờ lên hàng</label>
+														<p:calendar
+															value="#{orderLixBean.orderLixCrud.s_up_goods_date}"
+															pattern="dd/MM/yyyy HH:mm" showOn="button"
+															mask="99/99/9999 99:99" showButtonPanel="true" />
+													</div>
+													<div class="col-md-6 pdnone">
+														<label class="text-ellipsis"
+															title="Ngày giờ lên hàng xong">Ngày giờ lên hàng
+															xong</label>
+														<p:calendar
+															value="#{orderLixBean.orderLixCrud.c_up_goods_date}"
+															pattern="dd/MM/yyyy HH:mm" showOn="button"
+															mask="99/99/9999 99:99" showButtonPanel="true" />
+													</div>
+												</div>
+												<div class="row">
+													<label>Nơi giao hàng</label>
+													<div class="col-md-12 pdnone">
+														<p:inputTextarea id="noighang" readonly="true"
+															styleClass="textareap"
+															value="#{orderLixBean.orderLixCrud.delivery_pricing.address}"
+															rows="2">
+														</p:inputTextarea>
+														<p:commandLink style="height: 49px;right: 0px !important;"
+															update="dlgpickpd,:messages" styleClass="btn_innerinput"
+															action="#{orderLixBean.showDialogPickDeliveryPricing()}">
+															<i class="fa fa-list"
+																style="line-height: 49px !important;" aria-hidden="true"></i>
+														</p:commandLink>
+													</div>
+												</div>
+												<div class="row">
+													<div class="col-md-6 pdright3">
+														<p:selectBooleanCheckbox styleClass="text-ellipsis"
+															title="Đã giao hàng" itemLabel="Đã giao hàng"
+															value="#{orderLixBean.orderLixCrud.delivered}" />
+														<label class="text-ellipsis" title="Lý do chưa GH">Lý
+															do chưa giao hàng</label>
+														<p:inputTextarea
+															value="#{orderLixBean.orderLixCrud.reason_not_delivered}"
+															rows="4" />
+													</div>
+													<div class="col-md-6 pdnone">
+														<p:selectBooleanCheckbox styleClass="text-ellipsis"
+															title="Đã thanh toán" itemLabel="Đã thanh toán"
+															value="#{orderLixBean.orderLixCrud.dathanhtoan}" />
+														<label class="text-ellipsis">Lưu ý thanh toán</label>
+														<p:inputTextarea
+															value="#{orderLixBean.orderLixCrud.luuythanhtoan}"
+															rows="2" />
+													</div>
+												</div>
+												<div class="row">
+													<div class="col-md-6 pdright3">
+														<label class="text-ellipsis" title="Số lượng xe">SL
+															xe</label>
+														<p:inputNumber onclick="this.select()"
+															value="#{orderLixBean.orderLixCrud.slxe}"
+															styleClass="intputnumcc" style="width:100%;" minValue="0"
+															decimalPlaces="0" decimalSeparator="," emptyValue="0"
+															thousandSeparator="." />
+													</div>
+													<div class="col-md-6 pdnone">
+														<label class="text-ellipsis" title="Khối lượng vận chuyển">Khối
+															lượng VC(Kg)</label>
+														<p:outputPanel id="klvanchuyen">
+															<p:inputNumber onclick="this.select()"
+																value="#{orderLixBean.orderLixCrud.khoiluongvc}"
+																styleClass="intputnumcc" style="width:100%;"
+																minValue="0" decimalPlaces="0" decimalSeparator=","
+																emptyValue="0" thousandSeparator="." />
+															<p:commandLink process="@this"
+																title="Cập nhật lại khối lượng vận chuyển theo khối lượng chưa xuất bao gồm cả khuyến mãi"
+																update="klvanchuyen" style="margin-top: 22px;"
+																action="#{orderLixBean.capnhatKLVC()}"
+																styleClass="btn_innerinput">
+																<i class="fa fa-sync" aria-hidden="true"></i>
+															</p:commandLink>
+														</p:outputPanel>
+													</div>
+												</div>
+											</div>
+											<div class="col-md-3">
+												<div class="row">
+													<label>Người vận chuyển</label>
+													<div class="nhapdlg">
+														<span class="fa fa-search"></span>
+														<p:autoComplete style="width:100%;"
+															value="#{orderLixBean.orderLixCrud.carrier}"
+															dropdown="true" queryDelay="900"
+															converter="abstractConverter" minQueryLength="2"
+															placeholder="Tìm người vận chuyển"
+															completeMethod="#{abstractAutoComplete.completeCarrier}"
+															var="p" itemLabel="#{p.carrier_code}-#{p.carrier_name}"
+															itemValue="#{p}" forceSelection="true"
+															onclick="this.select();">
+															<p:column style="width:50px">
+																<h:outputText value="#{p.carrier_code}" />
+															</p:column>
+															<p:column style="width:150px">
+																<h:outputText value="#{p.carrier_name}" />
+															</p:column>
+														</p:autoComplete>
+													</div>
+												</div>
+												<div class="row">
+													<label>Hợp đồng v/c</label>
+													<div class="col-md-12 pdnone">
+														<p:inputText id="fc_id" readonly="true"
+															value="#{orderLixBean.orderLixCrud.freight_contract.contract_code}" />
+														<p:commandLink style="right: 0px !important;"
+															update="dlg2" process="@this" styleClass="btn_innerinput"
+															action="#{orderLixBean.showDialogPickHDVC()}">
+															<i class="fa fa-list" aria-hidden="true"></i>
+														</p:commandLink>
+													</div>
+												</div>
+												<div class="row">
+													<div class="col-md-4 pdright3">
+														<label class="text-ellipsis" title="Số phiếu vận chuyển">Số
+															phiếu VC</label>
+														<p:inputText
+															value="#{orderLixBean.orderLixCrud.sophieuvc}"
+															style="width:100%;" />
+													</div>
+													<div class="col-md-8 pdnone">
+														<label>HT thanh toán</label>
+														<p:selectOneMenu
+															value="#{orderLixBean.orderLixCrud.payment_method}"
+															converter="abstractConverter" effect="fade" var="t"
+															style="width:100%;" filter="true"
+															filterPlaceholder="Tìm phương thức"
+															filterMatchMode="custom" filterFunction="customFilter2">
+															<f:selectItem itemLabel="--select--" itemValue="#{null}" />
+															<f:selectItems value="#{orderLixBean.listPaymentMethod}"
+																var="theme"
+																itemLabel="#{theme.old_code}-#{theme.method_name}"
+																itemValue="#{theme}" />
+															<p:column>
+																<h:outputText value="#{t.old_code}" />
+															</p:column>
+															<p:column>
+																<h:outputText
+																	value="#{t==null ? '--select--' : t.method_name}" />
+															</p:column>
+														</p:selectOneMenu>
+													</div>
+
+
+												</div>
+												<div class="row">
+													<div class="col-md-4 pdright3">
+														<label>LĐĐ</label>
+														<p:inputText value="#{orderLixBean.orderLixCrud.ldd}"
+															style="width:100%;" />
+													</div>
+													<div class="col-md-8 pdnone">
+														<label>Người tạo</label>
+														<div class="usernhapsp">
+															<span class="fa fa-user-circle-o"></span>
+															<p:inputText readonly="true"
+																value="#{orderLixBean.orderLixCrud.created_by}"
+																style="width:100%;" />
+														</div>
+													</div>
+												</div>
+												<div class="row">
+													<div class="col-md-4 pdright3">
+														<label>P/O</label>
+														<p:inputText value="#{orderLixBean.orderLixCrud.po_no}"
+															style="width:100%;" />
+													</div>
+													<div class="col-md-8 pdnone">
+														<label>Kho<span style="color: red;">*</span></label>
+														<p:selectOneMenu
+															value="#{orderLixBean.orderLixCrud.warehouse}"
+															converter="abstractConverter" effect="fade" var="t"
+															style="width:100%;" filter="true"
+															filterPlaceholder="Tìm nhà kho" filterMatchMode="custom"
+															filterFunction="customFilter2">
+															<f:selectItem itemLabel="--select--" itemValue="#{null}" />
+															<f:selectItems value="#{orderLixBean.listWarehouse}"
+																var="theme" itemLabel="#{theme.old_code}-#{theme.name}"
+																itemValue="#{theme}" />
+															<p:column>
+																<h:outputText value="#{t.code}" />
+															</p:column>
+															<p:column>
+																<h:outputText value="#{t.old_code}" />
+															</p:column>
+															<p:column>
+																<h:outputText value="#{t==null ? '--select--' : t.name}" />
+															</p:column>
+														</p:selectOneMenu>
+													</div>
+												</div>
+												<div class="row" style="margin-top: 10px">
+													<p:fieldset id="tongtien">
+														<h:panelGrid columns="2" cellspacing="10"
+															styleClass="pdmargin0" columnClasses="w60,w40"
+															style="width:100%">
+															<p:outputLabel value="Tiền hàng" />
+															<p:outputLabel
+																style="text-align:right;width:80%;padding-right:5px;color: #9c27b0;"
+																value="#{orderLixBean.sumOrderLix()}">
+																<f:convertNumber locale="vi" pattern="###,###,###,##0" />
+															</p:outputLabel>
+															<p:outputLabel value="Thuế" />
+															<p:outputLabel
+																style="text-align:right;width:80%;padding-right:5px"
+																value="#{orderLixBean.sumOrderLixVAT()}">
+																<f:convertNumber locale="vi" pattern="###,###,###,##0" />
+															</p:outputLabel>
+														</h:panelGrid>
+													</p:fieldset>
+												</div>
+											</div>
+										</div>
+									</div>
+									<div class="col-md-12"
+										style="margin-top: 5px; padding-left: 0px !important; padding-right: 0px !important;">
+										<div class="row"></div>
+									</div>
+									<div class="col-md-12"
+										style="margin-top: 5px; padding-left: 0px !important; padding-right: 0px !important;">
+										<div class="row">
+
+											<h:panelGroup id="button_order1"
+												styleClass="#{orderLixBean.tabOrder ? 'btn_blockdiv' : 'btn_disdiv'}"
+												style="text-align:right;  width:100%; line-height: 50px; height: 50px;">
+												<p:commandLink process="tab2real"
+													update="tab2real,tablesp,:messages"
+													action="#{orderLixBean.saveOrUpdateOrderLix()}"
+													styleClass="btn_primmary"
+													style="margin-left:5px;margin-right:5px; ">
+													<i class="fa fa-floppy-o" aria-hidden="true"></i>
+													<span>Lưu/Cập nhật</span>
+												</p:commandLink>
+												<p:commandLink process="@this" update="tab2real,:messages"
+													action="#{orderLixBean.createdNew()}" styleClass="btn_new"
+													style="margin-left:5px;margin-right:5px;">
+													<i class="fa fa-file-text-o" aria-hidden="true"></i>
+													<span>Tạo mới</span>
+												</p:commandLink>
+												<p:commandLink process="@this"
+													action="#{orderLixBean.exportPDF()}"
+													styleClass="btn_printtt"
+													style="margin-left:5px; padding-left:25px;padding-right:25px;margin-right:5px;">
+													<i class="fa fa-print" aria-hidden="true"></i>
+													<span>In</span>
+												</p:commandLink>
+												<p:commandLink process="tab2real" update="tab2real,tablesp"
+													action="#{orderLixBean.createInvoiceMain()}"
+													styleClass="btn_other"
+													style="margin-left:5px; margin-right:5px; ">
+													<i class="fa fa-floppy-o" aria-hidden="true"></i>
+													<span>Tạo hóa đơn</span>
+												</p:commandLink>
+												<p:commandLink process="tab2real" update="tab2real,tablesp"
+													action="#{orderLixBean.createInvoiceTempMain()}"
+													styleClass="btn_new2"
+													
+													style="margin-left:5px; margin-right:5px; ">
+													<i class="fa fa-floppy-o" aria-hidden="true"></i>
+													<span>Tạo hóa đơn tạm</span>
+												</p:commandLink>
+												<p:commandLink process="@this" update="tab2real,:messages"
+													action="#{orderLixBean.copyOrderLix()}"
+													styleClass="btn_primmary"
+													style="margin-left:5px; margin-right:5px;">
+													<i class="fa fa-files-o" aria-hidden="true"></i>
+													<span>Copy</span>
+												</p:commandLink>
+											</h:panelGroup>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="col-md-12"
+								style="margin-top: 16px; padding-left: 0px !important; padding-right: 0px !important; background-color: white; padding-top: 0px;">
+								<div class="row"
+									style="border-bottom: 2px solid #ececee; margin-bottom: 8px;">
+									<h:panelGroup id="grouptab">
+										<p:commandLink process="@this"
+											update="taborder,tablect,tabinvoice,button_order1,grouptab"
+											action="#{orderLixBean.tabOrderOnClick()}"
+											onclick="PF('tablect').clearFilters();PF('tablekm').clearFilters();"
+											styleClass="#{orderLixBean.tabOrder ? 'btn_tabactive' : 'btn_tabdis'}">
+											<span>Đơn hàng</span>
+										</p:commandLink>
+										<p:commandLink process="@this"
+											update="taborder,tablect,tabinvoice,button_order1,messages,grouptab"
+											action="#{orderLixBean.tabInvoiceOnClick()}"
+											styleClass="#{orderLixBean.tabOrder ? 'btn_tabdis' : 'btn_tabactive'}">
+											<span>Hiệu chỉnh đơn hàng</span>
+										</p:commandLink>
+									</h:panelGroup>
+								</div>
+								<div class="row">
+									<h:panelGroup id="taborder"
+										styleClass="#{orderLixBean.tabOrder ? 'btn_blockdiv' : 'btn_disdiv'}">
+										<p:fieldset legend="Sản phẩm đơn hàng"
+											styleClass="fieldsetclass label12 borderfsnone"
+											toggleable="true" toggleSpeed="500" collapsed="false"
+											style="margin-bottom:10px;">
+											<div class="col-md-12">
+												<div class="row">
+													<div class="col-md-10">
+														<p:outputPanel id="idbtprocessdt">
+															<p:commandLink process="@this" update="dlgc1"
+																action="#{orderLixBean.showDialogOrderDetail()}"
+																styleClass="btn_primmary"
+																disabled="#{orderLixBean.orderLixCrud.id==0}"
+																style="margin-left:2px; margin-right:0px;height:29px !important;line-height:29px !important;">
+																<i class="fa fa-plus" aria-hidden="true"></i>
+																<span>Thêm</span>
+															</p:commandLink>
+															<p:commandLink update="dlgc1"
+																action="#{orderLixBean.showEditOrderDetail()}"
+																styleClass="btn_new"
+																disabled="#{orderLixBean.orderDetailSelect==null}"
+																style="margin-left:2px; margin-right:0px;height:29px !important;line-height:29px !important;">
+																<i class="fa fa-pencil" aria-hidden="true"></i>
+																<span>Chỉnh sửa</span>
+															</p:commandLink>
+															<p:commandLink styleClass="btn_destroy"
+																style="margin-left:2px; margin-right:0px;height:29px !important;line-height:29px !important;"
+																update="tablect,tablekm,menuformid:tabview1:tongtien,menuformid:tabview1:tongtien"
+																action="#{orderLixBean.deleteOrderLixDetail()}"
+																disabled="#{orderLixBean.orderDetailSelect==null}"
+																title="Xóa chi tiết">
+																<i class="fa fa-trash" aria-hidden="true"></i>
+																<span>Xóa </span>
+																<p:confirm icon="ui-icon-alert" />
+															</p:commandLink>
+															<p:commandLink id="idtinhlaitxkm" rendered="false"
+																disabled="#{orderLixBean.orderLixCrud.id==0}"
+																update="tablect,tablekm,menuformid:tabview1:tongtien,menuformid:tabview1:tongtien"
+																action="#{orderLixBean.tinhlaikhuyenmaisoluong()}"
+																styleClass="btn_printtt" style="margin-left:10px; ">
+																<i class="fa fa-calculator" aria-hidden="true"></i>
+																<span>Tính khuyến mãi</span>
+															</p:commandLink>
+															<p:commandLink process="@this" update="dlgc1"
+																styleClass="btn_primmary" onclick="PF('dlgup1').show();"
+																disabled="#{orderLixBean.orderLixCrud.id==0}"
+																style="margin-left:2px; margin-right:0px;height:29px !important;line-height:29px !important;">
+																<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+																<span>Nạp excel đơn hàng</span>
+															</p:commandLink>
+														</p:outputPanel>
+													</div>
+													<div class="col-md-2" style="text-align: right;">
+														<p:commandLink title="Cập nhật lại số lượng thực xuất"
+															disabled="#{orderLixBean.orderLixCrud.id==0}"
+															update="tablect,tablekm,menuformid:tabview1:tongtien,menuformid:tabview1:tongtien"
+															action="#{orderLixBean.capnhatSLThucXuat()}"
+															styleClass="btn_printtt" style="margin-left:10px; ">
+															<i class="fa fa-sync" aria-hidden="true"></i>
+														</p:commandLink>
+													</div>
+												</div>
+											</div>
+											<div class="col-md-12">
+												<div class="row">
+													<p:dataTable value="#{orderLixBean.listOrderDetail}"
+														rowKey="#{item.id}" style="width:100%"
+														binding="#{orderLixBean.dataTable}"
+														styleClass="tablenhapsp" scrollable="true"
+														selection="#{orderLixBean.orderDetailSelect}"
+														selectionMode="single" id="tablect" rowIndexVar="rowIdx"
+														sortMode="single"
+														filteredValue="#{orderLixBean.listOrderDetailFilter}"
+														scrollHeight="350" widgetVar="tablect" var="item">
+														<p:ajax event="rowDblselect"
+															listener="#{orderLixBean.showEditOrderDetail()}"
+															update="dlgc1" />
+														<p:ajax event="rowSelect"
+															update="menuformid:tabview1:idbtprocessdt" />
+														<p:ajax event="sort" listener="#{orderLixBean.onSort}"
+															update="tablect" />
+														<p:column headerText="ID" width="50" sortBy="#{item.id}">
+															<h:outputText value="#{item.id}" />
+														</p:column>
+														<p:column headerText="Mã SP" width="50"
+															filterMatchMode="contains"
+															sortBy="#{item.product.product_code}"
+															filterBy="#{orderLixBean.formatHandler.converViToEn(item.product.product_code)}">
+															<h:outputText value="#{item.product.product_code}" />
+														</p:column>
+														<p:column headerText="Sản phẩm" width="250"
+															sortBy="#{item.product.product_name}"
+															filterMatchMode="contains"
+															filterBy="#{orderLixBean.formatHandler.converViToEn(item.product.product_name)}">
+															<h:outputText style="white-space: initial;"
+																value="#{item.product.product_name}" />
+														</p:column>
+														<p:column headerText="Số lượng (thùng)" width="50"
+															style="white-space: break-spaces;" styleClass="textright">
+															<h:outputText style="white-space: initial;"
+																value="#{item.box_quantity}">
+																<f:convertNumber locale="vi" pattern="###,###,##0.##" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Thực xuất (thùng)"
+															style="white-space: break-spaces;" width="50"
+															styleClass="textright">
+															<h:outputText
+																style="white-space: initial;color:#{item.box_quantity_actual!=item.box_quantity?'blue':''}"
+																value="#{item.box_quantity_actual}">
+																<f:convertNumber locale="vi" pattern="###,###,##0.##" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Thực xuất (ĐVT)" width="50"
+															style="white-space: break-spaces;" styleClass="textright">
+															<h:outputText value="#{item.quantity}">
+																<f:convertNumber locale="vi" pattern="###,###,##0.00" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Đơn giá" width="40"
+															styleClass="textright">
+															<h:outputText value="#{item.unit_price}">
+																<f:convertNumber locale="vi" pattern="###,###,##0.##" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="ĐG PO" width="40"
+															styleClass="textright"
+															style="#{item.unit_pricePO!=item.unit_price?'background:#ffb8b8':''}">
+															<h:outputText value="#{item.unit_pricePO}">
+																<f:convertNumber locale="vi" pattern="###,###,##0.##" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Thành tiền" width="60"
+															styleClass="textright">
+															<h:outputText value="#{item.total}">
+																<f:convertNumber locale="vi" pattern="###,###,##0" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="HTKM" width="40"
+															style="text-align:center" styleClass="tdrelative">
+															<h:outputText value="#{item.promotion_forms}">
+																<f:convertNumber locale="vi" pattern="###" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Qui cách" width="80">
+															<h:outputText value="#{item.product.specification}">
+																<f:convertNumber locale="vi" pattern="###" />
+															</h:outputText>
+															<h:outputText style="white-space: initial;"
+																value="#{item.product.unit}/#{item.product.packing_unit}" />
+														</p:column>
+														<p:column headerText="Mã LH" width="60">
+															<h:outputText value="#{item.batch_code}" />
+														</p:column>
+														<p:column headerText="Số Cont" width="40"
+															styleClass="textright">
+															<h:outputText value="#{item.container_number}" />
+														</p:column>
+														<p:column headerText="Số Seal" width="40"
+															styleClass="textright">
+															<h:outputText value="#{item.seal_number}" />
+														</p:column>
+														<p:column style="width:30px" styleClass="textcenter"
+															toggleable="false">
+															<f:facet name="header">
+																<p:outputLabel value="Hủy" style="" />
+																<p:selectBooleanCheckbox value="#{orderLixBean.huyCT}">
+																	<p:ajax update="@(.stchoosect)" process="@this"
+																		listener="#{orderLixBean.huyHetCT()}" />
+																</p:selectBooleanCheckbox>
+															</f:facet>
+															<p:selectBooleanCheckbox value="#{item.huyct}"
+																styleClass="stchoosect">
+																<p:ajax process="@this"
+																	listener="#{orderLixBean.capnhattrangthaihuy(item)}" />
+															</p:selectBooleanCheckbox>
+														</p:column>
+													</p:dataTable>
+												</div>
+											</div>
+										</p:fieldset>
+										<p:fieldset legend="Sản phẩm khuyến mãi"
+											styleClass="fieldsetclass label12 borderfsnone"
+											toggleable="true" toggleSpeed="500" collapsed="false">
+											<div class="col-md-12">
+												<div class="row">
+													<p:dataTable
+														value="#{orderLixBean.listPromotionOrderDetail}"
+														style="width:100%;" styleClass="tablenhapsp"
+														rowKey="#{item.id}" scrollable="true" id="tablekm"
+														scrollHeight="250" widgetVar="tablekm"
+														resizableColumns="true"
+														filteredValue="#{orderLixBean.listPromotionOrderDetailFilter}"
+														var="item">
+														<p:column headerText="ID" width="50">
+															<h:outputText value="#{item.id}" />
+														</p:column>
+														<p:column headerText="Mã SPĐH" width="60"
+															filterMatchMode="contains"
+															filterBy="#{orderLixBean.formatHandler.converViToEn(item.order_detail.product.product_code)}">
+															<h:outputText
+																value="#{item.order_detail.product.product_code}" />
+														</p:column>
+														<p:column headerText="Mã SP" width="50"
+															filterMatchMode="contains"
+															filterBy="#{orderLixBean.formatHandler.converViToEn(item.product.product_code)}">
+															<h:outputText value="#{item.product.product_code}" />
+														</p:column>
+														<p:column headerText="Sản phẩm" filterMatchMode="contains"
+															width="250"
+															filterBy="#{orderLixBean.formatHandler.converViToEn(item.product.product_name)}">
+															<h:outputText style="white-space: initial;"
+																value="#{item.product.product_name}" />
+														</p:column>
+														<p:column headerText="Số lượng (ĐVT)" width="60"
+															style="white-space: break-spaces;" styleClass="textright">
+															<h:outputText value="#{item.quantity}">
+																<f:convertNumber locale="vi" pattern="###,###,##0.00" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Đã xuất (ĐVT)" width="60"
+															style="white-space: break-spaces;" styleClass="textright">
+															<h:outputText style="color:red;font-weight:bold;"
+																id="realExport" value="#{item.quantityAct}">
+																<f:convertNumber locale="vi" pattern="###,###,##0.00" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Đơn giá" width="60"
+															styleClass="textright">
+															<h:outputText value="#{item.unit_price}">
+																<f:convertNumber locale="vi" pattern="###,###,##0.###" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Số tiền" width="60"
+															styleClass="textright">
+															<h:outputText value="#{item.quantity*item.unit_price}">
+																<f:convertNumber locale="vi" pattern="###,###,##0.###" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Qui cách" width="90">
+															<h:outputText value="#{item.product.specification}">
+																<f:convertNumber locale="vi" pattern="###" />
+															</h:outputText>
+															<h:outputText style="white-space: initial;"
+																value="#{item.product.unit}/#{item.product.packing_unit}" />
+														</p:column>
+														<p:column headerText="Nhóm SPKM" width="60"
+															style="white-space: break-spaces;">
+															<h:outputText
+																value="#{item.product.promotion_product_group.code}" />
+														</p:column>
+														<p:column headerText="Nợ" width="40"
+															styleClass="textcenter">
+															<p:selectBooleanCheckbox value="#{item.no}">
+																<p:ajax process="@this" event="change"
+																	listener="#{orderLixBean.ajaxNo(item)}" />
+															</p:selectBooleanCheckbox>
+														</p:column>
+														<p:column headerText="Hủy" width="40"
+															styleClass="textcenter">
+															<p:selectBooleanCheckbox value="#{item.huyct}"
+																disabled="true">
+															</p:selectBooleanCheckbox>
+														</p:column>
+														<p:column headerText="Ghi chú" width="100">
+															<h:outputText
+																value="#{item.product.promotion_product_group ==null ?'' :'KM'} #{item.product.promotion_product_group.name}" />
+														</p:column>
+													</p:dataTable>
+												</div>
+											</div>
+										</p:fieldset>
+									</h:panelGroup>
+									<h:panelGroup id="tabinvoice"
+										styleClass="#{orderLixBean.tabOrder ? 'btn_disdiv' : 'btn_blockdiv'}">
+										<p:fieldset legend="Sản phẩm đơn hàng"
+											styleClass="fieldsetclass label12 borderfsnone"
+											toggleable="true" toggleSpeed="500" collapsed="false"
+											style="margin-bottom:10px;">
+											<div class="col-md-12">
+												<div class="row"
+													style="text-align: right; position: absolute; right: 0px; top: -35px;">
+													<p:outputPanel style="display: initial; padding: 0px 10px;"
+														id="khoiluongxuat">
+														Trọng tải:
+														<p:outputLabel value="#{orderLixBean.khoiluongxuat}"
+															style="font-weight: bold;color: blue;">
+															<f:convertNumber locale="vi" pattern="###,###,###,##0" />
+														</p:outputLabel>
+														<p:outputLabel value="Kg"
+															style="margin-left:3px;font-weight: bold;" />
+
+													</p:outputPanel>
+													<p:selectBooleanCheckbox value="#{orderLixBean.allex}"
+														style="color: #4bac4d;font-weight: bold;"
+														itemLabel="Xuất tất cả">
+														<p:ajax process="@this"
+															update="menuformid:tabview1:tablect1,menuformid:tabview1:tablekm1,messages"
+															event="change" listener="#{orderLixBean.exportAll()}" />
+													</p:selectBooleanCheckbox>
+													<p:commandLink process="@this"
+														action="#{orderLixBean.exportPDFSub()}"
+														styleClass="btn_printtt"
+														style="margin-left:5px; padding-left:25px;padding-right:25px;margin-right:5px;">
+														<i class="fa fa-print" aria-hidden="true"></i>
+														<span>In</span>
+													</p:commandLink>
+													<p:commandLink process="@this" update="tablekm1"
+														action="#{orderLixBean.tinhkhuyenmaixuattiep()}"
+														styleClass="btn_new" style="margin-left:10px; ">
+														<i class="fa fa-calculator" aria-hidden="true"></i>
+														<span>Tính khuyến mãi</span>
+													</p:commandLink>
+													<p:commandLink process="tab2real" update="tab2real,tablesp"
+														action="#{orderLixBean.createInvoiceByExtensionOrder()}"
+														styleClass="btn_other"
+														style="margin-left:10px; margin-right:10px; ">
+														<i class="fa fa-floppy-o" aria-hidden="true"></i>
+														<span>Tạo hóa đơn</span>
+													</p:commandLink>
+													<p:commandLink process="tab2real" update="tab2real,tablesp"
+														action="#{orderLixBean.createInvoiceTempByExtensionOrder()}"
+														styleClass="btn_new2" rendered="#{orderLixBean.account.member.code eq 'admin'}"
+														style="margin-left:10px; margin-right:10px; ">
+														<i class="fa fa-floppy-o" aria-hidden="true"></i>
+														<span>Tạo hóa đơn tạm</span>
+													</p:commandLink>
+												</div>
+												<div class="row">
+													<p:dataTable
+														value="#{orderLixBean.listWrapOrderDetailLixReqInfo}"
+														rowKey="#{item.order_detail.id}" style="width:100%;"
+														scrollable="true" styleClass="tablenhapsp" id="tablect1"
+														scrollHeight="250" widgetVar="tablect1"
+														resizableColumns="true" var="item2">
+														<p:column headerText="ID" width="50">
+															<h:outputText value="#{item2.order_detail.id}" />
+														</p:column>
+														<p:column headerText="Mã SP" width="50">
+															<h:outputText
+																value="#{item2.order_detail.product.product_code}" />
+														</p:column>
+														<p:column headerText="Sản phẩm" width="250">
+															<h:outputText style="white-space: initial;"
+																value="#{item2.order_detail.product.product_name}" />
+														</p:column>
+														<p:column headerText="Số thùng" width="50"
+															styleClass="textright">
+															<h:outputText value="#{item2.order_detail.box_quantity}">
+																<f:convertNumber locale="vi" pattern="###,###,###,##0" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Thực xuất" width="50"
+															styleClass="textright">
+															<h:outputText value="#{item2.real_quantity}">
+																<f:convertNumber locale="vi" pattern="###,###,###,##0" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Còn lại" width="50"
+															styleClass="textright">
+															<h:outputText id="idconlai"
+																style="font-weight: bold;color: green;"
+																value="#{item2.remain_quantity-item2.export_quantity}">
+																<f:convertNumber locale="vi" pattern="###,###,###,##0" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="KL(Kg)" width="50"
+															styleClass="textright">
+															<h:outputText style="color:#7364ec"
+																value="#{(item2.remain_quantity-item2.export_quantity)*item2.order_detail.product.specification*item2.order_detail.product.factor}">
+																<f:convertNumber locale="vi" pattern="###,###,###,##0" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Xuất tiếp" width="50"
+															styleClass="textright">
+															<p:inputNumber onclick="this.select()"
+																disabled="#{item2.order_detail.huyct}"
+																value="#{item2.export_quantity}"
+																styleClass="inputtext_nhapsp" style="width:100%;"
+																minValue="0" decimalPlaces="0" decimalSeparator="."
+																maxValue="10000000" emptyValue="0" thousandSeparator=",">
+																<p:ajax event="blur"
+																	update="idconlai,idsoluong,idsotien"
+																	listener="#{orderLixBean.kiemTraSoLuong(item2)}" />
+															</p:inputNumber>
+														</p:column>
+														<p:column headerText="Số lượng" width="50"
+															styleClass="textright">
+															<h:outputText style="white-space: initial;"
+																id="idsoluong" value="#{item2.export_unit_quantity}">
+																<f:convertNumber locale="vi"
+																	pattern="###,###,###,##0.00" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Đơn giá" width="60"
+															styleClass="textright">
+															<h:outputText value="#{item2.order_detail.unit_price}">
+																<f:convertNumber locale="vi"
+																	pattern="###,###,###,##0.##" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Số tiền" width="60"
+															styleClass="textright">
+															<h:outputText id="idsotien"
+																value="#{item2.total_unit_quantity}">
+																<f:convertNumber locale="vi" pattern="###,###,###,##0" />
+															</h:outputText>
+														</p:column>
+														<p:column headerText="Hủy" width="40"
+															styleClass="textcenter">
+															<p:selectBooleanCheckbox
+																value="#{item2.order_detail.huyct}" disabled="true">
+															</p:selectBooleanCheckbox>
+														</p:column>
+													</p:dataTable>
+												</div>
+											</div>
+										</p:fieldset>
+										<p:fieldset legend="Sản phẩm khuyến mãi"
+											styleClass="fieldsetclass label12 borderfsnone"
+											toggleable="true" toggleSpeed="500" collapsed="false">
+											<p:dataTable
+												value="#{orderLixBean.listPromotionOrderDetailInvoice}"
+												style="width:100%;" styleClass="tablenhapsp"
+												rowKey="#{item.id}" scrollable="true" id="tablekm1"
+												scrollHeight="250" widgetVar="tablekm1"
+												resizableColumns="true" var="item">
+												<p:column headerText="Mã SPĐH" width="50">
+													<h:outputText
+														value="#{item.order_detail.product.product_code}" />
+												</p:column>
+												<p:column headerText="Mã SP" width="50">
+													<h:outputText value="#{item.product.product_code}" />
+												</p:column>
+												<p:column headerText="Sản phẩm" width="280">
+													<h:outputText style="white-space: initial;"
+														value="#{item.product.product_name}" />
+												</p:column>
+												<p:column headerText="Số lượng" width="80"
+													styleClass="textright">
+													<h:outputText
+														value="#{orderLixBean.formatHandler.getNumberFormat(item.quantity,1)}" />
+												</p:column>
+												<p:column headerText="Đơn giá" width="80"
+													styleClass="textright">
+													<h:outputText
+														value="#{orderLixBean.formatHandler.getNumberFormat(item.unit_price,1000)}" />
+												</p:column>
+												<p:column headerText="Số tiền" width="80"
+													styleClass="textright">
+													<h:outputText
+														value="#{orderLixBean.formatHandler.getNumberFormat(item.quantity*item.unit_price,1000)}" />
+												</p:column>
+												<p:column headerText="Qui cách" width="100">
+													<h:outputText
+														value="#{orderLixBean.formatHandler.getNumberFormat(item.product.specification,1000)} #{item.product.unit}/#{item.product.packing_unit}" />
+												</p:column>
+												<p:column headerText="Mã nhóm SPKM" width="80"
+													style="white-space: break-spaces;">
+													<h:outputText
+														value="#{item.product.promotion_product_group.code}" />
+												</p:column>
+												<p:column headerText="Ghi chú" width="100">
+													<h:outputText
+														value="#{item.product.promotion_product_group ==null ?'' :'KM'} #{item.product.promotion_product_group.name}" />
+												</p:column>
+												<p:column headerText="Nợ" width="50" styleClass="textcenter">
+													<p:selectBooleanCheckbox value="#{item.no}">
+														<p:ajax process="@this" event="change"
+															listener="#{orderLixBean.tinhkhoiluong()}" />
+													</p:selectBooleanCheckbox>
+												</p:column>
+												<p:column headerText="Cập nhật" width="70">
+													<h:outputText value="#{item.last_modifed_date}">
+														<f:convertDateTime pattern="dd/MM/yyyy" />
+													</h:outputText>
+												</p:column>
+											</p:dataTable>
+										</p:fieldset>
+									</h:panelGroup>
+								</div>
+							</div>
+						</h:panelGroup>
+					</p:tab>
+					<p:tab id="tab1" title="Danh sách đơn hàng">
+						<div class="col-md-12"
+							style="padding-left: 0px !important; padding-right: 0px !important; background-color: #eeeeee; padding-top: 15px;">
+							<p:fieldset id="searchform"
+								style="margin-bottom:10px;background:#3c8dbc">
+								<div class="row">
+									<div class="ui-g">
+										<div class="ui-md-6 ui-sm-12 ">
+											<div class="ui-g">
+												<div class="ui-md-8 ui-sm-12 ">
+													<div class="nhapdlg">
+														<span class="fa fa-search" />
+														<p:remoteCommand name="searchEnter"
+															actionListener="#{orderLixBean.search()}"
+															update="tablesp" />
+														<p:inputText
+															placeholder="Tìm theo số chứng từ, khách hàng, số xe, người tạo, sản phẩm,.."
+															id="inputsearch" style="width:100%;"
+															value="#{orderLixBean.stextStr}"
+															onkeypress="if (event.keyCode === 13) { searchEnter(); return false; }">
+														</p:inputText>
+													</div>
+												</div>
+												<div class="ui-md-4 ui-sm-12 ">
+													<p:commandLink id="idorder" styleClass="btn_primmary"
+														immediate="true"
+														style="margin-left:5px; margin-right:0px;height:28px !important;line-height:28px !important;">
+														<i class="fa fa-search" aria-hidden="true"></i>
+														<span>Lọc nâng cao</span>
+													</p:commandLink>
+												</div>
+											</div>
+										</div>
+										<div class="ui-md-6 ui-sm-12">
+											<div style="float: right">
+
+												<p:commandLink styleClass="btn_destroy"
+													style="margin-left:1px;height:28px !important;line-height:28px !important;"
+													update=":messages,menuformid"
+													rendered="#{orderLixBean.account.admin}"
+													action="#{orderLixBean.capnhatthanhtien()}"
+													title="Cập nhật lại thành tiền">
+													<i class="fa fa-trash" aria-hidden="true"></i>
+													<span>Cập nhật thành tiền</span>
+												</p:commandLink>
+												<p:commandLink styleClass="btn_destroy"
+													style="margin-left:1px;height:28px !important;line-height:28px !important;"
+													update=":messages,menuformid"
+													disabled="#{orderLixBean.orderLixSelect==null}"
+													action="#{orderLixBean.deleteOrderLix()}"
+													title="Xóa đơn hàng">
+													<i class="fa fa-trash" aria-hidden="true"></i>
+													<span>Xóa</span>
+													<p:confirm icon="ui-icon-alert" />
+												</p:commandLink>
+												<p:commandLink process="@this"
+													onclick="PF('dlnapdonhang').show();"
+													title="Nạp đơn hàng từ chương trình DMS"
+													update="idfnapdonhang" styleClass="btn_upload"
+													style="margin-left:5px;background-color:#a61edc !important">
+													<i class="fa fa-upload" aria-hidden="true"></i>
+													<span>Nạp đơn hàng(DMS)</span>
+												</p:commandLink>
+												<p:commandLink process="@this"
+													onclick="PF('dldonhangexcel').show();"
+													title="Nạp đơn hàng từ excel" update="iddonhangexcel"
+													styleClass="btn_upload"
+													style="margin-left:5px;background-color:#666 !important">
+													<i class="fa fa-upload" aria-hidden="true"></i>
+													<span>Nạp đơn hàng(Excel)</span>
+												</p:commandLink>
+
+												<button type="button" class="btn  dropdown-toggle"
+													style="background-color: #4bac4d; height: 30px; color: white; font-weight: 600; padding-left: 9px; padding-right: 9px; border-radius: 3px !important; font-size: 11px;"
+													data-toggle="dropdown">
+													Báo cáo tổng hợp<span class="caret"
+														style="margin-left: 4px; margin-top: -2px;"></span>
+												</button>
+												<ul class="dropdown-menu" role="menu">
+													<li><p:commandLink update=":messages" target="_blank"
+															title="In đơn hàng tổng hợp trong danh sách được chọn"
+															action="#{orderLixBean.baoCaoTongHopPDFExcel('indonhangtonghop')}">
+															<i class="fa fa-print" aria-hidden="true"></i>
+															<span>In đơn hàng tổng hợp</span>
+														</p:commandLink></li>
+													<li><p:commandLink update=":messages" target="_blank"
+															title="Thủ kho tổng hợp trong danh sách được chọn"
+															action="#{orderLixBean.baoCaoTongHopPDFExcel('thukhotonghop')}">
+															<i class="fa fa-print" aria-hidden="true"></i>
+															<span>Thủ kho tổng hợp đơn hàng</span>
+														</p:commandLink></li>
+													<li><p:commandLink update=":messages" target="_blank"
+															title="Tổng hợp đơn hàng"
+															action="#{orderLixBean.baoCaoTongHopPDFExcel('tonghopdonhang')}">
+															<i class="fa fa-print" aria-hidden="true"></i>
+															<span>Tổng hợp đơn hàng</span>
+														</p:commandLink></li>
+													<li><p:commandLink update=":messages" target="_blank"
+															title="Xuất excel danh sách được chọn" ajax="false"
+															action="#{orderLixBean.exportIEInvoiceListExcel()}">
+															<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+															<span>Xuất file excel đơn hàng chọn</span>
+														</p:commandLink></li>
+													<li><p:commandLink update=":messages"
+															rendered="#{applicationBean.account.admin}"
+															title="Cập nhật trang thái ĐH"
+															action="#{orderLixBean.capnhattrangthaiDH()}">
+															<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+															<span>Cập nhật trạng thái ĐH</span>
+														</p:commandLink></li>
+													<li><p:commandLink update=":messages"
+															rendered="#{applicationBean.account.admin}"
+															title="Cập nhật trang thái ĐH (hủy)"
+															action="#{orderLixBean.capnhattrangthaiDHHuy()}">
+															<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+															<span>Cập nhật trạng thái ĐH (hủy)</span>
+														</p:commandLink></li>
+
+
+												</ul>
+												<p:commandLink styleClass="btn_destroy"
+													style="margin-left:1px;height:28px !important;line-height:28px !important;"
+													update=":messages,menuformid"
+													rendered="#{orderLixBean.account.admin}"
+													action="#{orderLixBean.capnhatthanhtien()}"
+													title="Cập nhật lại thành tiền">
+													<i class="fa fa-trash" aria-hidden="true"></i>
+													<span>Cập nhật thành tiền</span>
+												</p:commandLink>
+												<p:commandLink
+													title="Cập nhật số lượng thực xuất, tình trạng đơn hàng"
+													update=":messages,menuformid"
+													action="#{orderLixBean.capnhattinhtrangdonhang()}"
+													styleClass="btn_printtt" style="margin-left:10px; ">
+													<i class="fa fa-sync" aria-hidden="true"></i>
+												</p:commandLink>
+											</div>
+										</div>
+									</div>
+								</div>
+								<p:overlayPanel id="imagePanel" for="idorder" hideEffect="fade"
+									dismissable="false" widgetVar="panelsearch"
+									style="width:360px;">
+									<div class="col-md-12"
+										style="border: 1px solid #ccc; border-radius: 6px; margin-bottom: 5px !important;">
+										<div class="col-md-12"
+											style="padding: 10px 0px !important; padding-left: 0px !important; padding-right: 0px !important;">
+											<div class="row">
+												<div class="col-md-6 pdright3">
+													<label title="Lấy theo ngày tính ĐG/KM">Từ ngày</label>
+													<p:calendar value="#{orderLixBean.fromDateSearch}"
+														pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+														showButtonPanel="true" />
+												</div>
+												<div class="col-md-6 pdright3">
+													<label title="Lấy theo ngày tính ĐG/KM">Đến ngày</label>
+													<p:calendar value="#{orderLixBean.toDateSearch}"
+														pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+														showButtonPanel="true" />
+												</div>
+											</div>
+											<div class="row">
+												<div class="col-md-6 pdright3">
+													<label>Số chứng từ</label>
+													<p:inputText value="#{orderLixBean.voucherCodeSearch}"
+														style="width:100%" />
+												</div>
+												<div class="col-md-6 pdnone">
+													<label>ID(fox)</label>
+													<p:inputText value="#{orderLixBean.orderCodeSearch}"
+														style="width:100%" />
+												</div>
+											</div>
+											<div class="row">
+												<div class="col-md-12"
+													style="padding-left: 0px !important; padding-right: 0px !important;">
+													<label>Sản phẩm</label>
+												</div>
+											</div>
+											<div class="row">
+												<div class="col-md-12"
+													style="padding-left: 0px !important; padding-right: 0px !important; margin-bottom: 5px;">
+													<div class="nhapdlg">
+														<span class="fa fa-search"></span>
+														<p:autoComplete style="width:100%;"
+															value="#{orderLixBean.productSearch}" queryDelay="900"
+															maxResults="100" placeholder="Tìm sản phẩm"
+															converter="abstractConverter" minQueryLength="2"
+															completeMethod="#{abstractAutoComplete.completeProduct}"
+															var="p" itemLabel="#{p.product_name}" itemValue="#{p}"
+															forceSelection="true" onclick="this.select();">
+															<p:column style="width:50px">
+																<h:outputText value="#{p.product_code}" />
+															</p:column>
+															<p:column style="width:150px">
+																<h:outputText value="#{p.product_name}" />
+															</p:column>
+														</p:autoComplete>
+													</div>
+												</div>
+											</div>
+											<div class="row">
+												<div class="col-md-12"
+													style="padding-left: 0px !important; padding-right: 0px !important;">
+													<label>Khách hàng</label>
+												</div>
+											</div>
+											<div class="row">
+												<div class="col-md-12"
+													style="padding-left: 0px !important; padding-right: 0px !important; margin-bottom: 5px;">
+													<div class="nhapdlg">
+														<span class="fa fa-search"></span>
+														<p:autoComplete style="width:100%;"
+															value="#{orderLixBean.customerSearch}" queryDelay="900"
+															placeholder="Tìm khách hàng" maxResults="60"
+															converter="abstractConverter" minQueryLength="2"
+															completeMethod="#{orderLixBean.completeCustomer}" var="p"
+															itemLabel="#{p.customer_code}-#{p.customer_name}"
+															itemValue="#{p}" forceSelection="true"
+															onclick="this.select();">
+															<p:column style="width:50px">
+																<h:outputText value="#{p.customer_code}" />
+															</p:column>
+															<p:column style="width:150px">
+																<h:outputText value="#{p.customer_name}" />
+															</p:column>
+														</p:autoComplete>
+													</div>
+												</div>
+											</div>
+											<div class="row">
+												<div class="col-md-6"
+													style="padding-left: 0px !important; padding-right: 0px !important; margin-bottom: 5px;">
+													<label>Loại xuất nhập</label>
+													<p:autoComplete style="width:100%;"
+														value="#{orderLixBean.iECategoriesSearch}" dropdown="true"
+														converter="abstractConverter" minQueryLength="1"
+														completeMethod="#{abstractAutoComplete.completeIECategoriesCode}"
+														var="p" itemLabel="#{p.content}" itemValue="#{p}"
+														forceSelection="true" onclick="this.select();">
+														<p:column>
+															<h:outputText value="#{p.code}" />
+														</p:column>
+														<p:column>
+															<h:outputText value="#{p.content}" />
+														</p:column>
+													</p:autoComplete>
+													<label>P/O</label>
+													<p:inputText value="#{orderLixBean.poNoSearch}"
+														style="width:100%" />
+													<label>Đơn hàng tại</label>
+													<p:selectOneMenu value="#{orderLixBean.brandSearch}"
+														style="width:100%;">
+														<f:selectItem itemLabel="TẤT CẢ" itemValue="TAT CA" />
+														<f:selectItem itemLabel="HỒ CHÍ MINH"
+															itemValue="HO CHI MINH" />
+														<f:selectItem itemLabel="BÌNH DƯƠNG"
+															itemValue="BINH DUONG" />
+														<f:selectItem itemLabel="BẮC NINH" itemValue="BAC NINH" />
+													</p:selectOneMenu>
+												</div>
+												<div class="col-md-6"
+													style="padding-left: 4px !important; padding-right: 0px !important; margin-bottom: 5px;">
+													<label>Trạng thái</label>
+													<p:selectManyMenu value="#{orderLixBean.statusSearch}"
+														effect="fade" style="width:100%;">
+														<f:selectItem itemLabel="Tất cả" itemValue="#{-1}" />
+														<f:selectItem itemLabel="Chưa xuất hàng" itemValue="#{0}" />
+														<f:selectItem itemLabel="Đang xuất hàng" itemValue="#{1}" />
+														<f:selectItem itemLabel="Đã xuất hàng" itemValue="#{2}" />
+														<f:selectItem itemLabel="Đơn hàng hủy" itemValue="#{3}" />
+														<f:selectItem itemLabel="Đơn hàng không hủy"
+															itemValue="#{4}" />
+													</p:selectManyMenu>
+												</div>
+											</div>
+
+										</div>
+									</div>
+									<div class="col-md-12"
+										style="padding-left: 0px !important; padding-right: 0px !important; margin-bottom: 5px;">
+										<div class="pull-right">
+											<p:commandButton value="Lọc"
+												process="imagePanel,menuformid:tabview1:inputsearch"
+												icon="ui-icon-search" oncomplete="PF('panelsearch').hide()"
+												actionListener="#{orderLixBean.search()}" update="tablesp" />
+										</div>
+									</div>
+								</p:overlayPanel>
+							</p:fieldset>
+							<div class="col-md-12" style="margin-top: 3px;">
+								<p:dataTable value="#{orderLixBean.listOrderLix}"
+									widgetVar="tablesp" paginatorPosition="bottom"
+									columnClasses="hidden-col, col2, col3" styleClass="tablenhapsp"
+									paginator="true" rowKey="#{item.id}" id="tablesp"
+									style="width:100%;" sortOrder="descending" sortBy="#{item.id}"
+									selection="#{orderLixBean.orderLixSelect}" rows="50"
+									rowsPerPageTemplate="30,50,100" selectionMode="single"
+									resizableColumns="true" var="item">
+									<f:facet name="header">
+										<div class="flex justify-content-between align-items-center">
+											<div>
+												<p:commandLink id="toggler" styleClass="btn_primmary"
+													immediate="true" title="Cột hiển thị" style="float:right">
+													<i class="fa fa-table" aria-hidden="true"></i>
+													<span>Cột</span>
+												</p:commandLink>
+												<p:columnToggler datasource="tablesp" trigger="toggler">
+													<p:ajax listener="#{orderLixBean.onToggle}" />
+												</p:columnToggler>
+											</div>
+										</div>
+										<div style="clear: both" />
+									</f:facet>
+									<p:ajax event="rowSelect"
+										listener="#{orderLixBean.showEditOrderLix()}"
+										update="menuformid:tabview1:tab2real,menuformid:tabview1:tongtien,menuformid:tabview1:tongtien,menuformid:tabview1:searchform" />
+									<p:column style="width:30px" styleClass="textcenter"
+										toggleable="false">
+										<f:facet name="header">
+											<p:selectBooleanCheckbox value="#{orderLixBean.chonhet}">
+												<p:ajax update="@(.stchoose)" process="@this"
+													listener="#{orderLixBean.chonHetPhieu()}" />
+											</p:selectBooleanCheckbox>
+										</f:facet>
+										<p:selectBooleanCheckbox value="#{item.chonphieu}"
+											styleClass="stchoose">
+											<p:ajax process="@this" />
+										</p:selectBooleanCheckbox>
+									</p:column>
+
+									<p:column headerText="Id" width="50" sortBy="#{item.id}"
+										toggleable="false">
+										<h:outputText value="#{item.id}-#{item.status}" />
+									</p:column>
+									<p:column headerText="Số chứng từ" width="100"
+										visible="#{orderLixBean.cotdsdonhang[2]}"
+										sortBy="#{item.voucher_code}">
+										<h:outputText value="#{item.voucher_code}" />
+									</p:column>
+									<p:column headerText="Ngày ĐH" width="60"
+										visible="#{orderLixBean.cotdsdonhang[17]}"
+										style="text-align:center" sortBy="#{item.orderDateCreate}">
+										<h:outputText value="#{item.orderDateCreate}">
+											<f:convertDateTime pattern="dd/MM/yyyy" />
+										</h:outputText>
+
+									</p:column>
+									<p:column headerText="Ngày ĐG/KM" width="60"
+										visible="#{orderLixBean.cotdsdonhang[3]}"
+										style="text-align:center" sortBy="#{item.order_date}">
+										<h:outputText value="#{item.order_date}">
+											<f:convertDateTime pattern="dd/MM/yyyy" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="Hạn GH" width="55"
+										visible="#{orderLixBean.cotdsdonhang[4]}"
+										style="text-align:center" sortBy="#{item.order_date}">
+										<h:outputText value="#{item.delivery_date}">
+											<f:convertDateTime pattern="dd/MM/yyyy" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="Khách hàng" width="250"
+										visible="#{orderLixBean.cotdsdonhang[5]}"
+										sortBy="#{item.customer.customer_name}">
+										<h:outputText style="white-space: initial;"
+											value="#{item.customer.customer_code}-#{item.customer.customer_name}" />
+									</p:column>
+									<p:column headerText="Người tạo" width="120"
+										visible="#{orderLixBean.cotdsdonhang[6]}"
+										sortBy="#{item.created_by}">
+										<h:outputText value="#{item.created_by}" />
+									</p:column>
+									<p:column headerText="Mã NX" width="50"
+										visible="#{orderLixBean.cotdsdonhang[7]}"
+										style="text-align:center"
+										sortBy="#{item.ie_categories.content}">
+										<p:tooltip for="idmnx" value="#{item.ie_categories.content}" />
+										<h:outputText style="white-space: initial;" id="idmnx"
+											value="#{item.ie_categories.code}" />
+									</p:column>
+									<p:column headerText="Số xe" width="70"
+										visible="#{orderLixBean.cotdsdonhang[8]}"
+										sortBy="#{item.car.license_plate}">
+										<h:outputText value="#{item.car.license_plate}" />
+									</p:column>
+									<p:column headerText="P/O" width="80" sortBy="#{item.po_no}"
+										visible="#{orderLixBean.cotdsdonhang[9]}">
+										<h:outputText value="#{item.po_no}" />
+									</p:column>
+									<p:column headerText="Đã GH" width="40"
+										visible="#{orderLixBean.cotdsdonhang[10]}"
+										style="text-align:center" sortBy="#{item.delivered}">
+										<p:selectBooleanCheckbox disabled="true"
+											value="#{item.delivered}" />
+									</p:column>
+									<p:column headerText="CT.Đơn giá" width="80"
+										visible="#{orderLixBean.cotdsdonhang[11]}"
+										sortBy="#{item.pricing_program.program_code}">
+										<h:outputText value="#{item.pricing_program.program_code}" />
+									</p:column>
+									<p:column headerText="CT.Khuyến mãi" width="80"
+										visible="#{orderLixBean.cotdsdonhang[12]}"
+										sortBy="#{item.promotion_program.program_code}">
+										<h:outputText value="#{item.promotion_program.program_code}" />
+									</p:column>
+									<p:column headerText="LĐĐ" width="70"
+										visible="#{orderLixBean.cotdsdonhang[13]}"
+										sortBy="#{item.ldd}">
+										<h:outputText value="#{item.ldd}"
+											style="white-space: initial;" />
+									</p:column>
+									<p:column headerText="P/O" width="60"
+										visible="#{orderLixBean.cotdsdonhang[14]}"
+										sortBy="#{item.po_no}">
+										<h:outputText value="#{item.po_no}"
+											style="white-space: initial;" />
+									</p:column>
+									<p:column headerText="Nơi giao hàng" width="200"
+										visible="#{orderLixBean.cotdsdonhang[15]}"
+										sortBy="#{item.delivery_pricing.address}">
+										<h:outputText value="#{item.delivery_pricing.address}"
+											style="white-space: initial;" />
+									</p:column>
+									<p:column headerText="Chi chú" width="200"
+										visible="#{orderLixBean.cotdsdonhang[16]}"
+										sortBy="#{item.note}">
+										<h:outputText value="#{item.note}"
+											style="white-space: initial;" />
+									</p:column>
+									<p:column headerText="Đơn hàng tại" width="100"
+										visible="#{orderLixBean.cotdsdonhang[18]}"
+										sortBy="#{item.brand}">
+										<h:outputText value="#{item.brand}"
+											style="white-space: initial;" />
+									</p:column>
+								</p:dataTable>
+							</div>
+						</div>
+					</p:tab>
+				</p:tabView>
+			</h:form>
+		</div>
+		<p:dialog header="Hợp đồng vận chuyển" styleClass="dialogcommon"
+			resizable="false" width="800" style="overflow: initial;"
+			closeOnEscape="true" widgetVar="dlg2" modal="true">
+			<p:ajax event="close" update="dlg2"
+				listener="#{orderLixBean.closeDialogPickHDVC()}" />
+			<h:form id="dlg2" style="width:100%;">
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important;">
+					<div class="row">
+						<div class="col-md-4" style="padding-left: 0px !important;">
+							<label>Từ ngày</label>
+						</div>
+						<div class="col-md-4">
+							<label>Đến ngày</label>
+						</div>
+						<div class="col-md-4">
+							<label>Số hợp đồng</label>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-md-4" style="padding-left: 0px !important;">
+							<p:calendar value="#{orderLixBean.fromDateFCFilter}"
+								pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+								showButtonPanel="true" />
+						</div>
+						<div class="col-md-4">
+							<p:calendar value="#{orderLixBean.toDateFCFilter}"
+								pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+								showButtonPanel="true" />
+						</div>
+						<div class="col-md-4" style="padding-right: 0px !important;">
+							<p:inputText value="#{orderLixBean.contractNoFCFilter}"
+								style="width:100%;" />
+						</div>
+					</div>
+					<div class="row" style="margin-top: 5px;">
+						<div class="col-md-4" style="padding-left: 0px !important;">
+							<label>Loại khách hàng</label>
+						</div>
+						<div class="col-md-4">
+							<label>Khách hàng</label>
+						</div>
+					</div>
+					<div class="row">
+						<div class="col-md-4" style="padding-left: 0px !important;">
+							<p:selectOneMenu value="#{orderLixBean.customerTypesFCFilter}"
+								converter="abstractConverter" effect="fade" var="t"
+								style="width:100%;" filter="true"
+								filterPlaceholder="Tìm loại khách hàng" filterMatchMode="custom"
+								filterFunction="customFilter2">
+								<f:selectItem itemLabel="Tất cả" itemValue="#{null}" />
+								<f:selectItems value="#{orderLixBean.listCustomerTypes}"
+									var="theme" itemLabel="#{theme.code}-#{theme.name}"
+									itemValue="#{theme}" />
+								<p:column>
+									<h:outputText value="#{t.code}" />
+								</p:column>
+								<p:column>
+									<h:outputText value="#{t==null ? 'Tất cả' : t.name}" />
+								</p:column>
+							</p:selectOneMenu>
+						</div>
+						<div class="col-md-4">
+							<div class="nhapdlg">
+								<span class="fa fa-search"></span>
+								<p:autoComplete style="width:100%;"
+									value="#{orderLixBean.customerFcFilter}" queryDelay="900"
+									placeholder="Tìm khách hàng" maxResults="60"
+									converter="abstractConverter" minQueryLength="2"
+									completeMethod="#{orderLixBean.completeCustomerFC}" var="p"
+									itemLabel="#{p.customer_name}" itemValue="#{p}"
+									forceSelection="true" onclick="this.select();">
+									<p:column style="width:50px">
+										<h:outputText value="#{p.customer_code}" />
+									</p:column>
+									<p:column style="width:150px">
+										<h:outputText value="#{p.customer_name}" />
+									</p:column>
+								</p:autoComplete>
+							</div>
+						</div>
+						<div class="col-md-4">
+							<p:commandLink update="tbselectfc"
+								action="#{orderLixBean.searchHDVC()}" styleClass="btn_primmary"
+								style="margin-left:10px; ">
+								<i class="fa fa-search" aria-hidden="true"></i>
+								<span>Tìm kiếm</span>
+							</p:commandLink>
+						</div>
+					</div>
+					<div class="row" style="margin-top: 5px;">
+						<p:dataTable value="#{orderLixBean.listFreightContractSelect}"
+							paginatorPosition="bottom" styleClass="tablenhapsp"
+							style="width:100%;" paginator="true" rowKey="#{item.id}"
+							id="tbselectfc" scrollable="true" scrollHeight="350"
+							paginatorTemplate="{Exporters}" selectionMode="single"
+							resizableColumns="true" var="item">
+
+							<p:ajax event="rowDblselect"
+								listener="#{orderLixBean.rowFreightContractClick}"
+								update="menuformid:tabview1:fc_id" />
+							<p:column headerText="Mã hợp đồng" width="70">
+								<h:outputText value="#{item.contract_code}" />
+							</p:column>
+							<p:column headerText="Số hợp đồng" width="70">
+								<h:outputText value="#{item.contract_no}" />
+							</p:column>
+							<p:column headerText="Ngày" width="60">
+								<h:outputText value="#{item.contract_date}">
+									<f:convertDateTime pattern="dd/MM/yyyy" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="Mã KH" width="50">
+								<h:outputText value="#{item.customer.customer_code}" />
+							</p:column>
+							<p:column headerText="Khách hàng" width="250">
+								<h:outputText style="white-space: initial;"
+									value="#{item.customer.customer_name}" />
+							</p:column>
+							<p:column headerText="Số xe" width="70">
+								<h:outputText style="white-space: initial;"
+									value="#{item.car.license_plate}" />
+							</p:column>
+							<p:column headerText="Thanh toán" width="60"
+								styleClass="textcenter">
+								<p:selectBooleanCheckbox disabled="true" value="#{item.payment}" />
+							</p:column>
+						</p:dataTable>
+					</div>
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog header="Chi tiết đơn hàng" styleClass="dialogcommon"
+			resizable="false" width="500" style="oveFrflow: initial;"
+			closeOnEscape="true" widgetVar="dlgc1">
+			<h:form id="dlgc1">
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important;">
+					<div class="col-md-12"
+						style="padding-left: 0px !important; padding-right: 0px !important;">
+						<div class="row">
+							<label>Sản phẩm<span style="color: red;">*</span></label>
+						</div>
+						<div class="row">
+							<div class="nhapdlg">
+								<span class="fa fa-search"></span>
+								<p:autoComplete style="width:100%;"
+									placeholder="Nhập mã, tên sản phẩm"
+									value="#{orderLixBean.orderDetailCrud.product}" maxResults="20"
+									converter="abstractConverter" minQueryLength="2"
+									queryDelay="900"
+									completeMethod="#{abstractAutoComplete.completeProduct}"
+									var="p" itemLabel="#{p.product_name}" itemValue="#{p}"
+									forceSelection="true" onclick="this.select();">
+									<p:column style="width:50px">
+										<h:outputText value="#{p.product_code}" />
+									</p:column>
+									<p:column style="width:150px">
+										<h:outputText value="#{p.product_name}" />
+									</p:column>
+									<p:ajax event="itemSelect"
+										listener="#{orderLixBean.changeProduct()}" update="dlgc1" />
+								</p:autoComplete>
+							</div>
+						</div>
+					</div>
+					<div class="col-md-12"
+						style="padding-left: 0px !important; padding-right: 0px !important; margin-top: 10px;">
+						<div class="row">
+							<div class="col-md-6 pdright3">
+								<label>Số lượng(thùng)<span style="color: red;">*</span></label>
+								<p:inputNumber
+									value="#{orderLixBean.orderDetailCrud.box_quantity}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="0"
+									decimalSeparator="," thousandSeparator=".">
+									<p:ajax event="keyup"
+										listener="#{orderLixBean.changeBoxOrderDetail()}"
+										update="dlgrealbox,idctthanhtien,idsldonvitinh" />
+								</p:inputNumber>
+								<label>Thực xuất(thùng)</label>
+								<p:inputNumber disabled="true" id="dlgrealbox"
+									value="#{orderLixBean.orderDetailCrud.box_quantity_actual}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="0"
+									decimalSeparator="," thousandSeparator=".">
+								</p:inputNumber>
+								<label>Số lượng (ĐVT)</label>
+								<p:inputNumber disabled="true" id="idsldonvitinh"
+									value="#{orderLixBean.orderDetailCrud.quantity}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="2"
+									decimalSeparator="," thousandSeparator=".">
+								</p:inputNumber>
+								<label>Đơn giá</label>
+								<p:inputNumber disabled="true"
+									value="#{orderLixBean.orderDetailCrud.unit_price}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="2"
+									decimalSeparator="," thousandSeparator=".">
+								</p:inputNumber>
+								<label>Thành tiền</label>
+								<p:inputNumber disabled="true" id="idctthanhtien"
+									value="#{orderLixBean.orderDetailCrud.total}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="0"
+									decimalSeparator="," thousandSeparator=".">
+								</p:inputNumber>
+							</div>
+							<div class="col-md-6 pdnone">
+								<label>Mã lô hàng<span style="color: red;"></span></label>
+								<p:inputText value="#{orderLixBean.orderDetailCrud.batch_code}" />
+								<label>Số cont</label>
+								<p:inputNumber
+									value="#{orderLixBean.orderDetailCrud.container_number}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="0"
+									decimalSeparator="," thousandSeparator=".">
+								</p:inputNumber>
+								<label>Số seal</label>
+								<p:inputNumber
+									value="#{orderLixBean.orderDetailCrud.seal_number}"
+									styleClass="fix_width100" minValue="0" decimalPlaces="0"
+									decimalSeparator="," thousandSeparator=".">
+								</p:inputNumber>
+								<label>Hình thức KM</label>
+								<p:inputText styleClass="styleHTKM"
+									value="#{orderLixBean.orderDetailCrud.promotion_forms}" />
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important; margin-top: 10px;">
+					<p:commandLink process="dlgc1"
+						update="dlgc1,menuformid:tabview1:tablect,menuformid:tabview1:tablekm,menuformid:tabview1:tongtien,menuformid:tabview1:tongtien"
+						action="#{orderLixBean.saveOrUpdateOrderDetail()}"
+						styleClass="btn_primmary">
+						<i class="fa fa-floppy-o" aria-hidden="true"></i>
+						<span>Lưu/Cập nhật</span>
+					</p:commandLink>
+					<p:commandLink process="@this" update="dlgc1"
+						action="#{orderLixBean.createNewOrderDetail()}"
+						styleClass="btn_new"
+						style="margin-left:5px; padding-left:12px;padding-right:12px;">
+						<i class="fa fa-file-o" aria-hidden="true"></i>
+						<span>Tạo mới</span>
+					</p:commandLink>
+				</div>
+			</h:form>
+		</p:dialog>
+
+		<p:dialog header="Xe" styleClass="dialogcommon" resizable="false"
+			width="700" style="overflow: initial;" closeOnEscape="true"
+			widgetVar="dlgcar" modal="true">
+			<div class="col-md-12"
+				style="padding-left: 0px !important; padding-right: 0px !important;">
+				<div class="row">
+					<p:tabView id="tabcar" styleClass="clearfix label12 tabview_lix">
+						<p:tab id="tab1" title="Hiệu chỉnh"
+							rendered="#{orderLixBean.carCrud!=null}">
+							<h:form id="dlgcar">
+								<div class="col-md-12"
+									style="padding-left: 0px !important; padding-right: 0px !important;">
+									<div class="row">
+										<div class="col-md-6"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<div class="col-md-6"
+												style="padding-left: 0px !important; padding-right: 5px !important;">
+												<label>Số xe<span style="color: red;">*</span></label>
+											</div>
+											<div class="col-md-6"
+												style="padding-left: 5px !important; padding-right: 5px !important;">
+												<label>Điện thoại</label>
+											</div>
+										</div>
+										<div class="col-md-6"
+											style="padding-left: 5px !important; padding-right: 0px !important;">
+											<label>Tên xe<span style="color: red;">*</span></label>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-md-6"
+											style="padding-left: 0px !important; padding-right: 0px !important;">
+											<div class="col-md-6"
+												style="padding-left: 0px !important; padding-right: 5px !important;">
+												<p:inputText value="#{orderLixBean.carCrud.license_plate}" />
+											</div>
+											<div class="col-md-6"
+												style="padding-left: 5px !important; padding-right: 5px !important;">
+												<p:inputText value="#{orderLixBean.carCrud.phone_number}" />
+											</div>
+										</div>
+										<div class="col-md-6"
+											style="padding-left: 5px !important; padding-right: 0px !important;">
+											<p:inputText value="#{orderLixBean.carCrud.driver}" />
+										</div>
+									</div>
+									<div class="row" style="margin-top: 5px;">
+										<div class="col-md-6"
+											style="padding-left: 0px !important; padding-right: 5px !important;">
+											<label>Nhóm xe<span style="color: red;">*</span></label>
+										</div>
+										<div class="col-md-6"
+											style="padding-left: 5px !important; padding-right: 0px !important;">
+											<label>Chủ xe<span style="color: red;">*</span></label>
+										</div>
+									</div>
+									<div class="row">
+										<div class="col-md-6"
+											style="padding-left: 0px !important; padding-right: 5px !important;">
+											<p:selectOneMenu value="#{orderLixBean.carCrud.car_type}"
+												filter="true" filterPlaceholder="Tìm nhóm xe"
+												filterMatchMode="custom" filterFunction="customFilter2"
+												converter="abstractConverter" effect="fade" var="t"
+												style="width:100%;">
+												<f:selectItem itemLabel="Tất cả" value="#{null}" />
+												<f:selectItems value="#{orderLixBean.listCarType}"
+													var="theme" itemLabel="#{theme.old_code}-#{theme.name}"
+													itemValue="#{theme}" />
+												<p:column>
+													<h:outputText value="#{t.code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{t.old_code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{t==null ? 'Tất cả' :t.name}" />
+												</p:column>
+											</p:selectOneMenu>
+										</div>
+										<div class="col-md-6"
+											style="padding-left: 5px !important; padding-right: 0px !important;">
+											<p:selectOneMenu value="#{orderLixBean.carCrud.car_owner}"
+												converter="abstractConverter" effect="fade" var="t"
+												style="width:100%;" filter="true"
+												filterFunction="customFilter2"
+												filterPlaceholder="Tìm chủ xe">
+												<f:selectItem itemLabel="Tất cả" value="#{null}" />
+												<f:selectItems value="#{orderLixBean.listCarOwner}"
+													var="theme" itemLabel="#{theme.old_code}-#{theme.name}"
+													itemValue="#{theme}" />
+												<p:column>
+													<h:outputText value="#{t.code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{t.old_code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{t==null ? 'Tất cả' :t.name}" />
+												</p:column>
+											</p:selectOneMenu>
+
+										</div>
+									</div>
+									<div class="row" style="margin-top: 10px;">
+										<p:commandLink process="@this" update="dlgcar"
+											action="#{orderLixBean.createNewCar()}"
+											styleClass="btn_printtt">
+											<i class="fa fa-file-text-o" aria-hidden="true"></i>
+											<span>Tạo mới</span>
+										</p:commandLink>
+										<p:commandLink process="dlgcar"
+											update="dlgcar,tabcar:dlgcar2:tablecar,messages"
+											action="#{orderLixBean.saveOrUpdateCar()}"
+											styleClass="btn_primmary" style="margin-left:10px;">
+											<i class="fa fa-floppy-o" aria-hidden="true"></i>
+											<span>Lưu/Cập nhậtt</span>
+										</p:commandLink>
+									</div>
+								</div>
+							</h:form>
+						</p:tab>
+						<p:tab id="tab2" title="Danh sách">
+							<h:form id="dlgcar2">
+								<div class="col-md-12"
+									style="padding-left: 0px !important; padding-right: 0px !important;">
+									<div class="row">
+										<div class="col-md-3"
+											style="padding-left: 0px !important; padding-right: 5px !important;">
+											<label>Biển số</label>
+										</div>
+										<div class="col-md-4"
+											style="padding-left: 5px !important; padding-right: 5px !important;">
+											<label>Nhóm xe</label>
+										</div>
+										<div class="col-md-4"
+											style="padding-left: 5px !important; padding-right: 0px !important;">
+											<label>Chủ xe</label>
+										</div>
+										<div class="col-md-1"></div>
+									</div>
+									<div class="row">
+										<div class="col-md-3"
+											style="padding-left: 0px !important; padding-right: 5px !important;">
+											<p:inputText value="#{orderLixBean.licensePlateSearch}" />
+										</div>
+										<div class="col-md-4"
+											style="padding-left: 5px !important; padding-right: 5px !important;">
+											<p:selectOneMenu value="#{orderLixBean.carTypeSearch}"
+												filter="true" filterPlaceholder="Tìm nhóm xe"
+												filterMatchMode="custom" filterFunction="customFilter2"
+												converter="abstractConverter" effect="fade" var="t"
+												style="width:100%;">
+												<f:selectItem itemLabel="Tất cả" value="#{null}" />
+												<f:selectItems value="#{orderLixBean.listCarType}"
+													var="theme" itemLabel="#{theme.old_code}-#{theme.name}"
+													itemValue="#{theme}" />
+												<p:column>
+													<h:outputText value="#{t.code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{t.old_code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{t==null ? 'Tất cả' :t.name}" />
+												</p:column>
+											</p:selectOneMenu>
+										</div>
+										<div class="col-md-4"
+											style="padding-left: 5px !important; padding-right: 5px !important;">
+											<p:selectOneMenu value="#{orderLixBean.carOwnerSearch}"
+												converter="abstractConverter" effect="fade" var="t"
+												style="width:100%;" filter="true"
+												filterFunction="customFilter2"
+												filterPlaceholder="Tìm chủ xe">
+												<f:selectItem itemLabel="Tất cả" value="#{null}" />
+												<f:selectItems value="#{orderLixBean.listCarOwner}"
+													var="theme" itemLabel="#{theme.old_code}-#{theme.name}"
+													itemValue="#{theme}" />
+												<p:column>
+													<h:outputText value="#{t.code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{t.old_code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{t==null ? 'Tất cả' :t.name}" />
+												</p:column>
+											</p:selectOneMenu>
+										</div>
+										<div class="col-md-1"
+											style="padding-left: 5px !important; padding-right: 0px !important;">
+											<p:commandLink update="tablecar"
+												action="#{orderLixBean.searchCar()}"
+												style="height: 27px;width: 30px;display: inline-block;background-color: #4bac4d;border-radius: 3px;">
+												<i
+													style="line-height: 28px; color: white; padding-left: 10px; font-size: 11px;"
+													class="fa fa-search" aria-hidden="true"></i>
+											</p:commandLink>
+										</div>
+									</div>
+									<div class="row" style="margin-top: 10px;">
+										<p:dataTable value="#{orderLixBean.listCar}"
+											style="width:100%;" paginatorPosition="bottom"
+											styleClass="tablenhapsp" paginator="true" rowKey="#{item.id}"
+											paginatorTemplate="{ExportersCar}"
+											selection="#{orderLixBean.carSelect}" scrollable="true"
+											selectionMode="single" id="tablecar" scrollHeight="370"
+											widgetVar="tablecar" resizableColumns="true" var="item">
+
+											<p:ajax event="rowSelect"
+												listener="#{orderLixBean.showEditCar()}"
+												update="tabcar:dlgcar,menuformid:tabview1:carv" />
+											<p:column headerText="ID" width="30">
+												<h:outputText value="#{item.id}" />
+											</p:column>
+											<p:column headerText="Biển số xe" width="100">
+												<h:outputText value="#{item.license_plate}" />
+											</p:column>
+											<p:column headerText="Tên xe" width="250">
+												<h:outputText style="white-space: initial;"
+													value="#{item.driver}" />
+											</p:column>
+											<p:column headerText="Nhóm xe" width="150">
+												<h:outputText value="#{item.car_type.name}" />
+											</p:column>
+											<p:column headerText="Chủ xe" width="150">
+												<h:outputText value="#{item.car_owner.name}" />
+											</p:column>
+										</p:dataTable>
+									</div>
+								</div>
+							</h:form>
+						</p:tab>
+					</p:tabView>
+				</div>
+			</div>
+		</p:dialog>
+		<p:dialog header="Nạp đơn hàng từ file" widgetVar="dldonhangexcel"
+			resizable="false" styleClass="dialogcommon" modal="true"
+			style="overflow: initial;width:100%;max-width: min-content;min-width: 384px;">
+			<h:form id="iddonhangexcel" enctype="multipart/form-data">
+				<div class="col-md-12 boxCus">
+					<div class="col-md-12" style="margin-bottom: 10px;">
+						<div class="row">
+							<div class="col-md-12">
+								<a
+									href="#{request.contextPath}/resources/upload/filemau/file_cai_dat_donhang.xls"
+									style="color: #0077b3; text-decoration: underline;">Xem
+									file excel mẫu (xuất từ DMS)</a>
+							</div>
+						</div>
+					</div>
+					<div class="col-md-12">
+						<div class="row">
+							<p:fileUpload style="text-align:center" id="fileupload"
+								dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+								label="Chọn file từ máy tính" cancelLabel="Huỷ"
+								update="idfnapdonhang,menuformid:tabview1:tablesp"
+								uploadLabel="Tải lên" multiple="false"
+								oncomplete="PF('dldonhangexcel').hide();"
+								listener="#{orderLixBean.loadFileExcelDMS}" mode="advanced"
+								process="iddonhangexcel" />
+						</div>
+					</div>
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog header="Nạp chi tiết đơn hàng" widgetVar="dlgup1"
+			resizable="false" styleClass="dialogcommon" modal="true"
+			style="overflow: initial;width:100%;max-width: min-content;min-width: 384px;">
+			<h:form id="dlgup1" enctype="multipart/form-data">
+				<div class="col-md-12" style="margin-bottom: 10px;">
+					<div class="row">
+						<div class="col-md-12">
+							<a
+								href="#{request.contextPath}/resources/upload/filemau/file_mau_nhap_don_hang_.xlsx"
+								style="color: #0077b3; text-decoration: underline;">(Xem
+								file excel mẫu)</a>
+						</div>
+						<div class="col-md-12">
+							<p:selectBooleanCheckbox itemLabel="Chỉ nhập mã lô hàng"
+								value="#{orderLixBean.napMaLH}">
+								<p:ajax process="@this" />
+							</p:selectBooleanCheckbox>
+						</div>
+						<div class="col-md-12">
+							<p:selectBooleanCheckbox
+								itemLabel="Khuyến mãi lấy theo đơn giá bán"
+								value="#{orderLixBean.kmlaygiaban}">
+								<p:ajax process="@this" />
+							</p:selectBooleanCheckbox>
+						</div>
+					</div>
+				</div>
+				<div class="col-md-12">
+					<div class="row">
+						<p:fileUpload style="text-align:center" id="fileupload"
+							dragDropSupport="true" allowTypes="/(\.|\/)(xls|xlsx)$/"
+							label="Chọn file từ máy tính" cancelLabel="Huỷ"
+							oncomplete="PF('dlgup1').hide();"
+							update="messages,dlgc1,menuformid:tabview1:tablect,menuformid:tabview1:tablekm,menuformid:tabview1:tongtien,menuformid:tabview1:tongtien"
+							uploadLabel="Tải lên" multiple="false"
+							listener="#{orderLixBean.loadFileExcelOrderLix}" mode="advanced"
+							process="dlgup1" />
+					</div>
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog header="Chọn nơi vận chuyển" styleClass="dialogcommon"
+			resizable="false" width="600" style="overflow: initial;"
+			closeOnEscape="true" widgetVar="dlgpickpd" modal="true">
+			<h:form id="dlgpickpd" style="width:100%;">
+				<div class="col-md-12"
+					style="padding-left: 5px !important; padding-right: 0px !important;">
+					<p:dataTable widgetVar="tablepd" style="width:100%;"
+						styleClass="tablenhapsp" scrollable="true"
+						paginatorPosition="bottom" rowsPerPageTemplate="20,30,40"
+						paginator="true" rowKey="#{itemg.id}" scrollHeight="300"
+						var="itemg" value="#{orderLixBean.listDeliveryPricing}"
+						selectionMode="single">
+						<p:ajax event="rowDblselect" process="@this"
+							listener="#{orderLixBean.pickDeliveryPricing}"
+							update="menuformid:tabview1:tab2real,:messages" />
+						<p:column headerText="Mã nơi" width="40">
+							<h:outputText value="#{itemg.place_code}" />
+						</p:column>
+						<p:column headerText="Địa chỉ" width="200">
+							<h:outputText style="white-space: initial;"
+								value="#{itemg.address}" />
+						</p:column>
+						<p:column headerText="Đơn giá" width="60" styleClass="textcenter">
+							<h:outputText style="color:red;font-weight:bold;"
+								value="#{orderLixBean.formatHandler.getNumberFormat(itemg.unit_price,1)}" />
+						</p:column>
+						<p:column headerText="KM" width="30" styleClass="textright">
+							<h:outputText value="#{itemg.km}" />
+						</p:column>
+					</p:dataTable>
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="dlnapdonhang" resizable="false" width="1024"
+			header="Đơn hàng DMS">
+			<h:form id="idfnapdonhang">
+				<div class="col-md-12">
+					<div class="col-md-12">
+						<p:fieldset>
+							<div class="row">
+								<div class="col-md-12">
+									<div class="row">
+										<div class="col-md-6">
+											<p:outputPanel id="sedate">
+												<label style="width: 80px">Từ ngày</label>
+												<p:calendar value="#{orderLixBean.psDate}"
+													styleClass="ui-calendarw100" pattern="dd/MM/yyyy"
+													showOn="button" mask="99/99/9999" showButtonPanel="true">
+												</p:calendar>
+												<label style="width: 80px">Đến ngày</label>
+												<p:calendar value="#{orderLixBean.peDate}"
+													styleClass="ui-calendarw100" pattern="dd/MM/yyyy"
+													showOn="button" mask="99/99/9999" showButtonPanel="true">
+												</p:calendar>
+											</p:outputPanel>
+										</div>
+										<div class="col-md-6">
+											<p:commandLink styleClass="btn_primmary"
+												style="margin-left:1px;height:28px !important;line-height:28px !important;"
+												update="idfnapdonhang"
+												action="#{orderLixBean.taidonhangDMS()}"
+												title="Tải đơn hàng từ DMS">
+												<i class="fa fa-search" aria-hidden="true"></i>
+												<span>Tải đơn hàng DMS</span>
+											</p:commandLink>
+											<p:commandLink styleClass="btn_new"
+												update="idfnapdonhang,menuformid:tabview1:tablesp"
+												style="margin-left:5px;"
+												title="Nạp đơn hàng DMS đã chọn vào chương trình"
+												action="#{orderLixBean.napvaodonhang()}">
+												<i class="fa fa-paper-plane" aria-hidden="true"></i>
+												<span>Nạp vào đơn hàng</span>
+											</p:commandLink>
+										</div>
+									</div>
+								</div>
+							</div>
+						</p:fieldset>
+					</div>
+					<div class="col-md-12">
+						<p:dataTable value="#{orderLixBean.donHangNPPAPIs}"
+							filteredValue="#{orderLixBean.donHangNPPAPIFilters}"
+							styleClass="tablenhapsp" id="tablehd" rowKey="#{item.iddonhang}"
+							paginator="true" paginatorPosition="bottom" rows="5"
+							rowsPerPageTemplate="5,10,15" style="width:100%;"
+							widgetVar="tbdonhangdms" sortBy="#{item.ngaydathang}"
+							selection="#{orderLixBean.donHangNPPAPISelect}"
+							selectionMode="single" sortOrder="descending" var="item">
+							<p:ajax event="rowSelect"
+								listener="#{orderLixBean.selectDonHang()}"
+								update="idfnapdonhang:tablehdct" />
+							<p:column style="width:20px" styleClass="textcenter">
+								<f:facet name="header">
+									<p:selectBooleanCheckbox value="#{orderLixBean.chonhetDMS}">
+										<p:ajax update="@(.stchoosedl)"
+											listener="#{orderLixBean.chonHetPhieuDMS()}" />
+									</p:selectBooleanCheckbox>
+								</f:facet>
+								<p:selectBooleanCheckbox value="#{item.chonphieu}"
+									styleClass="stchoosedl">
+									<p:ajax process="@this" />
+								</p:selectBooleanCheckbox>
+							</p:column>
+							<p:column headerText="Id" style="width:40px"
+								styleClass="textcenter" sortBy="#{item.iddonhang}">
+								<h:outputText value="#{item.iddonhang}" />
+							</p:column>
+							<p:column headerText="Đã nạp" width="40" styleClass="textcenter">
+								<p:selectBooleanCheckbox value="#{item.daxuat}" disabled="true" />
+							</p:column>
+							<p:column headerText="Số ĐH" width="70"
+								filterFunction="#{abstractCustomFilter.filterByText}"
+								filterBy="#{item.madonhang}" sortBy="#{item.madonhang}">
+								<h:outputText value="#{item.madonhang}" />
+							</p:column>
+							<p:column headerText="Ngày giờ ĐH" width="70"
+								sortBy="#{item.ngaydathang}">
+								<h:outputText value="#{item.ngaydathang}">
+									<f:convertDateTime pattern="dd/MM/yyyy hh:mm" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="Ngày GH" width="50"
+								sortBy="#{item.ngaygiaohang}">
+								<h:outputText value="#{item.ngaygiaohang}">
+									<f:convertDateTime pattern="dd/MM/yyyy" />
+								</h:outputText>
+							</p:column>
+							<p:column headerText="Khách hàng" width="250"
+								filterFunction="#{abstractCustomFilter.filterByText}"
+								filterBy="#{item.makhachhang}-#{item.tenkhachhang}"
+								sortBy="#{item.tenkhachhang}">
+								<h:outputText style="white-space: initial;"
+									value="#{item.makhachhang}-#{item.tenkhachhang}" />
+							</p:column>
+							<p:column headerText="..." width="80">
+								<p:commandLink styleClass="btn_new"
+									title="Bỏ xác nhận đơn hàng để NPP điều chỉnh"
+									action="#{orderLixBean.boxacnhanDMS(item)}">
+									<span>Bỏ xác nhận</span>
+								</p:commandLink>
+							</p:column>
+						</p:dataTable>
+					</div>
+					<div class="col-md-12">
+						<p:dataTable value="#{orderLixBean.donHangNPPAPIChiTiets}"
+							scrollable="true" scrollHeight="200" rows="10"
+							rowIndexVar="indexd" style="width:100%;" styleClass="tablenhapsp"
+							id="tablehdct" var="item">
+							<p:column headerText="STT" width="30" styleClass="textcenter">
+								<h:outputText value="#{indexd+1}" />
+							</p:column>
+							<p:column headerText="Mã SP" width="30" styleClass="textcenter">
+								<h:outputText value="#{item.maspchinh}" />
+							</p:column>
+							<p:column headerText="Tên sản phẩm" width="350">
+								<h:outputText value="#{item.tenspchinh}" />
+							</p:column>
+							<p:column headerText="Số lượng(thùng)" width="50"
+								styleClass="textright">
+								<h:outputText value="#{item.soluongthung}">
+									<f:convertNumber locale="vi" pattern="###,###,##0.##" />
+								</h:outputText>
+							</p:column>
+						</p:dataTable>
+					</div>
+					<p:outputLabel
+						value="Chú ý: Chỉ nạp lại được các phiếu cùng mã đơn hàng khi chưa giao hàng và chưa có số xe." />
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog header="Dữ liệu không nạp được"
+			styleClass="dialogcommon dialogerror" resizable="false"
+			style="overflow: initial;width:100%;max-width: min-content;min-width: 400px;"
+			closeOnEscape="true" widgetVar="dldulieukhongnapduoc">
+			<h:form id="iddldulieukhongnapduoc">
+				<ui:repeat var="item" value="#{orderLixBean.dulieukhongnapduoc}">
+					<h:outputText value="#{item}" />
+					<br />
+				</ui:repeat>
+			</h:form>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

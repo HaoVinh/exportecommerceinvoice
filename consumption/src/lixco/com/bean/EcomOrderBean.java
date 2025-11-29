@@ -1,0 +1,632 @@
+package lixco.com.bean;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+
+import javax.annotation.PostConstruct;
+import javax.faces.application.FacesMessage;
+import javax.faces.bean.ManagedBean;
+import javax.faces.bean.ViewScoped;
+import javax.faces.component.UIComponent;
+import javax.faces.context.FacesContext;
+import javax.inject.Inject;
+
+import org.primefaces.PrimeFaces;
+import org.primefaces.component.datatable.DataTable;
+
+import lixco.com.entity.EcomOrder;
+import lixco.com.entity.EcomOrderDetail;
+import lixco.com.service.EcomOrderDetailService;
+import lixco.com.service.EcomOrderService;
+import lombok.Getter;
+import lombok.Setter;
+import trong.lixco.com.bean.AbstractBean;
+import vinh.lixco.com.apiecommerce.EcomOrderUtils;
+import vinh.lixco.com.apiecommerce.LazadaAPIServlet;
+import vinh.lixco.com.apiecommerce.OrderDTO;
+import vinh.lixco.com.apiecommerce.OrderDetailDTO;
+import vinh.lixco.com.apiecommerce.ShopeeAPIServlet;
+import vinh.lixco.com.apiecommerce.TikTokAPIServlet;
+
+@ManagedBean
+@ViewScoped
+public class EcomOrderBean extends AbstractBean implements Serializable {
+	private static final long serialVersionUID = 1L;
+	private static final Logger LOGGER = Logger.getLogger(EcomOrderBean.class.getName());
+
+	@Getter
+	@Setter
+	private List<EcomOrder> ecomOrders = new ArrayList<>();
+
+	@Getter
+	@Setter
+	private List<EcomOrder> filteredOrders;
+
+	@Getter
+	@Setter
+	private EcomOrder ecomOrder;
+
+	@Getter
+	@Setter
+	private List<EcomOrderDetail> ecomOrderDetails = new ArrayList<>();
+	@Getter
+	@Setter
+	private EcomOrderDetail ecomOrderDetail;
+	@Getter
+	@Setter
+	private int activeTabIndex = 0;
+
+	@Getter
+	@Setter
+	private String selectedPlatform = "Shopee";
+	@Inject
+	private EcomOrderService ecomOrderService;
+	@Getter
+	@Setter
+	private long lazadaOrderCount;
+	@Getter
+	@Setter
+	private long shopeeOrderCount;
+	@Getter
+	@Setter
+	private long tikTokOrderCount;
+	@Getter
+	@Setter
+	private boolean selectAll;
+
+	@PostConstruct
+	protected void initItem() {
+		fromDateSearch = getFirstDayOfMonth();
+		toDateSearch = getLastDayOfMonth();
+		loadOrders();
+		shopeeOrderCount = ecomOrderService.countShopeeOrders();
+		lazadaOrderCount = ecomOrderService.countLazadaOrders();
+		tikTokOrderCount = ecomOrderService.countTikTokOrders();
+	}
+
+	private Date getFirstDayOfMonth() {
+		Calendar cal = Calendar.getInstance();
+//		cal.add(Calendar.DAY_OF_MONTH, -2);
+		cal.set(Calendar.HOUR_OF_DAY, 0);
+		cal.set(Calendar.MINUTE, 0);
+		cal.set(Calendar.SECOND, 0);
+		cal.set(Calendar.MILLISECOND, 0);
+		return cal.getTime();
+	}
+
+	private Date getLastDayOfMonth() {
+		Calendar cal = Calendar.getInstance();
+		cal.set(Calendar.HOUR_OF_DAY, 23);
+		cal.set(Calendar.MINUTE, 59);
+		cal.set(Calendar.SECOND, 59);
+		cal.set(Calendar.MILLISECOND, 999);
+		return cal.getTime();
+	}
+
+	private Date normalizeStartOfDay(Date date) {
+		if (date == null)
+			return null;
+		Calendar cal = Calendar.getInstance();
+		cal.setTime(date);
+		cal.set(Calendar.HOUR_OF_DAY, 0);
+		cal.set(Calendar.MINUTE, 0);
+		cal.set(Calendar.SECOND, 0);
+		cal.set(Calendar.MILLISECOND, 0);
+		return cal.getTime();
+	}
+
+	private Date normalizeEndOfDay(Date date) {
+		if (date == null)
+			return null;
+		Calendar cal = Calendar.getInstance();
+		cal.setTime(date);
+		cal.set(Calendar.HOUR_OF_DAY, 23);
+		cal.set(Calendar.MINUTE, 59);
+		cal.set(Calendar.SECOND, 59);
+		cal.set(Calendar.MILLISECOND, 999);
+		return cal.getTime();
+	}
+
+	private void loadOrders() {
+		search();
+		LOGGER.info("Đã load đơn hàng TMĐT.");
+	}
+
+	@Getter
+	@Setter
+	private Date fromDateSearch;
+	@Getter
+	@Setter
+	private Date toDateSearch;
+	@Getter
+	@Setter
+	private String orderType = "Tất cả";
+
+	public void search() {
+		Date from = normalizeStartOfDay(fromDateSearch);
+		Date to = normalizeEndOfDay(toDateSearch);
+		ecomOrders = ecomOrderService.findByPlatformDatetoDate(selectedPlatform, from, to, orderType);
+		updateAutoExportedGlobal();
+
+	}
+
+	@Override
+	protected org.jboss.logging.Logger getLogger() {
+		return org.jboss.logging.Logger.getLogger(EcomOrderBean.class);
+	}
+
+	@Getter
+	@Setter
+	private EcomOrderDetail ecomOrderDetailSelect;
+
+	public void showEditInvoiceDetail() {
+		PrimeFaces current = PrimeFaces.current();
+		try {
+			if (ecomOrderDetailSelect != null) {
+				ecomOrderDetail = ecomOrderDetailSelect;
+				current.executeScript("PF('dlgc1').show();");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Getter
+	@Setter
+	private boolean globalAutoExported = false;
+
+	public void updateAutoExportedGlobal() {
+		try {
+			ecomOrderService.autoXuatHDDT(this.globalAutoExported);
+			String mode = globalAutoExported ? "TỰ ĐỘNG" : "THỦ CÔNG";
+			FacesContext.getCurrentInstance().addMessage(
+			    null,
+			    new FacesMessage(
+			        FacesMessage.SEVERITY_INFO,
+			        "Thành công",
+			        "Đã chuyển tất cả đơn hàng sang chế độ " + mode + " xuất HĐĐT"
+			    )
+			);
+
+		} catch (Exception e) {
+			FacesContext.getCurrentInstance().addMessage(null,
+					new FacesMessage(FacesMessage.SEVERITY_ERROR, "Lỗi", "Không thể cập nhật toàn bộ"));
+		}
+	}
+
+	public void syncSelectedOrderStatus() {
+		if (ecomOrders == null || ecomOrders.isEmpty()) {
+			canhbao("Không có đơn hàng nào để đồng bộ.");
+			return;
+		}
+
+		int syncedCount = 0;
+		int errorCount = 0;
+
+		for (EcomOrder order : ecomOrders) {
+			if (order != null && order.isSelect()) {
+				try {
+					this.ecomOrder = order;
+					OrderDTO dto = new OrderDTO();
+					if ("Shopee".equalsIgnoreCase(order.getLoaitmdt())) {
+						dto = shopeeAPIServlet.fetchOrder(order.getOrderNumber());
+					} else if ("Lazada".equalsIgnoreCase(order.getLoaitmdt())) {
+						dto = lazadaAPIServlet.fetchOrderData(order.getOrderNumber());
+					} else if ("Tiktok".equalsIgnoreCase(order.getLoaitmdt())) {
+						dto = tikTokAPIServlet.fetchOrder(order.getOrderNumber());
+					}
+					if (dto != null && dto.getOrder_status() != null) {
+						String newStatus = dto.getOrder_status();
+						String oldStatus = order.getMyStatus();
+						if (!newStatus.equalsIgnoreCase(order.getStatus())) {
+							order.setStatus(newStatus);
+							order.setUpdatedAt(dto.getUpdatedAt());
+							order.setThoigiancapnhat(new Date());
+							EcomOrderUtils.setMyStatus(order);
+							order.setSelect(false);
+							ecomOrderService.update(order);
+							order = ecomOrderService.findById(order.getId());
+
+							FacesContext.getCurrentInstance().addMessage(null,
+									new FacesMessage(FacesMessage.SEVERITY_INFO, "Đã đồng bộ trạng thái đơn hàng " + ""
+											+ order.getOrderNumber() + ":" + oldStatus + " → " + order.getMyStatus(),
+											""));
+							LOGGER.info("Đồng bộ thành công đơn hàng " + order.getOrderNumber() + ":" + oldStatus
+									+ " → " + order.getMyStatus() + " → " + order.getMyStatus());
+							selectAll = false;
+
+							syncedCount++;
+						} else {
+							FacesContext.getCurrentInstance().addMessage(null,
+									new FacesMessage(FacesMessage.SEVERITY_INFO,
+											"Trạng thái đơn hàng không thay đổi: " + order.getOrderNumber(), ""));
+							selectAll = false;
+							order.setSelect(false);
+						}
+					} else {
+						FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(FacesMessage.SEVERITY_WARN,
+								"Không lấy được trạng thái từ API cho đơn hàng: " + order.getOrderNumber(), ""));
+						selectAll = false;
+						order.setSelect(false);
+						errorCount++;
+
+					}
+				} catch (Exception ex) {
+					LOGGER.severe("Lỗi đồng bộ đơn hàng " + order.getOrderNumber() + ": " + ex.getMessage());
+					FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(FacesMessage.SEVERITY_ERROR,
+							"Lỗi khi đồng bộ đơn hàng: " + order.getOrderNumber(), ex.getMessage()));
+					selectAll = false;
+					errorCount++;
+				}
+			}
+		}
+
+		if (syncedCount > 0) {
+			PrimeFaces.current().ajax().update("orderForm:tabView:ordersTable");
+		}
+		if (errorCount > 0) {
+			canhbao("Có " + errorCount + " lỗi trong quá trình đồng bộ.");
+		}
+	}
+
+	public void dongbothanhtien() {
+
+		if (ecomOrder == null) {
+			FacesContext.getCurrentInstance().addMessage(null,
+					new FacesMessage(FacesMessage.SEVERITY_WARN, "Chưa chọn đơn hàng.", ""));
+			return;
+		}
+
+		try {
+			OrderDTO dto = new OrderDTO();
+			if ("Shopee".equalsIgnoreCase(ecomOrder.getLoaitmdt())) {
+				dto = shopeeAPIServlet.fetchOrder(ecomOrder.getOrderNumber());
+			}
+
+			else if ("Lazada".equalsIgnoreCase(ecomOrder.getLoaitmdt())) {
+				dto = lazadaAPIServlet.fetchOrderData(ecomOrder.getOrderNumber());
+			} else if ("Tiktok".equalsIgnoreCase(ecomOrder.getLoaitmdt())) {
+				dto = tikTokAPIServlet.fetchOrder(ecomOrder.getOrderNumber());
+			}
+			if (dto != null) {
+				Double newPrice = dto.getLastPrice();
+				if ((ecomOrder.getLastPrice() == null) || newPrice != ecomOrder.getLastPrice()) {
+					ecomOrder.setLastPrice(newPrice);
+					ecomOrder.setDiscountedPrice(dto.getDiscountedPrice());
+					ecomOrder.setSellerDiscount(dto.getSellerDiscount());
+					ecomOrder.setShippingFee(dto.getShippingFee());
+					ecomOrder.setComboDiscount(dto.getComboDiscount());
+					ecomOrderService.update(ecomOrder);
+					ecomOrder = ecomOrderService.findById(ecomOrder.getId());
+
+					FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(FacesMessage.SEVERITY_INFO,
+							"Đã cập nhật thành tiền: " + ecomOrder.getLastPrice() + " → " + newPrice, ""));
+					LOGGER.info("Đồng bộ thành công đơn hàng " + ecomOrder.getOrderNumber() + " → " + newPrice);
+				} else {
+					FacesContext.getCurrentInstance().addMessage(null,
+							new FacesMessage(FacesMessage.SEVERITY_INFO, "Thành tiền không có thay đổi.", ""));
+				}
+			} else {
+				FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(FacesMessage.SEVERITY_WARN,
+						"Không lấy được thành tiền từ API cho đơn hàng: " + ecomOrder.getOrderNumber(), ""));
+			}
+		} catch (Exception ex) {
+			LOGGER.severe("Lỗi đồng bộ đơn hàng " + ecomOrder.getOrderNumber() + ": " + ex.getMessage());
+			FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(FacesMessage.SEVERITY_ERROR,
+					"Lỗi khi đồng bộ đơn hàng: " + ecomOrder.getOrderNumber(), ex.getMessage()));
+		}
+
+	}
+
+	public void dongbodongia() {
+		try {
+			OrderDTO dto = null;
+			List<OrderDetailDTO> items = null;
+			if ("Shopee".equalsIgnoreCase(ecomOrder.getLoaitmdt())) {
+				dto = shopeeAPIServlet.fetchOrder(ecomOrder.getOrderNumber());
+				items = dto.getOrderDetails();
+			} else if ("Lazada".equalsIgnoreCase(ecomOrder.getLoaitmdt())) {
+				dto = lazadaAPIServlet.fetchOrderData(ecomOrder.getOrderNumber());
+				lazadaAPIServlet.saveOrUpdateOrder(dto);
+				items = dto.getOrderDetails();
+			} else if ("Tiktok".equalsIgnoreCase(ecomOrder.getLoaitmdt())) {
+				dto = tikTokAPIServlet.fetchOrder(ecomOrder.getOrderNumber());
+				items = dto.getOrderDetails();
+			}
+
+			if (items == null || items.isEmpty()) {
+				LOGGER.warning("No items found for orderNumber: " + ecomOrder.getOrderNumber());
+				return;
+			}
+
+			// Kiểm tra xem items có chứa các chi tiết tách không
+			LOGGER.info("Fetched items count: " + items.size() + ", sample orderItemIds: "
+					+ items.stream().map(OrderDetailDTO::getOrderItemId).collect(Collectors.joining(", ")));
+
+			// Ánh xạ giá và chi tiết đơn hàng
+			Map<String, Map<String, Object>> itemPriceMap = items.stream()
+					.collect(Collectors.toMap(item -> item.getOrderItemId() + "_" + item.getSku(), // Sử dụng tổ hợp
+																									// orderItemId và
+																									// sku làm khóa
+							item -> {
+								Map<String, Object> priceMap = new HashMap<>();
+								priceMap.put("lastItemPrice",
+										item.getLastItemPrice() != null ? item.getLastItemPrice() : 0.0);
+								priceMap.put("unitPrice", item.getUnitPrice() != null ? item.getUnitPrice() : 0.0);
+								priceMap.put("quantity", item.getQuantity() != 0 ? item.getQuantity() : 0);
+								priceMap.put("sku", item.getSku());
+								priceMap.put("name", item.getName());
+								return priceMap;
+							}));
+
+			for (EcomOrderDetail orddt : ecomOrderDetails) {
+				String orderItemId = orddt.getOrderItemNumber();
+				String uniqueKey = orderItemId + "_" + orddt.getSku(); // Khóa duy nhất
+				if (orderItemId != null && itemPriceMap.containsKey(uniqueKey)) {
+					Map<String, Object> prices = itemPriceMap.get(uniqueKey);
+					Double lastItemPrice = (Double) prices.get("lastItemPrice");
+					Double unitPrice = (Double) prices.get("unitPrice");
+					Integer quantity = (Integer) prices.get("quantity");
+					String sku = (String) prices.get("sku");
+					String name = (String) prices.get("name");
+
+					// Chỉ cập nhật nếu giá trị mới khác giá trị hiện tại
+					if (!Objects.equals(orddt.getSplitPrice(), lastItemPrice)
+							|| !Objects.equals(orddt.getUnitPrice(), unitPrice)
+							|| !Objects.equals(orddt.getQuantity(), quantity) || !Objects.equals(orddt.getSku(), sku)
+							|| !Objects.equals(orddt.getName(), name)) {
+						orddt.setSplitPrice(lastItemPrice);
+						orddt.setUnitPrice(unitPrice);
+						orddt.setQuantity(quantity);
+						orddt.setSku(sku);
+						orddt.setName(name);
+						ecomOrderDetailService.update(orddt);
+						LOGGER.info("Đồng bộ giá thành công cho orderItemNumber: " + orderItemId + ", splitPrice: "
+								+ lastItemPrice + ", unitPrice: " + unitPrice + ", quantity: " + quantity + ", sku: "
+								+ sku);
+					} else {
+						LOGGER.info("No changes needed for orderItemNumber: " + orderItemId + ", sku: " + sku);
+					}
+				} else {
+					LOGGER.warning("Không tìm thấy OrderDetailDTO cho orderItemNumber: " + orderItemId + ", sku: "
+							+ orddt.getSku() + ", available keys: " + itemPriceMap.keySet());
+				}
+			}
+
+		} catch (Exception ex) {
+			LOGGER.severe("Lỗi đồng bộ đơn hàng " + ecomOrder.getOrderNumber() + ": " + ex.getMessage());
+			FacesContext.getCurrentInstance().addMessage(null, new FacesMessage(FacesMessage.SEVERITY_ERROR,
+					"Lỗi khi đồng bộ đơn hàng: " + ecomOrder.getOrderNumber(), ex.getMessage()));
+		}
+	}
+
+	@Inject
+	private EcomOrderDetailService ecomOrderDetailService;
+	@Inject
+	private LazadaAPIServlet lazadaAPIServlet;
+	@Inject
+	private ShopeeAPIServlet shopeeAPIServlet;
+	@Inject
+	private TikTokAPIServlet tikTokAPIServlet;
+
+	public void onRowSelect() {
+		if (ecomOrder == null || ecomOrder.getOrderNumber() == null || ecomOrder.getOrderNumber().trim().isEmpty()) {
+			LOGGER.warning("Đơn hàng không hợp lệ.");
+			return;
+		}
+
+		try {
+			String orderNumber = ecomOrder.getOrderNumber();
+			String loaitmdt = ecomOrder.getLoaitmdt();
+			String orderType = ecomOrder.getOrderType();
+			if ("PROMO".equals(orderType)) {
+				ecomOrderDetails = ecomOrderDetailService.findByCodeAndPlatformAndOrderTypeAndOrderId(ecomOrder.getId(),
+						orderNumber, loaitmdt, "PROMO");
+			} else if ("SALE".equals(orderType)) {
+				ecomOrderDetails = ecomOrderDetailService.findByCodeAndPlatformAndOrderTypeAndOrderId(ecomOrder.getId(),
+						orderNumber, loaitmdt, "SALE");
+			} else {
+				ecomOrderDetails = ecomOrderDetailService.findByCodeAndPlatform(orderNumber, loaitmdt);
+			}
+
+			if (ecomOrderDetails == null || ecomOrderDetails.isEmpty()) {
+				List<OrderDetailDTO> apiItems = new ArrayList<>();
+				OrderDTO orderDTO = new OrderDTO();
+				if ("Lazada".equals(loaitmdt)) {
+					orderDTO = lazadaAPIServlet.fetchOrderData(orderNumber);
+					apiItems = orderDTO.getOrderDetails();
+				} else if ("Shopee".equals(loaitmdt)) {
+					orderDTO = shopeeAPIServlet.fetchOrder(orderNumber);
+					apiItems = orderDTO.getOrderDetails();
+				} else if ("TikTok".equals(loaitmdt)) {
+					orderDTO = tikTokAPIServlet.fetchOrder(ecomOrder.getOrderNumber());
+					apiItems = orderDTO.getOrderDetails();
+				}
+
+				if (apiItems == null || apiItems.isEmpty()) {
+					LOGGER.warning("API không trả về chi tiết đơn hàng.");
+					return;
+				}
+
+//				Set<String> existingItemNumbers = ecomOrderDetails.stream().map(EcomOrderDetail::getOrderItemNumber)
+//						.collect(Collectors.toSet());
+//
+//			for (OrderDetailDTO orddt : apiItems) {
+//					if (!existingItemNumbers.contains(orddt.getOrderItemId())) {
+//						EcomOrderDetail ecomOrddt = new EcomOrderDetail();
+//						ecomOrddt.setName(orddt.getName());
+//						ecomOrddt.setSku(orddt.getSku());
+//						ecomOrddt.setItemPrice(orddt.getItemPrice());
+//						ecomOrddt.setLoaitmdt(loaitmdt);
+//						ecomOrddt.setOrderId(orderNumber);
+//						ecomOrddt.setOrderItemNumber(orddt.getOrderItemId());
+//						ecomOrddt.setVariant(orddt.isVariant());
+//						ecomOrddt.setOrder(ecomOrder);
+//						ecomOrddt.setQuantity(orddt.getQuantity());
+//						ecomOrddt.setSplitPrice(orddt.getLastItemPrice());
+//						ecomOrddt.setUnitPrice(orddt.getUnitPrice());
+//						ecomOrddt.setOrderType(orddt.getOrderDetailType());
+//						ecomOrderDetailService.create(ecomOrddt);
+//						ecomOrderDetails.add(ecomOrddt);
+//					}
+//						else {
+//						EcomOrderDetail existingDetail = ecomOrderDetails.stream()
+//								.filter(d -> d.getOrderItemNumber().equals(orddt.getOrderItemId())).findFirst()
+//								.orElse(null);
+//						if (existingDetail != null) {
+//							existingDetail.setName(orddt.getName());
+//							existingDetail.setSku(orddt.getSku());
+//							existingDetail.setItemPrice(orddt.getItemPrice());
+//							existingDetail.setVariant(orddt.isVariant());
+//							existingDetail.setQuantity(orddt.getQuantity());
+//							existingDetail.setSplitPrice(orddt.getLastItemPrice());
+//							existingDetail.setUnitPrice(orddt.getUnitPrice());
+//							existingDetail.setOrderType(orddt.getOrderDetailType());
+//							ecomOrderDetailService.update(existingDetail);
+//						}
+//					}
+//				}
+
+			}
+
+		} catch (Exception e) {
+			LOGGER.severe("Lỗi load chi tiết đơn hàng: " + e.getMessage());
+			e.printStackTrace();
+		}
+	}
+
+	public void onRowDblSelect() {
+		activeTabIndex = 1;
+	}
+
+	public String getStatusDisplay(EcomOrder ecom) {
+		if (ecom.getStatus() == null)
+			return "";
+		String status = ecom.getStatus().toLowerCase();
+		String label, backgroundColor, textColor;
+
+		switch (status) {
+		case "pending":
+		case "processed":
+		case "awaiting_shipment":
+			label = "Chờ xử lý/Chờ giao hàng";
+			backgroundColor = "#ffeeba"; // vàng nhạt
+			textColor = "#856404"; // vàng đậm
+			break;
+		case "delivered":
+			label = "Đã giao";
+			backgroundColor = "#d4edda"; // xanh lá nhạt
+			textColor = "#155724"; // xanh lá đậm
+			break;
+		case "unpaid":
+			label = "Chưa trả tiền";
+			backgroundColor = "#f8d7da"; // đỏ nhạt
+			textColor = "#721c24"; // đỏ đậm
+			break;
+		case "packed":
+			label = "Đã đóng gói";
+			backgroundColor = "#d1ecf1"; // xanh lam nhạt
+			textColor = "#0c5460"; // xanh lam đậm
+			break;
+		case "ready_to_ship":
+			label = "Sẵn sàng giao";
+			backgroundColor = "#cce5ff"; // xanh da trời nhạt
+			textColor = "#004085"; // xanh da trời đậm
+			break;
+		case "shipped":
+			label = "Đang giao";
+			backgroundColor = "#e2e3e5"; // xám nhạt
+			textColor = "#383d41"; // xám đậm
+			break;
+		case "in_cancel":
+		case "cancelled":
+		case "canceled":
+			label = "Đã hủy";
+			backgroundColor = "#f5c6cb"; // đỏ hồng nhạt
+			textColor = "#721c24"; // đỏ đậm
+			break;
+		case "to_confirm_receive":
+			label = "Chờ xác nhận";
+			backgroundColor = "#e2e3e5"; // xám nhạt
+			textColor = "#383d41"; // xám đậm
+			break;
+		case "confirmed":
+		case "completed":
+			label = "Đã nhận được hàng/Đã hoàn thành";
+			backgroundColor = "#fff3cd"; // vàng chanh nhạt
+			textColor = "#856404"; // vàng đậm
+			break;
+		case "retry_ship":
+		case "awaiting_collection":
+			label = "Chờ lấy hàng";
+			backgroundColor = "#f8e8ff"; // hồng tím nhạt
+			textColor = "#6f42c1"; // tím đậm
+			break;
+		case "to_return":
+		case "shipped_back":
+			label = "Hoàn hàng";
+			backgroundColor = "#f0e68c"; // vàng cát nhạt
+			textColor = "#8b4513"; // nâu đậm
+			break;
+		case "in_transit":
+			label = "Đang trung chuyển";
+			backgroundColor = "#e6ccff"; // tím nhạt
+			textColor = "#4b0082"; // tím đậm
+			break;
+		case "shipped_back_success":
+			label = "Hoàn hàng thành công";
+			backgroundColor = "#FF99CC";
+			textColor = "#FF3399";
+			break;
+		default:
+			label = ecom.getStatus();
+			backgroundColor = "#dcdcdc"; // xám sáng
+			textColor = "#000000"; // đen
+			break;
+		}
+
+		return "<span style='background-color:" + backgroundColor + "; color:" + textColor
+				+ "; font-weight:bold; padding:2px 6px; border-radius:4px; display:inline-block;'>" + label + "</span>";
+	}
+
+	public void onSelectAllChange2() {
+		if (ecomOrders == null || ecomOrders.isEmpty()) {
+			if (selectAll) {
+				canhbao("Hãy chọn dữ liệu!!");
+			}
+			return;
+		}
+		UIComponent table = FacesContext.getCurrentInstance().getViewRoot()
+				.findComponent("orderForm:tabView:ordersTable");
+		if (table instanceof DataTable) {
+			DataTable dataTable = (DataTable) table;
+			List<EcomOrder> sourceOrders = (List<EcomOrder>) (dataTable.getFilteredValue() != null
+					? dataTable.getFilteredValue()
+					: dataTable.getValue());
+			int first = dataTable.getFirst(); // Vị trí bắt đầu của trang hiện tại
+			int rows = dataTable.getRows(); // Số dòng trên mỗi trang
+			int last = Math.min(first + rows, sourceOrders.size()); // Vị trí kết thúc của trang
+
+			// Lấy danh sách các dòng trên trang hiện tại
+			List<EcomOrder> pageOrders = sourceOrders.subList(first, last);
+
+			// Set select cho các dòng trên trang hiện tại
+			for (EcomOrder ecomOrder : pageOrders) {
+				ecomOrder.setSelect(selectAll);
+			}
+		} else {
+			LOGGER.warning("Không tìm thấy DataTable với id: orderForm:tabView:ordersTable");
+		}
+
+		PrimeFaces.current().ajax().update("orderForm:tabView:ordersTable");
+	}
+
+}

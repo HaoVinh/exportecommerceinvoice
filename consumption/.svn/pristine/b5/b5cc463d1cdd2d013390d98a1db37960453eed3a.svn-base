@@ -1,0 +1,134 @@
+package trong.lixco.com.api;
+
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+
+import javax.servlet.ServletException;
+import javax.ws.rs.FormParam;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+
+import com.google.gson.JsonObject;
+
+import io.jsonwebtoken.io.IOException;
+import trong.lixco.com.account.servicepublics.Account;
+import trong.lixco.com.account.servicepublics.AccountServicePublic;
+import trong.lixco.com.account.servicepublics.AccountServicePublicProxy;
+import trong.lixco.com.account.servicepublics.Program;
+import trong.lixco.com.account.servicepublics.Role;
+import trong.lixco.com.apitaikhoan.AccountData;
+import trong.lixco.com.apitaikhoan.AccountDataService;
+
+@Path("dangnhapapp")
+public class LoginServlet {
+//	  private static final Gson gson = new Gson();
+//  private static final long THOIGIANSONGTOKEN = 43200; 
+//  private static final String TOKEN_PREFIX = "Bearer";
+//    @POST
+//    @Produces("application/json; charset=utf-8")
+//    public String dangnhap(@FormParam("user") String user, @FormParam("pass") String pass)
+//            throws IOException, ServletException {
+//        StringBuilder result = new StringBuilder();
+//       
+//        try {
+//            if (user != null && pass != null && !user.trim().isEmpty() && !pass.trim().isEmpty()) {
+//                AccountData accountData = AccountDataService.dangnhap(user + "," + pass);
+//                if (accountData != null) {
+
+////                	AccountServicePublic accountServicePublic = new AccountServicePublicProxy();
+////                	 Account acc = null;
+////                	acc=new Account();
+////                	acc.setId(accountData.getId());
+////                	Program[] programs = accountServicePublic.findProgramByAccount(acc);
+////        			for (int i = 0; i < programs.length; i++) {
+////        				if ("consumption".equals(programs[i].getName())) {
+////        					Role[] roles = accountServicePublic.findRoleByAccPro(acc, programs[i]);
+////        					System.out.println(roles);
+////        					break;
+////        				}
+////        			}
+//                	 result.append(CommonModel.toJson(0, "Thanh cong.", ""));
+//                	
+//                    // Tạo JWT token
+////                    PrivateKey privateKey = getPrivateKey();
+////                    Instant now = Instant.now();
+////                    LocalDateTime current = LocalDateTime.now();
+////                    Date expirationDate = Date.from(current.plusMinutes(THOIGIANSONGTOKEN)
+////                            .atZone(ZoneId.systemDefault()).toInstant());
+////
+////                    Map<String, Object> claims = new HashMap<>();
+////                    claims.put("user", user);
+////                    claims.put("code", accountData.getMemberData().getCode());
+////                    claims.put("name", accountData.getMemberData().getName());
+////
+////                    String jwtToken = Jwts.builder()
+////                            .setClaims(claims)
+////                            .setSubject("LIXCO")
+////                            .setId(UUID.randomUUID().toString())
+////                            .setIssuedAt(Date.from(now))
+////                            .setExpiration(expirationDate)
+////                            .signWith(privateKey)
+////                            .compact();
+////
+////// Tạo phản hồi JSON
+//JsonObject jsonObject = new JsonObject();
+////jsonObject.addProperty("access_token", jwtToken);
+////jsonObject.addProperty("expires_in", expirationDate.getTime());
+////jsonObject.addProperty("token_type", TOKEN_PREFIX);
+//jsonObject.addProperty("user", user);
+//jsonObject.addProperty("pass", pass);
+//jsonObject.addProperty("code", accountData.getMemberData().getCode());
+//jsonObject.addProperty("name", accountData.getMemberData().getName());
+//                    
+////                    result.append(CommonModel.toJson(0, "Thanh cong.", gson.toJson(jsonObject)));
+//                } else {
+//                    result.append(CommonModel.toJson(1, "Sai ten dang nhap hoac mat khau."));
+//                }
+//            } else {
+//                result.append(CommonModel.toJson(-1, DefinedName.RESP_MSG_INVALID_REQUEST));
+//            }
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//            result.append(CommonModel.toJson(-1, "Loi he thong: " + e.getMessage()));
+//        }
+//        return result.toString();
+//    }
+	@POST
+	@Produces("application/json; charset=utf-8")
+	public String dangnhap(@FormParam("user") String user, @FormParam("pass") String pass)
+			throws IOException, ServletException {
+		StringBuilder result = new StringBuilder();
+		try {
+			if (user != null && pass != null && !user.trim().isEmpty() && !pass.trim().isEmpty()) {
+				AccountData accountData = AccountDataService.dangnhap(user + "," + pass);
+				if (accountData != null) {
+					JsonObject jsonObject = new JsonObject();
+					jsonObject.addProperty("user", user);
+					jsonObject.addProperty("pass", pass);
+					jsonObject.addProperty("code", accountData.getMemberData().getCode());
+					jsonObject.addProperty("name", accountData.getMemberData().getName());
+					result.append(CommonModel.toJson(0, "Thanh cong.", jsonObject.toString()));
+				} else {
+					result.append(CommonModel.toJson(1, "Sai ten dang nhap hoac mat khau.", ""));
+				}
+			} else {
+				result.append(CommonModel.toJson(-1, DefinedName.RESP_MSG_INVALID_REQUEST, ""));
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			result.append(CommonModel.toJson(-1, "Loi he thong: " + e.getMessage(), ""));
+		}
+		return result.toString();
+	}
+//    private PrivateKey getPrivateKey() throws NoSuchAlgorithmException {
+//        // Tạo cặp khóa RSA cho mục đích demo
+//        // Trong môi trường thực tế, bạn nên lấy khóa từ keystore hoặc file cấu hình
+//        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("JKS");
+//        keyGen.initialize(2048);
+//        KeyPair pair = keyGen.generateKeyPair();
+//        return pair.getPrivate();
+//    }
+}

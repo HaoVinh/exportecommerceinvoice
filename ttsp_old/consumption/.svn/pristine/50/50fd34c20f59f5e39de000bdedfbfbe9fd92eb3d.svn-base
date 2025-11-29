@@ -1,0 +1,53 @@
+package lixco.com.interfaces;
+
+import java.util.List;
+
+import lixco.com.commom_ejb.PagingInfo;
+import lixco.com.entity.Product;
+import lixco.com.entityapi.KhachHangData;
+import lixco.com.entityapi.ProductAsyncDTO;
+import lixco.com.entityapi.ProductDTO;
+import lixco.com.entityapi.SanPhamData;
+import lixco.com.entityapi.SanPhamData2;
+import lixco.com.reqInfo.ProductReqInfo;
+
+public interface IProductService {
+	public List<Product> findAll();
+	public int search(String json,List<Product> list);
+	public int insert(ProductReqInfo info);
+	public int update(ProductReqInfo info);
+	public int update(Product p);
+	public int updateCapNhat(List<Long> ids);
+	public int updateTare(long id, double tare) ;
+	public int selectById(long id,ProductReqInfo info);
+	public Product findById(long id);
+	public int deleteById(long id, StringBuilder error);
+	public int findLike(String text,int size,List<Product> list);
+	public int checkProductCode(String code,long productId);
+	public int checkProductName(String name,long productId);
+	public int complete(String text,List<Product> list);
+	public int complete2(String text,List<Product> list);
+	public int complete3(String text,List<Product> list);
+	public int selectByCode(String code,ProductReqInfo reqInfo);
+	
+	public Product selectByCode(String code);
+	public int completeByProductType(String text,long productTypeId,List<Product> list);
+	public Product selectOnlyId(String productCode);
+	public int selectBy(String json,List<Product> list);
+	public Product selectForDelivery(long id);
+	/*Phần nạp sản phẩm*/
+	public lixco.com.reqfox.Product getProductFoxPro(long id);
+	public int dongbosanpham(ProductAsyncDTO productAsyncDTO, StringBuilder errors);
+	public Product selectByCodeAll(String code);
+	public Product findByCodeUFull(String code);
+	public List<Product> findNotSync();
+	public Product findIdGetPCom(long id);
+	public long findByMaSPGetId(String masp);
+	public List<SanPhamData> complete2(String masp, String tensp);
+	public List<SanPhamData2> selectByCodes(List<String> masps);
+	public Product findIdGetPType(long id);
+	public String findByCodeU(String code);
+	List<Object[]> findByCodeNhanHang(List<String> product_codes);
+	public List<Product> findAllLite();
+	public List<SanPhamData2> selectByCodeLixAndULs(List<String> masps, String codeLixUL);
+}

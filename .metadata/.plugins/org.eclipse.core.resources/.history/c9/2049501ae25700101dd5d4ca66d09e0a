@@ -1,0 +1,497 @@
+package vinh.lixco.com.apiecommerce;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.ResponseBuilder;
+
+import org.slf4j.LoggerFactory;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.security.GeneralSecurityException;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Logger;
+
+@Path("lazada")
+public class LazadaAPIServlet {
+
+	// Constants
+	private static final String APP_KEY = "133487";
+	private static final String APP_SECRET = "RZTQdjz5VUdnpQ81koTwuQ0lrBJlnepC";
+	private static final String AUTH_URL = "https://auth.lazada.com/rest";
+	private static final String API_URL = "https://api.lazada.vn/rest";
+	private static final String API_NAME_AUTH = "/auth/token/create";
+	private static final String API_NAME_ORDERS = "/orders/get";
+	private static final String API_NAME_ORDER_ITEMS = "/order/items/get";
+	private static final String SIGN_METHOD = "sha256";
+	private static final String CHARSET_UTF8 = "UTF-8";
+	private static final String HMAC_SHA256 = "HmacSHA256";
+	private static final Logger LOGGER = Logger.getLogger(LazadaAPIServlet.class.getName());
+
+	// Token management
+	private static class TokenManager {
+		private static String accessToken = null;
+		private static String refreshToken = "5001600123cTm0p0FTKzgLnvwQz4J3M27718lc1SDz0j9fcGosdNPSco"; // Initial
+																											// refresh
+																											// token
+		private static long expiryTime = 0L;
+
+		public static String getAccessToken() throws IOException {
+			if (accessToken == null || System.currentTimeMillis() > expiryTime) {
+				refreshAccessToken();
+			}
+			return accessToken;
+		}
+
+		public static void updateTokens(String newAccessToken, String newRefreshToken, long expiresIn) {
+			accessToken = newAccessToken;
+			refreshToken = newRefreshToken != null ? newRefreshToken : refreshToken;
+			expiryTime = System.currentTimeMillis() + (expiresIn * 1000);
+			LOGGER.info("Updated Access Token: " + accessToken);
+			LOGGER.info("Updated Refresh Token: " + refreshToken);
+			LOGGER.info("Expiry Time: " + expiryTime);
+		}
+
+		private static void refreshAccessToken() throws IOException {
+			if (refreshToken == null) {
+				throw new IOException("No refresh token available");
+			}
+
+			long timestamp = System.currentTimeMillis();
+			Map<String, String> params = new HashMap<>();
+			params.put("app_key", APP_KEY);
+			params.put("refresh_token", refreshToken);
+			params.put("sign_method", SIGN_METHOD);
+			params.put("timestamp", String.valueOf(timestamp));
+
+			String sign = signApiRequest(params, null, APP_SECRET, SIGN_METHOD, API_NAME_AUTH);
+			LOGGER.info("Refresh Sign: " + sign);
+			LOGGER.info("Refresh Timestamp: " + timestamp);
+
+			StringBuilder query = new StringBuilder();
+			for (Map.Entry<String, String> entry : params.entrySet()) {
+				query.append(entry.getKey()).append("=").append(URLEncoder.encode(entry.getValue(), CHARSET_UTF8))
+						.append("&");
+			}
+			query.append("sign=").append(sign);
+
+			String urlStr = AUTH_URL + API_NAME_AUTH + "?" + query.toString();
+			LOGGER.info("Refresh URL: " + urlStr);
+
+			URL url = new URL(urlStr);
+			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+			conn.setRequestMethod("GET");
+			conn.setRequestProperty("Accept", "application/json");
+			conn.setConnectTimeout(10000);
+			conn.setReadTimeout(10000);
+
+			int responseCode = conn.getResponseCode();
+			BufferedReader in = (responseCode >= 200 && responseCode < 300)
+					? new BufferedReader(new InputStreamReader(conn.getInputStream(), CHARSET_UTF8))
+					: new BufferedReader(new InputStreamReader(conn.getErrorStream(), CHARSET_UTF8));
+			StringBuilder responseBody = new StringBuilder();
+			String inputLine;
+			while ((inputLine = in.readLine()) != null) {
+				responseBody.append(inputLine);
+			}
+			in.close();
+			conn.disconnect();
+
+			if (responseCode >= 200 && responseCode < 300) {
+				ObjectMapper mapper = new ObjectMapper();
+				JsonNode responseJson = mapper.readTree(responseBody.toString());
+				String newAccessToken = responseJson.get("access_token").asText();
+				String newRefreshToken = responseJson.get("refresh_token") != null
+						? responseJson.get("refresh_token").asText()
+						: refreshToken;
+				long expiresIn = responseJson.get("expires_in").asLong();
+				updateTokens(newAccessToken, newRefreshToken, expiresIn);
+			} else {
+				LOGGER.warning("Refresh Token Error: " + responseBody.toString());
+				throw new IOException("Failed to refresh access token: " + responseBody.toString());
+			}
+		}
+	}
+
+	@GET
+	@Path("/auth/token/create")
+	@Produces("application/json; charset=utf-8")
+	public Response generateAccessToken(@QueryParam("code") String code) {
+		ResponseBuilder responseBuilder = Response.status(Response.Status.OK);
+		StringBuilder result = new StringBuilder();
+
+		try {
+			if (code == null || code.trim().isEmpty()) {
+				result.append("{\"code\":\"-1\",\"message\":\"Missing or empty code parameter\"}");
+				return Response.status(Response.Status.BAD_REQUEST).entity(result.toString()).build();
+			}
+
+			long timestamp = System.currentTimeMillis();
+			Map<String, String> params = new HashMap<>();
+			params.put("app_key", APP_KEY);
+			params.put("code", code.trim());
+			params.put("sign_method", SIGN_METHOD);
+			params.put("timestamp", String.valueOf(timestamp));
+
+			String sign = signApiRequest(params, null, APP_SECRET, SIGN_METHOD, API_NAME_AUTH);
+			LOGGER.info("Auth Sign: " + sign);
+			LOGGER.info("Auth Timestamp: " + timestamp);
+
+			StringBuilder query = new StringBuilder();
+			for (Map.Entry<String, String> entry : params.entrySet()) {
+				query.append(entry.getKey()).append("=").append(URLEncoder.encode(entry.getValue(), CHARSET_UTF8))
+						.append("&");
+			}
+			query.append("sign=").append(sign);
+
+			String urlStr = AUTH_URL + API_NAME_AUTH + "?" + query.toString();
+			LOGGER.info("Auth URL: " + urlStr);
+
+			URL url = new URL(urlStr);
+			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+			conn.setRequestMethod("GET");
+			conn.setRequestProperty("Accept", "application/json");
+			conn.setConnectTimeout(10000);
+			conn.setReadTimeout(10000);
+
+			int responseCode = conn.getResponseCode();
+			BufferedReader in = (responseCode >= 200 && responseCode < 300)
+					? new BufferedReader(new InputStreamReader(conn.getInputStream(), CHARSET_UTF8))
+					: new BufferedReader(new InputStreamReader(conn.getErrorStream(), CHARSET_UTF8));
+			StringBuilder responseBody = new StringBuilder();
+			String inputLine;
+			while ((inputLine = in.readLine()) != null) {
+				responseBody.append(inputLine);
+			}
+			in.close();
+			conn.disconnect();
+
+			result.append(responseBody.toString());
+
+			if (responseCode >= 200 && responseCode < 300) {
+				ObjectMapper mapper = new ObjectMapper();
+				JsonNode responseJson = mapper.readTree(responseBody.toString());
+				String accessToken = responseJson.get("access_token").asText();
+				String refreshToken = responseJson.get("refresh_token").asText();
+				long expiresIn = responseJson.get("expires_in").asLong();
+				TokenManager.updateTokens(accessToken, refreshToken, expiresIn);
+			} else {
+				LOGGER.warning("Auth Error Response: " + responseBody.toString());
+				responseBuilder = Response.status(responseCode);
+			}
+
+		} catch (IOException e) {
+			result.append("{\"code\":\"-1\",\"message\":\"Error processing request: ").append(e.getMessage())
+					.append("\"}");
+			responseBuilder = Response.status(Response.Status.INTERNAL_SERVER_ERROR);
+			LOGGER.severe("Auth Error: " + e.getMessage());
+		}
+
+		return responseBuilder.entity(result.toString()).build();
+	}
+
+	@GET
+	@Path("/orders/get")
+	@Produces("application/json; charset=utf-8")
+	public Response getOrders(@QueryParam("created_after") String createdAfter,
+			@QueryParam("created_before") String createdBefore, @QueryParam("status") String status,
+			@QueryParam("update_after") String updateAfter, @QueryParam("update_before") String updateBefore,
+			@QueryParam("sort_by") String sortBy, @QueryParam("sort_direction") String sortDirection,
+			@QueryParam("offset") Integer offset, @QueryParam("limit") Integer limit) {
+		ResponseBuilder responseBuilder = Response.status(Response.Status.OK);
+		StringBuilder result = new StringBuilder();
+
+		try {
+			String accessToken = TokenManager.getAccessToken();
+
+			long timestamp = System.currentTimeMillis();
+			Map<String, String> params = new HashMap<>();
+			params.put("app_key", APP_KEY);
+			params.put("access_token", accessToken);
+			if (createdAfter != null && !createdAfter.trim().isEmpty())
+				params.put("created_after", createdAfter);
+			if (createdBefore != null && !createdBefore.trim().isEmpty())
+				params.put("created_before", createdBefore);
+			if (status != null && !status.trim().isEmpty())
+				params.put("status", status);
+			if (updateAfter != null && !updateAfter.trim().isEmpty())
+				params.put("update_after", updateAfter);
+			if (updateBefore != null && !updateBefore.trim().isEmpty())
+				params.put("update_before", updateBefore);
+			if (sortBy != null && !sortBy.trim().isEmpty())
+				params.put("sort_by", sortBy);
+			if (sortDirection != null && !sortDirection.trim().isEmpty())
+				params.put("sort_direction", sortDirection);
+			if (offset != null)
+				params.put("offset", String.valueOf(offset));
+			if (limit != null)
+				params.put("limit", String.valueOf(limit));
+			params.put("sign_method", SIGN_METHOD);
+			params.put("timestamp", String.valueOf(timestamp));
+
+			String sign = signApiRequest(params, null, APP_SECRET, SIGN_METHOD, API_NAME_ORDERS);
+			LOGGER.info("Orders Sign: " + sign);
+			LOGGER.info("Orders Timestamp: " + timestamp);
+			LOGGER.info("Orders Access Token: " + accessToken);
+
+			StringBuilder query = new StringBuilder();
+			for (Map.Entry<String, String> entry : params.entrySet()) {
+				query.append(entry.getKey()).append("=").append(URLEncoder.encode(entry.getValue(), CHARSET_UTF8))
+						.append("&");
+			}
+			query.append("sign=").append(sign);
+
+			String urlStr = API_URL + API_NAME_ORDERS + "?" + query.toString();
+			LOGGER.info("Orders URL: " + urlStr);
+
+			URL url = new URL(urlStr);
+			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+			conn.setRequestMethod("GET");
+			conn.setRequestProperty("Accept", "application/json");
+			conn.setConnectTimeout(10000);
+			conn.setReadTimeout(10000);
+
+			int responseCode = conn.getResponseCode();
+			BufferedReader in = (responseCode >= 200 && responseCode < 300)
+					? new BufferedReader(new InputStreamReader(conn.getInputStream(), CHARSET_UTF8))
+					: new BufferedReader(new InputStreamReader(conn.getErrorStream(), CHARSET_UTF8));
+			StringBuilder responseBody = new StringBuilder();
+			String inputLine;
+			while ((inputLine = in.readLine()) != null) {
+				responseBody.append(inputLine);
+			}
+			in.close();
+			conn.disconnect();
+
+			result.append(responseBody.toString());
+
+			if (responseCode >= 200 && responseCode < 300) {
+				LOGGER.info("Orders retrieved successfully");
+			} else {
+				LOGGER.warning("Orders Error Response: " + responseBody.toString());
+				responseBuilder = Response.status(responseCode);
+			}
+
+		} catch (IOException e) {
+			result.append("{\"code\":\"-1\",\"message\":\"Error processing request: ").append(e.getMessage())
+					.append("\"}");
+			responseBuilder = Response.status(Response.Status.INTERNAL_SERVER_ERROR);
+			LOGGER.severe("Orders Error: " + e.getMessage());
+		}
+
+		return responseBuilder.entity(result.toString()).build();
+	}
+
+	@GET
+	@Path("/order/items/get")
+	@Produces("application/json; charset=utf-8")
+	public Response getOrderItems(@QueryParam("order_id") long orderId) {
+		ResponseBuilder responseBuilder = Response.status(Response.Status.OK);
+		StringBuilder result = new StringBuilder();
+
+		try {
+			String accessToken = TokenManager.getAccessToken();
+
+			long timestamp = System.currentTimeMillis();
+			Map<String, String> params = new HashMap<>();
+			params.put("app_key", APP_KEY);
+			params.put("access_token", accessToken);
+			params.put("order_id", String.valueOf(orderId));
+			params.put("sign_method", SIGN_METHOD);
+			params.put("timestamp", String.valueOf(timestamp));
+
+			String sign = signApiRequest(params, null, APP_SECRET, SIGN_METHOD, API_NAME_ORDER_ITEMS);
+			LOGGER.info("Order Items Sign: " + sign);
+			LOGGER.info("Order Items Timestamp: " + timestamp);
+			LOGGER.info("Order Items Access Token: " + accessToken);
+
+			StringBuilder query = new StringBuilder();
+			for (Map.Entry<String, String> entry : params.entrySet()) {
+				query.append(entry.getKey()).append("=").append(URLEncoder.encode(entry.getValue(), CHARSET_UTF8))
+						.append("&");
+			}
+			query.append("sign=").append(sign);
+
+			String urlStr = API_URL + API_NAME_ORDER_ITEMS + "?" + query.toString();
+			LOGGER.info("Order Items URL: " + urlStr);
+
+			URL url = new URL(urlStr);
+			HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+			conn.setRequestMethod("GET");
+			conn.setRequestProperty("Accept", "application/json");
+			conn.setConnectTimeout(10000);
+			conn.setReadTimeout(10000);
+
+			int responseCode = conn.getResponseCode();
+			BufferedReader in = (responseCode >= 200 && responseCode < 300)
+					? new BufferedReader(new InputStreamReader(conn.getInputStream(), CHARSET_UTF8))
+					: new BufferedReader(new InputStreamReader(conn.getErrorStream(), CHARSET_UTF8));
+			StringBuilder responseBody = new StringBuilder();
+			String inputLine;
+			while ((inputLine = in.readLine()) != null) {
+				responseBody.append(inputLine);
+			}
+			in.close();
+			conn.disconnect();
+
+			result.append(responseBody.toString());
+
+			if (responseCode >= 200 && responseCode < 300) {
+				LOGGER.info("Order items retrieved successfully");
+			} else {
+				LOGGER.warning("Order Items Error Response: " + responseBody.toString());
+				responseBuilder = Response.status(responseCode);
+			}
+
+		} catch (IOException e) {
+			result.append("{\"code\":\"-1\",\"message\":\"Error processing request: ").append(e.getMessage())
+					.append("\"}");
+			responseBuilder = Response.status(Response.Status.INTERNAL_SERVER_ERROR);
+			LOGGER.severe("Order Items Error: " + e.getMessage());
+		}
+
+		return responseBuilder.entity(result.toString()).build();
+	}
+
+	@POST
+	@Path("webhook/order")
+	@Consumes("application/json")
+	@Produces("application/json; charset=utf-8")
+	public Response webHookLazada(@Context HttpHeaders headers, String inputJson) {
+	    // Logging để debug
+	  
+	    LOGGER.info("Received Request - Headers: {}:"+ headers.getRequestHeaders());
+	    LOGGER.info("Input JSON: {}:" + inputJson);
+
+	    // Kiểm tra header Authorization
+	    String authHeader = headers.getRequestHeader("Authorization") != null && !headers.getRequestHeader("Authorization").isEmpty() 
+	        ? headers.getRequestHeader("Authorization").get(0) : null;
+	    String appKey = "123456"; // Thay bằng AppKey thực tế từ Lazada
+	    String appSecret = "3412gyo124goi3124"; // Thay bằng AppSecret thực tế từ Lazada
+	    String base = appKey + inputJson; // Tạo base string
+	    String computedSignature = SignatureUtil.getSignature(base, appSecret);
+
+	    if (authHeader == null || !authHeader.equals(computedSignature)) {
+	        ObjectMapper mapper = new ObjectMapper();
+	        ObjectNode errorResponse = mapper.createObjectNode();
+	        errorResponse.put("status", "error");
+	        errorResponse.put("message", "Invalid or missing Authorization header");
+	        LOGGER.info("Authorization failed - Expected: {}, Actual: {}:"+ " " + computedSignature + " " + authHeader);
+	        return Response.status(Response.Status.UNAUTHORIZED) // HTTP 401
+	                       .entity(errorResponse.toString())
+	                       .build();
+	    }
+
+	    try {
+	        // Parse JSON input
+	        ObjectMapper mapper = new ObjectMapper();
+	        JsonNode jsonNode = mapper.readTree(inputJson);
+
+	        // Xử lý dữ liệu
+	        String sellerId = jsonNode.get("seller_id").asText();
+	        int messageType = jsonNode.get("message_type").asInt();
+	        String orderStatus = jsonNode.get("data").get("order_status").asText();
+	        String tradeOrderId = jsonNode.get("data").get("trade_order_id").asText();
+	        String tradeOrderLineId = jsonNode.get("data").get("trade_order_line_id").asText();
+	        long statusUpdateTime = jsonNode.get("data").get("status_update_time").asLong();
+	        long timestamp = jsonNode.get("timestamp").asLong();
+	        String site = jsonNode.get("site").asText();
+
+	        // Tạo JSON response
+	        ObjectNode responseJson = mapper.createObjectNode();
+	        responseJson.put("status", "success");
+	        responseJson.put("message", "Webhook received and processed successfully");
+	        ObjectNode dataNode = mapper.createObjectNode();
+	        dataNode.put("seller_id", sellerId);
+	        dataNode.put("order_status", orderStatus);
+	        dataNode.put("trade_order_id", tradeOrderId);
+	        dataNode.put("trade_order_line_id", tradeOrderLineId);
+	        dataNode.put("status_update_time", statusUpdateTime);
+	        responseJson.set("data", dataNode);
+	        responseJson.put("timestamp", timestamp);
+	        responseJson.put("site", site);
+
+	        LOGGER.info("Response JSON: {}:" + mapper.writeValueAsString(responseJson));
+	        return Response.status(Response.Status.OK)
+	                       .entity(mapper.writeValueAsString(responseJson))
+	                       .build();
+	    } catch (Exception e) {
+	        LOGGER.info("Failed to process webhook: {}:"+ " " + e.getMessage() + " f" + e);
+	        ObjectMapper mapper = new ObjectMapper();
+	        ObjectNode errorResponse = mapper.createObjectNode();
+	        errorResponse.put("status", "error");
+	        errorResponse.put("message", "Failed to process webhook: " + e.getMessage());
+	        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+	                       .entity(errorResponse.toString())
+	                       .build();
+	    }
+	}
+
+	private static String signApiRequest(Map<String, String> params, String body, String appSecret, String signMethod,
+			String apiName) throws IOException {
+		String[] keys = params.keySet().toArray(new String[0]);
+		Arrays.sort(keys);
+
+		StringBuilder query = new StringBuilder();
+		query.append(apiName);
+		for (String key : keys) {
+			String value = params.get(key);
+			if (areNotEmpty(key, value)) {
+				query.append(key).append(value);
+			}
+		}
+
+		if (body != null) {
+			query.append(body);
+		}
+
+		byte[] bytes = encryptHMACSHA256(query.toString(), appSecret);
+		return byte2hex(bytes);
+	}
+
+	private static byte[] encryptHMACSHA256(String data, String secret) throws IOException {
+		try {
+			SecretKeySpec secretKey = new SecretKeySpec(secret.getBytes(CHARSET_UTF8), HMAC_SHA256);
+			Mac mac = Mac.getInstance(HMAC_SHA256);
+			mac.init(secretKey);
+			return mac.doFinal(data.getBytes(CHARSET_UTF8));
+		} catch (GeneralSecurityException gse) {
+			throw new IOException("HMAC-SHA256 encryption failed: " + gse.getMessage());
+		}
+	}
+
+	private static String byte2hex(byte[] bytes) {
+		StringBuilder sign = new StringBuilder();
+		for (byte b : bytes) {
+			String hex = Integer.toHexString(b & 0xFF);
+			if (hex.length() == 1) {
+				sign.append("0");
+			}
+			sign.append(hex.toUpperCase());
+		}
+		return sign.toString();
+	}
+
+	private static boolean areNotEmpty(String... values) {
+		return Arrays.stream(values).allMatch(s -> s != null && !s.trim().isEmpty());
+	}
+}

@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+	xmlns:h="http://java.sun.com/jsf/html">
+	<div class="col-md-12"
+		style="padding-left: 0px !important; padding-right: 0px !important; background-color: #eeeeee;">
+		<div class="row"
+			style="margin-top: 5px; margin-bottom: 25px; margin-left: 16px !important; margin-right: 16px !important;">
+			<div class="col-md-12"
+				style="padding-left: 0px !important; padding-right: 0px !important;">
+				<div class="row">
+					<div class="col-md-3"
+						style="padding-left: 0px !important; padding-right: 5px !important;">
+						<label>Từ ngày</label>
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 5px !important;">
+						<label>Đến ngày</label>
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 5px !important;">
+						<label>Hợp đồng</label>
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 5px !important;">
+						<label>Khách hàng</label>
+					</div>
+				</div>
+				<div class="row" style="margin-bottom: 5px;">
+					<div class="col-md-3"
+						style="padding-left: 0px !important; padding-right: 5px !important;">
+						<p:calendar value="#{reportBangKeHoaDonBean.fromDateSearch}"
+							pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+							showButtonPanel="true" />
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 5px !important;">
+						<p:calendar value="#{reportBangKeHoaDonBean.toDateSearch}"
+							pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+							showButtonPanel="true" />
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 5px !important;">
+						<div class="nhapdlg">
+							<span class="fa fa-search"></span>
+							<p:autoComplete style="width:100%;" placeholder="Tìm hợp đồng "
+								value="#{reportBangKeHoaDonBean.contractSearch}"
+								queryDelay="900" maxResults="150" converter="abstractConverter"
+								minQueryLength="2"
+								completeMethod="#{reportBangKeHoaDonBean.completeContract}"
+								var="p" itemLabel="#{p.voucher_code}" itemValue="#{p}"
+								forceSelection="true" onclick="this.select();">
+								<p:column style="width:50px">
+									<h:outputText value="#{p.voucher_code}" />
+								</p:column>
+								<p:column style="width:150px">
+									<h:outputText value="#{p.contract_code}" />
+								</p:column>
+							</p:autoComplete>
+						</div>
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 0px !important;">
+						<div class="nhapdlg">
+							<span class="fa fa-search"></span>
+							<p:autoComplete style="width:100%;" placeholder="Tìm khách hàng"
+								title="#{reportBangKeHoaDonBean.customerSearch.customer_name}"
+								value="#{reportBangKeHoaDonBean.customerSearch}"
+								queryDelay="900" converter="abstractConverter"
+								minQueryLength="2" maxResults="150"
+								completeMethod="#{reportBangKeHoaDonBean.completeCustomer}"
+								var="p" itemLabel="#{p.customer_name}" itemValue="#{p}"
+								forceSelection="true" onclick="this.select();">
+								<p:column style="width:50px">
+									<h:outputText value="#{p.customer_code}" />
+								</p:column>
+								<p:column style="width:150px">
+									<h:outputText value="#{p.customer_name}" />
+								</p:column>
+							</p:autoComplete>
+						</div>
+					</div>
+				</div>
+				<div class="row" style="margin-top: 5px;">
+					<div class="col-md-3"
+						style="padding-left: 0px !important; padding-right: 5px !important;">
+						<label>Loại xuất nhập</label>
+						<p:selectOneMenu
+							value="#{reportBangKeHoaDonBean.iECategoriesSearch}"
+							converter="abstractConverter" effect="fade" var="t"
+							style="width:100%;" filter="true" filterMatchMode="custom"
+							filterFunction="customFilter2">
+							<f:selectItem itemLabel="Tất cả" itemValue="#{null}" />
+							<f:selectItems value="#{reportBangKeHoaDonBean.listIECategories}"
+								var="theme" itemLabel="#{theme.code}-#{theme.content}"
+								itemValue="#{theme}" />
+							<p:column>
+								<h:outputText value="#{t.code}" />
+							</p:column>
+							<p:column>
+								<h:outputText value="#{t==null ? 'Tất cả' : t.content}" />
+							</p:column>
+						</p:selectOneMenu>
+					</div>
+				</div>
+
+				<div class="row" style="margin-top: 10px; margin-bottom: 5px;">
+					<div class="col-md-6" style="padding-left: 0px !important;">
+						<p:commandLink action="#{reportBangKeHoaDonBean.search()}"
+							process="menuformid2"
+							update=":messages,tabview1:menuformid2:tablenc"
+							styleClass="btn_primmary"
+							style="margin-left:0px; margin-right:0px;height:29px !important;line-height:29px !important;">
+							<i class="fa fa-search" aria-hidden="true"></i>
+							<span>Tìm kiếm</span>
+						</p:commandLink>
+					</div>
+					<div class=" col-md-6"
+						style="text-align: right; padding-right: 0px !important;">
+						<div class="btn-group" style="float: right; height: 35px;">
+							<button type="button" class="btn  dropdown-toggle"
+								style="background-color: #4bac4d; height: 30px; color: white; font-weight: 600; font-size: 11px; padding-left: 10px; padding-right: 10px;"
+								data-toggle="dropdown">
+								Xuất file<span class="caret"
+									style="margin-left: 4px; margin-top: -2px;"></span>
+							</button>
+							<ul class="dropdown-menu" role="menu">
+								<li><p:commandLink update=":messages" process="menuformid2"
+										action="#{reportBangKeHoaDonBean.reportBangKeHoaDon()}">Bảng kê hóa đơn</p:commandLink></li>
+								<li><p:commandLink target="_blank" ajax="false"
+										update=":messages" process="menuformid2"
+										action="#{reportBangKeHoaDonBean.reportBangKeHoaDonExcel()}">Bảng kê hóa đơn Excel</p:commandLink></li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				<div class="row" style="margin-top: 10px !important;">
+					<p:dataTable value="#{reportBangKeHoaDonBean.listBangKeHoaDon}"
+						paginatorPosition="bottom" styleClass="tablenhapsp tableright0"
+						style="width:100%;" paginator="true" rows="90"
+						paginatorTemplate="{CurrentPageReport} {FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}"
+						currentPageReportTemplate="{startRecord}-{endRecord} of {totalRecords} records"
+						rowsPerPageTemplate="90,120,150,200" id="tablenc"
+						widgetVar="tablenc" rowIndexVar="rowe" scrollable="true"
+						scrollHeight="400" resizableColumns="true" var="item"
+						filteredValue="#{reportBangKeHoaDonBean.listBangKeHoaDonFilter}">
+						<p:column headerText="STT" width="40" styleClass="textcenter">
+							<h:outputText value="#{rowe+1}" />
+						</p:column>
+						<p:column
+							filterBy="#{reportBangKeHoaDonBean.formatHandler.converViToEn(item.invoice_code)}"
+							filterMatchMode="contains" headerText="Mã hóa đơn" width="50"
+							styleClass="textcenter">
+							<h:outputText value="#{item.invoice_code}" />
+						</p:column>
+						<p:column
+							filterBy="#{reportBangKeHoaDonBean.formatHandler.converViToEn(item.voucher_code)}"
+							filterMatchMode="contains" headerText="Số chứng từ" width="60"
+							styleClass="textcenter">
+							<h:outputText value="#{item.voucher_code}" />
+						</p:column>
+						<p:column headerText="Ngày" width="60">
+							<h:outputText value="#{item.invoice_date}">
+								<f:convertDateTime pattern="dd/MM/yyyy" />
+							</h:outputText>
+						</p:column>
+						<p:column
+							filterBy="#{reportBangKeHoaDonBean.formatHandler.converViToEn(item.customer_code)}"
+							filterMatchMode="contains" headerText="MÃ KH" width="40">
+							<h:outputText value="#{item.customer_code}" />
+						</p:column>
+						<p:column
+							filterBy="#{reportBangKeHoaDonBean.formatHandler.converViToEn(item.customer_name)}"
+							filterMatchMode="contains" headerText="Khách hàng" width="250">
+							<h:outputText style="white-space: initial;"
+								value="#{item.customer_name}" />
+						</p:column>
+						<p:column headerText="Diễn giải" width="100">
+							<h:outputText style="white-space: initial;"
+								value="#{item.ie_categories_name}" />
+						</p:column>
+						<p:column headerText="Thành tiền" width="80"
+							styleClass="textright">
+							<h:outputText
+								value="#{reportBangKeHoaDonBean.formatHandler.getNumberFormat(item.total_amount,1000)}" />
+						</p:column>
+						<p:column headerText="Thuế TGGT" width="80" styleClass="textright">
+							<h:outputText
+								value="#{reportBangKeHoaDonBean.formatHandler.getNumberFormat(item.total_tax_amount,1000)}" />
+						</p:column>
+						<p:column headerText="Tổng TH.Toán" width="100"
+							styleClass="textright">
+							<h:outputText
+								value="#{reportBangKeHoaDonBean.formatHandler.getNumberFormat(item.total_amount_with_vat,1000)}" />
+						</p:column>
+					</p:dataTable>
+				</div>
+			</div>
+		</div>
+	</div>
+</ui:composition>

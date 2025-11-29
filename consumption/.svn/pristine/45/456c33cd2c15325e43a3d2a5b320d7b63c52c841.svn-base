@@ -1,0 +1,212 @@
+package trong.lixco.com.apitaikhoan;
+
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
+import trong.lixco.com.util.DataResponseAPI;
+import trong.lixco.com.util.DateJsonDeserializer;
+import trong.lixco.com.util.DateJsonSerializer;
+import trong.lixco.com.util.StaticPath;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+public class AccountDataService {
+	public static final String NAME = "accountnew";
+	static Gson gson;
+	static {
+		GsonBuilder gsonBuilder = new GsonBuilder().setPrettyPrinting();
+		gsonBuilder.registerTypeAdapter(Date.class, new DateJsonSerializer());
+		gsonBuilder.registerTypeAdapter(Date.class, new DateJsonDeserializer());
+		gson = gsonBuilder.create();
+	}
+
+	/**
+	 * 
+	 * @param method
+	 *            dangnhap
+	 * @param param
+	 *            user,pass
+	 * @return dang nhap
+	 */
+	public static AccountData dangnhap(String param) {
+		try {
+			String link = "cm=dangnhap&dt=" + param;
+			String data = processPost(link);
+			DataResponseAPI ketqua = gson.fromJson(data, DataResponseAPI.class);
+			AccountData accountData = gson.fromJson(ketqua.getDt(), AccountData.class);
+			return accountData;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+	/**
+	 * 
+	 * @param method lay account manv
+	 * @param param
+	 * 			manv
+	 * @return AccountData
+	 */
+	public static AccountData laytaikhoan(String manv) {
+		try {
+			String link = "cm=laytaikhoan&dt=" + manv;
+			String data = processPost(link);
+			DataResponseAPI ketqua = gson.fromJson(data, DataResponseAPI.class);
+			if(ketqua.getErr()==-1)
+				System.out.println("AccountData laytaikhoan: "+data);
+			AccountData accountData = gson.fromJson(ketqua.getDt(), AccountData.class);
+			return accountData;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+
+	}
+
+	/**
+	 * @param method
+	 *            pbtheocap
+	 * @param param
+	 *            id account
+	 * @return reload account
+	 */
+	public static AccountData reloadAccount(String param) {
+		try {
+			String link = "?cm=reloadAccount&dt=" + param;
+			String data = process(link);
+			DataResponseAPI ketqua = gson.fromJson(data, DataResponseAPI.class);
+			AccountData accountData = gson.fromJson(ketqua.getDt(), AccountData.class);
+			return accountData;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+
+	}
+
+	/**
+	 * 
+	 * @param method
+	 *            capnhatAccount
+	 * @param param
+	 *            account
+	 * @return account
+	 */
+	public static AccountData capnhatAccount(AccountData accountData) {
+		try {
+			String param = gson.toJson(accountData);
+			String link = "cm=capnhataccount&dt=" + param;
+			String data = processPost(link);
+			DataResponseAPI ketqua = gson.fromJson(data, DataResponseAPI.class);
+			AccountData departmentDatas = gson.fromJson(ketqua.getDt(), AccountData.class);
+			return departmentDatas;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+
+	}
+
+	/**
+	 * 
+	 * @param method
+	 *            deleteSSOByValue
+	 * @param param
+	 *            id
+	 * @return boolean
+	 */
+	public static boolean deleteSSO(String param) {
+		try {
+			String link = "?cm=deleteSSO&dt=" + param;
+			String data = process(link);
+			DataResponseAPI ketqua = gson.fromJson(data, DataResponseAPI.class);
+			boolean departmentDatas = gson.fromJson(ketqua.getDt(), Boolean.class);
+			return departmentDatas;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return false;
+		}
+
+	}
+
+	/**
+	 * 
+	 * @param method
+	 *            deleteSSOByValue
+	 * @param param
+	 *            id
+	 * @return boolean
+	 */
+	public static SingleSignOn findSSOByID(String param) {
+		try {
+			String link = "?cm=findSSOByID&dt=" + param;
+			String data = process(link);
+			DataResponseAPI ketqua = gson.fromJson(data, DataResponseAPI.class);
+			SingleSignOn sso = gson.fromJson(ketqua.getDt(), SingleSignOn.class);
+			return sso;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+
+	}
+
+	private static String process(String link) throws Exception {
+		URL url = new URL(StaticPath.getPathAPI() + NAME + link);
+		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+		conn.setDoOutput(true);
+		conn.setRequestMethod("GET");
+		conn.setRequestProperty("token", StaticPath.getTokenacc());
+		conn.setRequestProperty("Content-type", "application/json");
+		conn.setUseCaches(false);
+		conn.setDoInput(true);
+		try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"))) {
+			StringBuilder response = new StringBuilder();
+			String responseLine = null;
+			while ((responseLine = br.readLine()) != null) {
+				response.append(responseLine.trim());
+			}
+			return response.toString();
+		}
+	}
+
+	private static String processPost(String param) throws Exception {
+		String urlParameters = param;
+		byte[] postData = urlParameters.getBytes(StandardCharsets.UTF_8);
+		int postDataLength = postData.length;
+		URL url = new URL(StaticPath.getPathAPI() + NAME);
+		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+		conn.setDoOutput(true);
+		conn.setRequestMethod("POST");
+		conn.setRequestProperty("token", StaticPath.getTokenacc());
+		conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+		conn.setRequestProperty("charset", "utf-8");
+		conn.setRequestProperty("Content-Length", Integer.toString(postDataLength));
+		conn.setUseCaches(false);
+		OutputStream os = conn.getOutputStream();
+		try (DataOutputStream wr = new DataOutputStream(os)) {
+			wr.write(postData);
+			wr.flush();
+			wr.close();
+		} finally {
+			os.close();
+		}
+
+		try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "utf-8"))) {
+			StringBuilder response = new StringBuilder();
+			String responseLine = null;
+			while ((responseLine = br.readLine()) != null) {
+				response.append(responseLine.trim());
+			}
+			return response.toString();
+		}
+	}
+
+}

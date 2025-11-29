@@ -1,0 +1,430 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3 class="titleform">Yêu cầu kiểm tra hàng hóa</h3>
+		<p:separator />
+		<div class="col-md-12">
+			<h:form id="menuformid">
+				<span
+					style="position: absolute; right: 20px; top: 10px; z-index: 1;">
+					<p:commandLink title="Prev" update="menuformid:tabview1:group1"
+						styleClass="btnexportpos"
+						action="#{yeuCauKiemTraHangBean.nextOrPrev(0)}"
+						style="margin-right:2px;">
+						<i class="fa fa-caret-left" aria-hidden="true"></i>
+					</p:commandLink> <p:commandLink title="Prev" update="menuformid:tabview1:group1"
+						styleClass="btnexportpos"
+						action="#{yeuCauKiemTraHangBean.nextOrPrev(1)}">
+						<i class="fa fa-caret-right" aria-hidden="true"></i>
+					</p:commandLink>
+				</span>
+				<p:tabView id="tabview1" styleClass="clearfix label12 tabview_lix">
+					<p:ajax event="tabChange"
+						listener="#{yeuCauKiemTraHangBean.onTabChange}" update=":messages" />
+					<p:tab id="tab1" title="Chi tiết phiếu">
+						<h:panelGroup id="group1" style="margin:10px">
+							<div class="col-md-12" style="background-color: #eeeeee;">
+								<div class="col-md-9" style="margin-top: 10px;">
+									<div class="row"
+										style="display: flex; justify-content: space-between;">
+										<div class="nhapsp" style="width: 100%">
+											<span class="fa fa-search"></span>
+											<p:autoComplete style="width:100%;" id="completesp"
+												placeholder="Nhập mã, tên sản phẩm"
+												value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangDetailCrud.product}"
+												queryDelay="900" maxResults="200" scrollHeight="250"
+												converter="abstractConverter" minQueryLength="2"
+												completeMethod="#{yeuCauKiemTraHangBean.completeProduct}"
+												var="p" itemLabel="#{p.product_name}" itemValue="#{p}"
+												forceSelection="true" onclick="this.select();">
+												<p:column style="width:80px">
+													<h:outputText value="#{p.product_code}" />
+												</p:column>
+												<p:column>
+													<h:outputText value="#{p.product_name}" />
+												</p:column>
+												<p:ajax process="@this" event="itemSelect"
+													listener="#{yeuCauKiemTraHangBean.addYeuCauKiemTraHangDetail()}"
+													update="tablect,@this,messages" />
+											</p:autoComplete>
+										</div>
+										<p:commandLink styleClass="btn_primmary" immediate="true"
+											onclick="PF('dlnapexcel').show();">
+											<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+											<span>Nạp từ excel</span>
+										</p:commandLink>
+									</div>
+									<div class="row pdnone"
+										style="margin-top: 10px; margin-bottom: 20px;">
+										<p:dataTable
+											value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangDetails}"
+											paginatorPosition="bottom" rowsPerPageTemplate="50,60,70"
+											style="width:100%" rowIndexVar="index"
+											styleClass="tablenhapsp tableright1" rows="30"
+											scrollable="true" scrollHeight="500" paginator="true"
+											filteredValue="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangDetailFilters}"
+											rowKey="#{item.id==0?item.minv :item.id}" id="tablect"
+											widgetVar="wgtablect" resizableColumns="true" var="item">
+											<p:column headerText="" width="40" styleClass="textcenter">
+												<p:commandLink update="tablect,messages" value="Xóa"
+													styleClass="texttrash_del" process="@this"
+													actionListener="#{yeuCauKiemTraHangBean.deleteYeuCauKiemTraHangDetail(item)}">
+													<p:confirm icon="ui-icon-alert" />
+												</p:commandLink>
+											</p:column>
+											<p:column headerText="ID" width="50" styleClass="textcenter">
+												<h:outputText value="#{item.id}" />
+											</p:column>
+											<p:column headerText="STT" width="50" styleClass="textcenter">
+												<h:outputText value="#{index+1}" />
+											</p:column>
+											<p:column headerText="Sản phẩm" width="150"
+												filterBy="#{item.product.product_code}#{item.product.product_name}"
+												filterMatchMode="contains">
+												<h:outputText style="font-weight:bold"
+													value="#{item.product.product_code}" />-
+												<h:outputText style="white-space: initial;"
+													value="#{item.product.product_name}" />
+											</p:column>
+											<p:column headerText="SL(ĐVT)" width="80"
+												style="text-align:right">
+												<p:inputNumber value="#{item.quantity}"
+													styleClass="fix_width100 textal_right" decimalPlaces="2"
+													decimalSeparator="," thousandSeparator=".">
+													<p:ajax event="keyup" update="idslthung" process="@this" />
+												</p:inputNumber>
+											</p:column>
+											<p:column headerText="SL(Thùng)" width="70"
+												style="text-align:right">
+												<h:outputText style="text-align:right;" id="idslthung"
+													value="#{item.quantity/item.product.specification}">
+													<f:convertNumber locale="vi" pattern="###,###,###,##0.00" />
+												</h:outputText>
+											</p:column>
+											<p:column headerText="Lô hàng" width="100">
+												<p:inputText value="#{item.lohang}" />
+											</p:column>
+											<p:column headerText="Nguồn gốc" width="130">
+												<p:selectOneMenu value="#{item.nguongoc}" style="width:100%">
+													<f:selectItem itemLabel="--select--" itemValue="#{0}" />
+													<f:selectItem itemLabel="Hàng lưu kho" itemValue="#{1}" />
+													<f:selectItem itemLabel="Hàng trả về" itemValue="#{2}" />
+													<f:selectItem itemLabel="Hàng đổi trả" itemValue="#{3}" />
+												</p:selectOneMenu>
+											</p:column>
+											<p:column headerText="Tình trạng" width="130">
+												<p:inputText value="#{item.tinhtrang}" />
+											</p:column>
+											<p:column headerText="KQ kiểm tra" width="170">
+												<div class="row">
+													<p:selectBooleanCheckbox disabled="true"
+														styleClass="blchecknormal" style="margin-top: 5px;"
+														itemLabel="Đạt" value="#{item.kiemtradat}" />
+												</div>
+												<div class="row">
+													Ngày gia hạn:
+													<h:outputText style="white-space: initial;"
+														value="#{item.giahanluukho}">
+														<f:convertDateTime pattern="dd/MM/yyyy" />
+													</h:outputText>
+												</div>
+												<div class="row">
+													<h:outputText style="white-space: initial;"
+														value="TC hóa lý vi sinh:#{item.tieuchuan}" />
+												</div>
+											</p:column>
+											<p:column headerText="Nguyên nhân" width="160"
+												styleClass="pdnone">
+												<h:outputText style="white-space: initial;"
+													value="#{item.nguyennhan}" />
+											</p:column>
+											<p:column headerText="Kết luận" width="130"
+												styleClass="pdnone">
+												<h:outputText style="white-space: initial;"
+													value="#{item.huonggiaiquyet}" />
+											</p:column>
+										</p:dataTable>
+									</div>
+								</div>
+								<div class="col-md-3"
+									style="margin-top: 10px; background-color: white;">
+									<label>ID</label>
+									<p:inputText disabled="true"
+										value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangCrud.id}" />
+
+									<label>Ngày<span style="color: red;">*</span></label>
+									<p:calendar
+										value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangCrud.requestDate}"
+										pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+										showButtonPanel="true" />
+									<label>Số chứng từ<span style="color: red;">*</span></label>
+									<p:inputText
+										value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangCrud.requestCode}" />
+									<label>Nhân viên tạo</label>
+									<div class="usernhapsp">
+										<span class="fa fa-user-circle-o"></span>
+										<p:inputText disabled="true"
+											value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangCrud.createdBy}" />
+									</div>
+									<label>Ghi chú</label>
+									<p:inputTextarea rows="3"
+										value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangCrud.note}" />
+
+									<label>Nhân viên kiểm tra</label>
+									<div class="usernhapsp">
+										<span class="fa fa-user-circle-o"></span>
+										<p:inputText disabled="true"
+											value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangCrud.createdCheck}" />
+									</div>
+									<div class="row">
+										<div class="col-md-6 pdnone">
+											<p:selectBooleanCheckbox itemLabel="Phiếu đã kiểm tra"
+												disabled="true" style="margin-top:20px"
+												styleClass="blchecknormal"
+												value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangCrud.dakiemtra}" />
+										</div>
+										<div class="col-md-6 pdright3">
+											<label>Ngày kiểm tra</label>
+											<p:calendar disabled="true"
+												value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangCrud.ngayKiemTra}"
+												pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+												showButtonPanel="true" />
+										</div>
+									</div>
+
+									<div class="row" style="margin-top: 10px;">
+										<p:separator />
+									</div>
+									<div class="row" style="margin: 10px 0px; text-align: center;">
+										<p:commandLink styleClass="btn_primmary"
+											action="#{yeuCauKiemTraHangBean.saveOrUpdate()}"
+											update="menuformid:tabview1:group1,menuformid:tabview1:tablect,menuformid:tabview1:tablesp">
+											<i class="fa fa-floppy-o" aria-hidden="true"></i>
+											<span>Lưu/Cập nhật</span>
+										</p:commandLink>
+										<p:commandLink styleClass="btn_new"
+											action="#{yeuCauKiemTraHangBean.createNew()}"
+											update="menuformid:tabview1:group1,menuformid:tabview1:tablect,menuformid:tabview1:tablesp"
+											style="margin-left:10px;">
+											<i class="fa fa-file-o" aria-hidden="true"></i>
+											<span>Tạo mới</span>
+										</p:commandLink>
+										<p:commandLink styleClass="btn_printtt" id="idinphieu"
+											disabled="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangCrud.id==0}"
+											style="margin-left:10px;">
+											<i class="fa fa-print" aria-hidden="true"></i>
+											<span>In</span>
+										</p:commandLink>
+										<p:overlayPanel id="idfinphieu" for="idinphieu"
+											hideEffect="fade" dismissable="false"
+											widgetVar="panelinphieu" style="width:170px;">
+											<div class="col-md-12">
+												<div class="row" style="text-align: left;">
+													<p:commandLink
+														style="margin-right:10px;text-decoration: underline;"
+														oncomplete="PF('panelinphieu').hide()"
+														action="#{yeuCauKiemTraHangBean.inphieu('yeucau')}">Phiếu yêu cầu</p:commandLink>
+												</div>
+												<div class="row" style="text-align: left; margin-top: 5px">
+													<p:commandLink style="text-decoration: underline;"
+														oncomplete="PF('panelinphieu').hide()"
+														action="#{yeuCauKiemTraHangBean.inphieu('ketqua')}">Kết quả kiểm tra</p:commandLink>
+												</div>
+											</div>
+										</p:overlayPanel>
+									</div>
+								</div>
+							</div>
+						</h:panelGroup>
+					</p:tab>
+					<p:tab id="tab2" title="Danh sách phiếu">
+						<div class="col-md-12"
+							style="padding-left: 0px !important; padding-right: 0px !important; background-color: #eeeeee;">
+							<p:fieldset id="searchform"
+								style="margin-bottom:10px;background:#3c8dbc">
+								<div class="row">
+									<div class="ui-g">
+										<div class="ui-md-6 ui-sm-12 ">
+											<div class="ui-g">
+												<div class="ui-md-8 ui-sm-12 ">
+													<div class="nhapdlg">
+														<span class="fa fa-search" />
+														<p:remoteCommand name="searchEnter"
+															actionListener="#{yeuCauKiemTraHangBean.search()}"
+															update="tablesp" />
+														<p:inputText
+															placeholder="Tìm theo số chứng từ, khách hàng, sản phẩm,.."
+															id="inputsearch" style="width:100%;"
+															value="#{yeuCauKiemTraHangBean.stextStr}"
+															onkeypress="if (event.keyCode === 13) { searchEnter(); return false; }">
+														</p:inputText>
+													</div>
+												</div>
+												<div class="ui-md-4 ui-sm-12 ">
+													<p:commandLink id="idorder" styleClass="btn_primmary"
+														immediate="true"
+														style="margin-left:5px; margin-right:0px;height:28px !important;line-height:28px !important;">
+														<i class="fa fa-search" aria-hidden="true"></i>
+														<span>Lọc nâng cao</span>
+													</p:commandLink>
+												</div>
+											</div>
+										</div>
+										<div class="ui-md-6 ui-sm-12">
+											<div style="float: right">
+												<p:commandLink styleClass="btn_destroy"
+													style="margin-left:2px; margin-right:0px;height:29px !important;line-height:29px !important;"
+													update="menuformid:tabview1:tablesp,messages"
+													disabled="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangCrud.id==0}"
+													action="#{yeuCauKiemTraHangBean.deleteYeuCauKiemTraHang()}"
+													title="Xóa phiếu">
+													<i class="fa fa-trash" aria-hidden="true"></i>
+													<span>Xóa</span>
+												</p:commandLink>
+
+												<p:commandLink styleClass="btn_download" update=":messages"
+													ajax="false" target="_blank"
+													style="margin-left:5px;background-color: #149d0f !important;"
+													title="Xuất danh sách ra excel"
+													action="#{yeuCauKiemTraHangBean.exportExcelTongHop()}">
+													<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+													<span>Xuất file excel</span>
+												</p:commandLink>
+											</div>
+										</div>
+									</div>
+								</div>
+								<p:overlayPanel id="imagePanel" for="idorder" hideEffect="fade"
+									dismissable="false" widgetVar="panelsearch"
+									style="width:360px;">
+									<div class="col-md-12"
+										style="padding-top: 10px !important; padding-left: 0px !important; padding-right: 0px !important;">
+										<div class="row">
+											<div class="col-md-6">
+												<label>Từ ngày</label>
+												<p:calendar value="#{yeuCauKiemTraHangBean.fromDateSearch}"
+													pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+													showButtonPanel="true" />
+											</div>
+											<div class="col-md-6">
+												<label>Đến ngày</label>
+												<p:calendar value="#{yeuCauKiemTraHangBean.toDateSearch}"
+													pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+													showButtonPanel="true" />
+											</div>
+										</div>
+										<div class="col-md-12"
+											style="margin: 10px; margin-right: 15px">
+											<div class="pull-right">
+												<p:commandLink styleClass="btn_new" process="searchform"
+													update="menuformid:tabview1:tablesp"
+													style="margin-left:5px;"
+													title="Lọc dữ liệu theo điều kiện lọc ở trên"
+													oncomplete="PF('panelsearch').hide();"
+													action="#{yeuCauKiemTraHangBean.search()}">
+													<i class="fa fa-search" aria-hidden="true"></i>
+													<span>Lọc</span>
+												</p:commandLink>
+											</div>
+										</div>
+									</div>
+								</p:overlayPanel>
+							</p:fieldset>
+							<p:sticky target="searchform" />
+							<div class="row"
+								style="margin-top: 5px; margin-bottom: 25px; margin-left: 16px !important; margin-right: 16px !important;">
+								<p:dataTable value="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangs}"
+									paginatorPosition="bottom" styleClass="tablenhapsp"
+									style="width:100%;" paginator="true" rowKey="#{item.id}"
+									id="tablesp" widgetVar="tablesp"
+									rowStyleClass="#{item.dakiemtra?'hlsuccess':''}"
+									selection="#{yeuCauKiemTraHangBean.yeuCauKiemTraHangSelect}"
+									selectionMode="single" resizableColumns="true" var="item">
+									<p:ajax event="rowSelect"
+										listener="#{yeuCauKiemTraHangBean.loadYeuCauKiemTraHang()}"
+										update="menuformid:tabview1:group1,menuformid:tabview1:searchform" />
+									<p:column headerText="ID" width="30" styleClass="textcenter">
+										<h:outputText value="#{item.id}" />
+									</p:column>
+									<p:column headerText="Số chứng từ" width="60"
+										styleClass="textcenter">
+										<h:outputText value="#{item.requestCode}" />
+									</p:column>
+									<p:column headerText="Ngày" width="60">
+										<h:outputText value="#{item.requestDate}">
+											<f:convertDateTime pattern="dd/MM/yyyy" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="Nhân viên tạo" width="60">
+										<h:outputText value="#{item.createdBy}" />
+									</p:column>
+									<p:column headerText="Ghi chú" width="200">
+										<h:outputText style="white-space: initial;"
+											value="#{item.note}" />
+									</p:column>
+									<p:column headerText="Đã kiểm tra" width="60"
+										style="text-align:center">
+										<p:selectBooleanCheckbox disabled="true"
+											value="#{item.dakiemtra}" />
+									</p:column>
+									<p:column headerText="Ngày kiểm tra" width="60">
+										<h:outputText value="#{item.ngayKiemTra}">
+											<f:convertDateTime pattern="dd/MM/yyyy" />
+										</h:outputText>
+									</p:column>
+									<p:column headerText="NV kiểm tra" width="60">
+										<h:outputText value="#{item.createdCheck}" />
+									</p:column>
+								</p:dataTable>
+							</div>
+						</div>
+					</p:tab>
+				</p:tabView>
+			</h:form>
+		</div>
+		<p:dialog header="Nạp chi tiết" styleClass="dialogcommon"
+			resizable="false"
+			style="overflow: initial;width:100%;max-width: min-content;min-width: 384px;"
+			closeOnEscape="true" widgetVar="dlnapexcel">
+			<h:form id="fidnapexcel" enctype="multipart/form-data">
+				<div class="col-md-12"
+					style="padding-left: 0px !important; padding-right: 0px !important;">
+					<div class="col-md-12">
+						<div class="col-md-6">
+							<p:selectBooleanCheckbox
+								value="#{yeuCauKiemTraHangBean.ghilaidulieu}"
+								itemLabel="Ghi lại dữ liệu">
+								<p:ajax process="@this" />
+							</p:selectBooleanCheckbox>
+						</div>
+						<div class="col-md-6">
+							<a
+								href="#{request.contextPath}/resources/upload/filemau/file_mau_nap_yeu_cau_kiemtrahang.xlsx"
+								style="color: #0077b3; text-decoration: underline;">Xem file
+								excel mẫu</a>
+						</div>
+
+					</div>
+					<div class="col-md-12">
+						<div class="row">
+							<p:fileUpload style="width: max-content;" dragDropSupport="true"
+								allowTypes="/(\.|\/)(xls|xlsx)$/" label="Chọn file"
+								cancelLabel="Huỷ" update=":messages" uploadLabel="Tải lên"
+								multiple="false"
+								listener="#{yeuCauKiemTraHangBean.loadExcelNapCT}"
+								mode="advanced" />
+
+						</div>
+					</div>
+				</div>
+			</h:form>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

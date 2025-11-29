@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:pe="http://primefaces.org/ui/extensions"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:fn="http://java.sun.com/jsp/jstl/functions"
+	xmlns:h="http://java.sun.com/jsf/html">
+	<div class="col-md-12"
+		style="padding-left: 0px !important; padding-right: 0px !important; background-color: #eeeeee;">
+		<div class="row"
+			style="margin-top: 5px; margin-bottom: 25px; margin-left: 16px !important; margin-right: 16px !important;">
+			<div class="col-md-12"
+				style="padding-left: 0px !important; padding-right: 0px !important;">
+				<div class="row">
+					<div class="col-md-3"
+						style="padding-left: 0px !important; padding-right: 5px !important;">
+						<div class="col-md-6"
+							style="padding-left: 0px !important; padding-right: 5px !important;">
+							<label>Từ ngày</label>
+							<p:calendar value="#{reportTonKhoSanPhamBean.fromDateSearch}"
+								pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+								showButtonPanel="true" />
+						</div>
+						<div class="col-md-6"
+							style="padding-left: 5px !important; padding-right: 0px !important;">
+							<label>Đến ngày</label>
+							<p:calendar value="#{reportTonKhoSanPhamBean.toDateSearch}"
+								pattern="dd/MM/yyyy" showOn="button" mask="99/99/9999"
+								showButtonPanel="true" />
+						</div>
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 5px !important;">
+						<label>Loại sản phẩm</label>
+						<p:selectOneMenu
+							value="#{reportTonKhoSanPhamBean.productTypeSearch}"
+							converter="abstractConverter" effect="fade" var="t"
+							style="width:100%;" filter="true" filterMatchMode="custom"
+							filterFunction="customFilter2">
+							<f:selectItem itemLabel="Tất cả" itemValue="#{null}" />
+							<f:selectItems value="#{reportTonKhoSanPhamBean.listProductType}"
+								var="theme" itemLabel="#{theme.code}-#{theme.name}"
+								itemValue="#{theme}" />
+							<p:column>
+								<h:outputText value="#{t.code}" />
+							</p:column>
+							<p:column>
+								<h:outputText value="#{t==null ? 'Tất cả' : t.name}" />
+							</p:column>
+						</p:selectOneMenu>
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 0px !important;">
+						<label>Sản phẩm</label>
+						<div class="nhapdlg">
+							<span class="fa fa-search"></span>
+							<p:autoComplete style="width:100%;" placeholder="Tìm sản phẩm"
+								title="#{reportTonKhoSanPhamBean.productSearch.product_name}"
+								value="#{reportTonKhoSanPhamBean.productSearch}"
+								queryDelay="900" converter="abstractConverter"
+								minQueryLength="2" maxResults="150"
+								completeMethod="#{reportTonKhoSanPhamBean.completeProduct}"
+								var="p" itemLabel="#{p.product_name}" itemValue="#{p}"
+								forceSelection="true" onclick="this.select();">
+								<p:column style="width:50px">
+									<h:outputText value="#{p.product_code}" />
+								</p:column>
+								<p:column style="width:150px">
+									<h:outputText value="#{p.product_name}" />
+								</p:column>
+							</p:autoComplete>
+						</div>
+					</div>
+					<div class="col-md-3"
+						style="padding-left: 5px !important; padding-right: 0px !important;">
+						<br />
+						<p:selectOneRadio value="#{reportTonKhoSanPhamBean.typep}"
+							converter="integerConverter" layout="grid" columns="3">
+							<f:selectItem itemLabel="Tất cả" itemValue="-1" />
+							<f:selectItem itemLabel="Nội địa" itemValue="0" />
+							<f:selectItem itemLabel="Xuất khẩu" itemValue="1" />
+							
+						</p:selectOneRadio>
+					</div>
+				</div>
+				<div class="row" style="margin-top: 10px; margin-bottom: 5px;">
+					<div class="col-md-6" style="padding-left: 0px !important;">
+						<p:commandLink action="#{reportTonKhoSanPhamBean.search()}"
+							process="menuformid2"
+							update=":messages,tabview1:menuformid2:tablenc"
+							styleClass="btn_primmary"
+							style="margin-left:0px; margin-right:0px;height:29px !important;line-height:29px !important;">
+							<i class="fa fa-search" aria-hidden="true"></i>
+							<span>Tìm kiếm</span>
+						</p:commandLink>
+					</div>
+					<div class=" col-md-6"
+						style="text-align: right; padding-right: 0px !important;">
+						<div class="btn-group" style="float: right; height: 35px;">
+							<button type="button" class="btn  dropdown-toggle"
+								style="background-color: #4bac4d; height: 30px; color: white; font-weight: 600; font-size: 11px; padding-left: 10px; padding-right: 10px;"
+								data-toggle="dropdown">
+								Xuất file<span class="caret"
+									style="margin-left: 4px; margin-top: -2px;"></span>
+							</button>
+							<ul class="dropdown-menu" role="menu">
+								<li><p:commandLink
+										update=":messages,tabview1:menuformid2:tablenc"
+										process="menuformid2"
+										action="#{reportTonKhoSanPhamBean.reportTonKhoSanPham()}">Tồn kho sản phẩm</p:commandLink></li>
+								<li><p:commandLink ajax="false" target="_blank"
+										update=":messages,tabview1:menuformid2:tablenc"
+										process="menuformid2"
+										action="#{reportTonKhoSanPhamBean.reportTonKhoSanPhamExcel()}">Tồn kho sản phẩm excel</p:commandLink></li>
+										<li><p:commandLink ajax="false" target="_blank"
+										update=":messages,tabview1:menuformid2:tablenc"
+										process="menuformid2"
+										action="#{reportTonKhoSanPhamBean.reportTonKhoSanPhamExcel_ChiTietTheoNgay()}">Tồn kho sản phẩm excel (chi tiết)</p:commandLink></li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				<div class="row" style="margin-top: 10px !important;">
+					<p:dataTable value="#{reportTonKhoSanPhamBean.listTonKhoSanPham}"
+						sortBy="#{item.product_type_id}" expandableRowGroups="true"
+						paginatorPosition="bottom" styleClass="tablenhapsp tableright0"
+						style="width:100%;" paginator="true" rows="90"
+						paginatorTemplate="{CurrentPageReport} {FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}"
+						currentPageReportTemplate="{startRecord}-{endRecord} of {totalRecords} records"
+						rowsPerPageTemplate="90,120,150,200" id="tablenc"
+						widgetVar="tablenc" rowIndexVar="rowe" scrollable="true"
+						scrollHeight="400" scrollWidth="100%" resizableColumns="true"
+						var="item"
+						filteredValue="#{reportTonKhoSanPhamBean.listTonKhoSanPhamFilter}">
+						<p:headerRow>
+							<c:set var="datap"
+								value="#{reportTonKhoSanPhamBean.sumByType(item.product_type_id)}"></c:set>
+							<p:column colspan="2">
+								<h:outputText value="#{item.product_type_name}" />
+							</p:column>
+							<p:column styleClass="textright">
+								
+							</p:column>
+							<p:column styleClass="textright">
+								
+							</p:column>
+							<p:column styleClass="textright">
+								
+							</p:column>
+							<p:column styleClass="textright">
+								
+							</p:column>
+							<p:column styleClass="textright">
+								
+							</p:column>
+							<p:column styleClass="textright">
+								
+							</p:column>
+							<p:column styleClass="textright">
+								
+							</p:column>
+							<p:column styleClass="textright">
+								
+							</p:column>
+							<p:column styleClass="textright">
+								
+							</p:column>
+						</p:headerRow>
+						<p:column
+							filterBy="#{reportTonKhoSanPhamBean.formatHandler.converViToEn(item.product_code)}"
+							filterMatchMode="contains" headerText="Mã SP" width="60">
+							<h:outputText value="#{item.product_code}" />
+						</p:column>
+						<p:column
+							filterBy="#{reportTonKhoSanPhamBean.formatHandler.converViToEn(item.product_name)}"
+							filterMatchMode="contains" headerText="Sản phẩm" width="300">
+							<h:outputText style="white-space: initial;"
+								value="#{item.product_name}" />
+						</p:column>
+						<p:column headerText="Tồn đầu" width="70" styleClass="textright">
+							<h:outputText value="#{item.kg_opening_balance}">
+								<f:convertNumber locale="vi"  pattern="###,###,##0.00" />
+							</h:outputText>
+						</p:column>
+						<p:column headerText="Tồn đầu(ĐVT)" width="70"
+							styleClass="textrightblue">
+							<h:outputText value="#{item.kg_opening_balance/item.factor}">
+								<f:convertNumber locale="vi"  pattern="###,###,##0.00#" />
+							</h:outputText>
+						</p:column>
+						<p:column headerText="Nhập(Kg)" width="70" styleClass="textright">
+							<h:outputText value="#{item.kg_import_quantity}">
+								<f:convertNumber locale="vi"  pattern="###,###,##0.00#" />
+							</h:outputText>
+						</p:column>
+						<p:column headerText="Nhập(ĐVT)" width="70"
+							styleClass="textrightblue">
+							<h:outputText value="#{item.kg_import_quantity/item.factor}">
+								<f:convertNumber locale="vi"  pattern="###,###,##0.00#" />
+							</h:outputText>
+						</p:column>
+						<p:column headerText="Xuất(Kg)" width="70" styleClass="textright">
+							<h:outputText value="#{item.kg_export_quantity}">
+								<f:convertNumber locale="vi"  pattern="###,###,##0.00#" />
+							</h:outputText>
+						</p:column>
+						<p:column headerText="Xuất(ĐVT)" width="70"
+							styleClass="textrightblue">
+							<h:outputText value="#{item.kg_export_quantity/item.factor}">
+								<f:convertNumber locale="vi"  pattern="###,###,##0.00#" />
+							</h:outputText>
+						</p:column>
+						<p:column headerText="Trị giá xuất" width="70"
+							styleClass="textright">
+							<h:outputText value="#{item.export_total_amount}">
+								<f:convertNumber locale="vi"  pattern="###,###,##0.00" />
+							</h:outputText>
+						</p:column>
+						<p:column headerText="Tồn cuối(Kg)" width="70"
+							styleClass="textright">
+							<h:outputText value="#{item.kg_closing_balance}">
+								<f:convertNumber locale="vi"  pattern="###,###,##0.00#" />
+							</h:outputText>
+						</p:column>
+						<p:column headerText="Tồn cuối(ĐVT)" width="70"
+							styleClass="textrightblue">
+							<h:outputText value="#{item.kg_closing_balance/item.factor}">
+								<f:convertNumber locale="vi"  pattern="###,###,##0.00#" />
+							</h:outputText>
+						</p:column>
+
+					</p:dataTable>
+				</div>
+			</div>
+		</div>
+	</div>
+</ui:composition>

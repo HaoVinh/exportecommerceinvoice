@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui:composition xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ui="http://java.sun.com/jsf/facelets"
+	xmlns:p="http://primefaces.org/ui"
+	xmlns:f="http://java.sun.com/jsf/core"
+	xmlns:c="http://java.sun.com/jsp/jstl/core"
+	xmlns:h="http://java.sun.com/jsf/html" template="/pages/home.xhtml">
+	<ui:define name="content">
+		<h3
+			style="margin: 0px; color: #00145a; font-weight: bold; font-size: 15px !important; line-height: 13px; padding-top: 10px; padding-left: 10px;">Danh
+			mục đơn giá vận chuyển</h3>
+		<p:separator />
+		<h:form id="menuformid">
+			<div class="col-md-12"
+				style="padding-left: 0px !important; padding-right: 0px !important;">
+				<p:fieldset id="searchform"
+					style="margin-bottom:10px;background:#3c8dbc">
+					<div class="row">
+						<div class="ui-g">
+							<div class="ui-md-6 ui-sm-12 ">
+								<div class="ui-g">
+									<div class="ui-md-8 ui-sm-12 ">
+										<div class="nhapdlg">
+											<span class="fa fa-search" />
+											<p:remoteCommand name="searchEnter"
+												actionListener="#{deliveryPricingBean.search()}"
+												update="tablesp" />
+											<p:inputText placeholder="Tìm theo mã vận chuyển, khách hàng"
+												id="inputsearch" style="width:100%;"
+												value="#{deliveryPricingBean.stextStr}"
+												onkeypress="if (event.keyCode === 13) { searchEnter(); return false; }">
+											</p:inputText>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="ui-md-6 ui-sm-12">
+								<div style="float: right">
+									<p:commandLink styleClass="btn_destroy"
+										style="margin-left:1px;height:28px !important;line-height:28px !important;"
+										update=":messages,menuformid"
+										disabled="#{deliveryPricingBean.deliveryPricingCrud.id==0}"
+										action="#{deliveryPricingBean.delete()}"
+										title="Xóa chương trình">
+										<i class="fa fa-trash" aria-hidden="true"></i>
+										<span>Xóa</span>
+										<p:confirm icon="ui-icon-alert" />
+									</p:commandLink>
+									<p:commandLink styleClass="btn_primmary"
+										style="margin-left:5px;height:28px !important;line-height:28px !important;"
+										update="editdetail" title="Thêm mới chương trình"
+										action="#{deliveryPricingBean.showDialog()}">
+										<i class="fa fa-plus" aria-hidden="true"></i>
+										<span>Thêm mới</span>
+									</p:commandLink>
+									<p:commandLink styleClass="btn_printtt"
+										style="margin-left:5px;height:28px !important;line-height:28px !important;"
+										update="editdetail" process="@this" target="blank_"
+										action="#{deliveryPricingBean.showDialogUpload()}">
+										<i class="fa fa-file-excel-o" aria-hidden="true"></i>
+										<span>Nạp excel</span>
+									</p:commandLink>
+									<p:commandLink styleClass="btn_destroy"
+										style="margin-left:1px;height:28px !important;line-height:28px !important;"
+										update=":messages,menuformid"
+										rendered="#{sessionScope.database eq 'HO CHI MINH'}"
+										action="#{deliveryPricingBean.dongbo()}"
+										title="Đồng bộ dữ liệu đơn giá vận chuyển qua chi nhánh (BD)">
+										<i class="fa fa-trash" aria-hidden="true"></i>
+										<span>Đồng bộ (#{deliveryPricingBean.dongBo.time})</span>
+									</p:commandLink>
+								</div>
+							</div>
+						</div>
+					</div>
+				</p:fieldset>
+				<p:sticky target="searchform" />
+				<p:dataTable value="#{deliveryPricingBean.listDeliveryPricing}"
+					paginatorPosition="bottom" styleClass="tablenhapsp tableright1"
+					style="width:100%;" paginator="true" rowKey="#{item.id}"
+					id="tablesp" rows="50" rowsPerPageTemplate="50,100,200"
+					selection="#{deliveryPricingBean.deliveryPricingSelect}"
+					selectionMode="single" resizableColumns="true" var="item">
+					<p:ajax event="rowSelect"
+						listener="#{deliveryPricingBean.showEdit()}"
+						update="editdetail,menuformid:searchform" />
+					<p:ajax event="rowDblselect" oncomplete="PF('dlg1').show();"
+						update="editdetail" />
+					<p:column headerText="ID" width="50" styleClass="textcenter">
+						<h:outputText value="#{item.id}" />
+					</p:column>
+					<p:column headerText="MAVC" width="70">
+						<h:outputText value="#{item.place_code}" />
+					</p:column>
+					<p:column headerText="MAKH" width="70">
+						<h:outputText value="#{item.customer.customer_code}" />
+					</p:column>
+					<p:column headerText="Khách hàng" width="250">
+						<h:outputText style="white-space: initial;"
+							value="#{item.customer.customer_name}" />
+					</p:column>
+					<p:column headerText="Nơi đến" width="250">
+						<h:outputText style="white-space: initial;"
+							value="#{item.address}" />
+					</p:column>
+					<p:column headerText="Số KM" width="50" styleClass="textright">
+						<h:outputText
+							value="#{deliveryPricingBean.formatHandler.getNumberFormat(item.km,1000)}" />
+					</p:column>
+					<p:column headerText="Đơn giá" width="90" styleClass="textright">
+						<h:outputText
+							value="#{deliveryPricingBean.formatHandler.getNumberFormat(item.unit_price,1000)}" />
+					</p:column>
+					<p:column headerText="ĐG Không sử dụng" width="90"
+						styleClass="textcenter">
+						<p:selectBooleanCheckbox disabled="true" value="#{item.disable}" />
+					</p:column>
+				</p:dataTable>
+			</div>
+		</h:form>
+		<p:dialog styleClass="dialogcommon" resizable="false" width="640"
+			style="overflow: initial;" closeOnEscape="true"
+			header="Đơn giá vận chuyển khách hàng" widgetVar="dlg1">
+			<h:form id="editdetail" style="width:100%;">
+				<div class="col-md-12 boxCus">
+					<div class="col-md-12"
+						style="padding-left: 0px !important; padding-right: 0px !important;">
+						<div class="row">
+							<div class="col-md-12">
+								<label>Khách hàng</label>
+								<p:autoComplete style="width:100%;"
+									value="#{deliveryPricingBean.deliveryPricingCrud.customer}"
+									queryDelay="1000" maxResults="50" converter="abstractConverter"
+									minQueryLength="2"
+									completeMethod="#{deliveryPricingBean.completeCustomerCrud}"
+									var="p" itemLabel="#{p.customer_name}" itemValue="#{p}"
+									forceSelection="true" onclick="this.select();">
+									<p:column style="width:50px">
+										<h:outputText value="#{p.customer_code}" />
+									</p:column>
+									<p:column style="width:150px">
+										<h:outputText value="#{p.customer_name}" />
+									</p:column>
+								</p:autoComplete>
+							</div>
+						</div>
+					</div>
+					<div class="col-md-12"
+						style="padding-left: 0px !important; padding-right: 0px !important;">
+						<div class="row">
+							<div class="col-md-6">
+								<label>Mã nơi đến</label>
+							</div>
+							<div class="col-md-6">
+								<label>Số KM</label>
+							</div>
+						</div>
+						<div class="row">
+							<div class="col-md-6">
+								<p:inputText
+									value="#{deliveryPricingBean.deliveryPricingCrud.place_code}"
+									style="width:100%;" />
+							</div>
+							<div class="col-md-6">
+								<p:inputText
+									value="#{deliveryPricingBean.deliveryPricingCrud.km}"
+									style="width:100%;" />
+							</div>
+						</div>
+					</div>
+					<div class="col-md-12"
+						style="padding-left: 0px !important; padding-right: 0px !important;">
+						<div class="row">
+							<div class="col-md-12">
+								<label>Nơi đến</label>
+							</div>
+						</div>
+						<div class="row">
+							<div class="col-md-12">
+								<p:inputTextarea rows="3"
+									value="#{deliveryPricingBean.deliveryPricingCrud.address}"
+									style="width:100%;" />
+							</div>
+						</div>
+					</div>
+					<div class="col-md-12"
+						style="padding-left: 0px !important; padding-right: 0px !important;">
+						<div class="row">
+							<div class="col-md-12">
+								<label>Nơi đến in hóa đơn (Big C)</label>
+							</div>
+						</div>
+						<div class="row">
+							<div class="col-md-12">
+								<p:inputTextarea rows="2"
+									value="#{deliveryPricingBean.deliveryPricingCrud.place_arrived}"
+									style="width:100%;" />
+							</div>
+						</div>
+					</div>
+					<div class="col-md-12"
+						style="padding-left: 0px !important; padding-right: 0px !important;">
+						<div class="row">
+							<div class="col-md-6">
+								<label>Đơn giá(đ/tấn)</label>
+							</div>
+							<div class="col-md-6"></div>
+						</div>
+						<div class="row">
+							<div class="col-md-6">
+								<p:inputNumber onclick="this.select()"
+									value="#{deliveryPricingBean.deliveryPricingCrud.unit_price}"
+									styleClass="intputnumcc" style="width:100%;" minValue="0"
+									decimalPlaces="3" decimalSeparator="," maxValue="1000000"
+									emptyValue="0" thousandSeparator="." />
+							</div>
+							<div class="col-md-6">
+								<p:selectBooleanCheckbox
+									value="#{deliveryPricingBean.deliveryPricingCrud.disable}"
+									itemLabel="Đơn giá không sử dụng" />
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="col-md-12" style="padding: 10px 0px;">
+					<p:commandButton id="idorder" icon="fa fa-floppy-o"
+						style="padding:4px !important;"
+						actionListener="#{deliveryPricingBean.saveOrUpdate()}"
+						styleClass="buttonaddrow" update=":messages,menuformid:tablesp"
+						value="Lưu/Cập nhật" />
+				</div>
+			</h:form>
+		</p:dialog>
+		<p:dialog widgetVar="uploadpdffile" resizable="false" height="400"
+			styleClass="dislogUpload" header="Tải File">
+			<h:form id="mm" enctype="multipart/form-data">
+				<p:selectBooleanCheckbox value="#{deliveryPricingBean.fontvni}"
+					itemLabel="FontVni">
+					<p:ajax process="@this" />
+				</p:selectBooleanCheckbox>
+				<p:fileUpload style="text-align:center" id="fileupload"
+					dragDropSupport="true" label="Chọn file từ máy tính"
+					cancelLabel="Huỷ" update=":messages,menuformid:tablesp"
+					uploadLabel="Tải lên" multiple="false"
+					listener="#{deliveryPricingBean.loadExcel}"
+					mode="advanced" process="@this,mm" />
+			</h:form>
+		</p:dialog>
+	</ui:define>
+</ui:composition>

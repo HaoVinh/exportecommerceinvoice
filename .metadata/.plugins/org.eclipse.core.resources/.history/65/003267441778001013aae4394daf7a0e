@@ -1,0 +1,633 @@
+package vinh.lixco.com.apiecommerce;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import javax.inject.Inject;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.HeaderParam;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+import org.hibernate.StaleStateException;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
+
+import lixco.com.entity.EcomOrder;
+import lixco.com.entity.EcomOrderDetail;
+import lixco.com.entity.PricingProgram;
+import lixco.com.entity.PricingProgramDetail;
+import lixco.com.entity.Product;
+import lixco.com.interfaces.ICustomerService;
+import lixco.com.interfaces.IPricingProgramDetailService;
+import lixco.com.interfaces.IPricingProgramService;
+import lixco.com.interfaces.IProductService;
+import lixco.com.entity.Customer;
+import lixco.com.service.EcomOrderDetailService;
+import lixco.com.service.EcomOrderService;
+import okhttp3.HttpUrl;
+import okhttp3.Request;
+import okio.Buffer;
+
+@Path("/tiktok")
+public class TikTokAPIServlet {
+	private static final Logger LOGGER = Logger.getLogger(TikTokAPIServlet.class.getName());
+	private static final String APP_KEY = "6gm54lge178ke";
+	private static final String APP_SECRET = "f54f72703a82039bb14f11e225154739fdf5dd58";
+	private static final String SHOP_CIPHER = "ROW_K8m16gAAAAAtvyvTQ0hdgNF8K705eDAW";
+
+	private final okhttp3.OkHttpClient httpClient = new okhttp3.OkHttpClient();
+	private final ObjectMapper mapper = new ObjectMapper();
+
+	@Inject
+	private EcomOrderService ecomOrderService;
+	@Inject
+	private EcomOrderDetailService ecomOrderDetailService;
+	@Inject
+	private TikTokTokenManager tokenManager;
+	@Inject
+	private IPricingProgramService priceProgramService;
+	@Inject
+	private IPricingProgramDetailService pricingProgramDetailService;
+	@Inject
+	private IProductService productService;
+	@Inject
+	private ICustomerService customerService;
+
+	@POST
+	@Path("/webhook/order")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response receiveOrderWebhook(@HeaderParam("Authorization") String authHeader, String rawBody,
+			@Context HttpHeaders headers) {
+		try {
+			OrderDTO orderDTO = new OrderDTO();
+			LOGGER.info("Lazada: Nhận yêu cầu - Headers: " + headers.getRequestHeaders());
+//            headers.getRequestHeaders().forEach((key, values) -> LOGGER.info(key + ": " + values.get(0)));
+//            LOGGER.info("====================================");
+
+			if (rawBody == null || rawBody.trim().isEmpty()) {
+				LOGGER.warning("❌ Empty or invalid payload");
+				return Response.status(Response.Status.BAD_REQUEST)
+						.entity("{\"status\":\"error\",\"message\":\"Empty or invalid payload\"}")
+						.type(MediaType.APPLICATION_JSON).build();
+			}
+			if (authHeader == null || authHeader.isEmpty()) {
+				LOGGER.warning("❌ Missing Authorization header");
+				return Response.status(Response.Status.UNAUTHORIZED)
+						.entity("{\"status\":\"error\",\"message\":\"Missing Authorization header\"}")
+						.type(MediaType.APPLICATION_JSON).build();
+			}
+
+			// Verify webhook signature
+			String generatedSignature = generateWebhookSignature(rawBody, APP_SECRET, APP_KEY);
+//            LOGGER.info("Generated Signature: " + generatedSignature);
+//            LOGGER.info("Received Authorization: " + authHeader);
+			if (!generatedSignature.equals(authHeader)) {
+				LOGGER.warning("❌ Signature mismatch");
+				return Response.status(Response.Status.UNAUTHORIZED)
+						.entity("{\"status\":\"error\",\"message\":\"Invalid signature\"}")
+						.type(MediaType.APPLICATION_JSON).build();
+			}
+
+			// Parse JSON
+			JsonObject json = JsonParser.parseString(rawBody).getAsJsonObject();
+			if (!json.has("shop_id") || !json.has("data")) {
+				LOGGER.warning("❌ Missing required fields: shop_id or data");
+				return Response.status(Response.Status.BAD_REQUEST)
+						.entity("{\"status\":\"error\",\"message\":\"Missing required fields: shop_id or data\"}")
+						.type(MediaType.APPLICATION_JSON).build();
+			}
+
+			String shopId = json.get("shop_id").getAsString();
+			JsonObject data = json.getAsJsonObject("data");
+			String orderId = null;
+			String orderStatus = data.has("order_status") ? data.get("order_status").getAsString() : "";
+			if (data.has("order_id")) {
+				orderId = data.get("order_id").getAsString();
+			} else if (data.has("orders")) {
+				JsonArray ordersArray = data.getAsJsonArray("orders");
+				if (ordersArray != null && ordersArray.size() > 0) {
+					JsonObject orderObj = ordersArray.get(0).getAsJsonObject();
+					if (orderObj.has("id")) {
+						orderId = orderObj.get("id").getAsString();
+					}
+				}
+			}
+
+			if (orderId == null || orderId.trim().isEmpty()) {
+				LOGGER.warning("❌ Missing or invalid order_id");
+				return Response.status(Response.Status.BAD_REQUEST)
+						.entity("{\"status\":\"error\",\"message\":\"Missing or invalid order_id\"}")
+						.type(MediaType.APPLICATION_JSON).build();
+			}
+
+			orderDTO = fetchOrder(orderId);
+			saveOrUpdateOrder(orderDTO);
+
+			return Response
+					.ok("{\"status\":\"success\",\"message\":\"Webhook received\",\"data\":{\"shop_id\":\"" + shopId
+							+ "\",\"order_id\":\"" + orderId + "\",\"order_status\":\"" + orderStatus + "\"}}")
+					.type(MediaType.APPLICATION_JSON).build();
+
+		} catch (JsonSyntaxException e) {
+			LOGGER.severe("❌ Failed to parse JSON: " + e.getMessage());
+			return Response.status(Response.Status.BAD_REQUEST)
+					.entity("{\"status\":\"error\",\"message\":\"Invalid JSON format\"}")
+					.type(MediaType.APPLICATION_JSON).build();
+		} catch (Exception e) {
+			LOGGER.severe("❌ Error processing webhook: " + e.getMessage());
+			e.printStackTrace();
+			return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+					.entity("{\"status\":\"error\",\"message\":\"Error processing webhook: " + e.getMessage() + "\"}")
+					.type(MediaType.APPLICATION_JSON).build();
+		}
+	}
+
+	public OrderDTO fetchOrder(String orderId) throws Exception {
+		if (orderId == null || orderId.trim().isEmpty()) {
+			throw new IllegalArgumentException("orderId cannot be null or empty");
+		}
+
+		int maxTokenRefreshAttempts = 2;
+		for (int attempt = 1; attempt <= maxTokenRefreshAttempts; attempt++) {
+			String accessToken = tokenManager.getAccessToken();
+//            LOGGER.info("Using access token (attempt " + attempt + "): " + accessToken.substring(0, 10) + "...");
+
+			String timestamp = String.valueOf(System.currentTimeMillis() / 1000);
+			HttpUrl.Builder urlBuilder = new HttpUrl.Builder().scheme("https").host("open-api.tiktokglobalshop.com")
+					.addPathSegments("order/202309/orders").addQueryParameter("app_key", APP_KEY)
+					.addQueryParameter("timestamp", timestamp).addQueryParameter("shop_cipher", SHOP_CIPHER)
+					.addQueryParameter("ids", orderId);
+
+			Request unsignedRequest = new Request.Builder().url(urlBuilder.build()).get()
+					.header("x-tts-access-token", accessToken).header("Content-Type", "application/json").build();
+
+			String sign = generateSignature(unsignedRequest, APP_SECRET);
+			LOGGER.info("Generated Signature: " + sign);
+
+			HttpUrl signedUrl = urlBuilder.addQueryParameter("sign", sign).build();
+			Request signedRequest = unsignedRequest.newBuilder().url(signedUrl).build();
+
+			int maxRetries = 5;
+			long delayMillis = 5000;
+			IOException lastException = null;
+
+			for (int retry = 1; retry <= maxRetries; retry++) {
+				okhttp3.Response response = null;
+				try {
+					response = httpClient.newCall(signedRequest).execute();
+					if (!response.isSuccessful()) {
+						String errorBody = response.body().string();
+						LOGGER.warning("HTTP error code: " + response.code() + ", Response: " + errorBody);
+						JsonNode errorJson = mapper.readTree(errorBody);
+						if (errorJson.path("code").asInt() == 36009004 && attempt < maxTokenRefreshAttempts) {
+							LOGGER.info("Invalid token detected (code 36009004). Refreshing token and retrying...");
+							tokenManager.getAccessToken(); // Làm mới hoặc khởi tạo token
+							continue; // Thử lại với token mới
+						}
+						throw new IOException("HTTP error code: " + response.code() + ", Response: " + errorBody);
+					}
+
+					String responseBody = response.body().string();
+					LOGGER.info("API Response: " + responseBody);
+					JsonNode root = mapper.readTree(responseBody);
+					JsonNode ordersNode = root.path("data").path("orders");
+
+					if (!ordersNode.isArray() || ordersNode.size() == 0) {
+						throw new RuntimeException("TikTok returned empty orders.");
+					}
+
+					JsonNode orderData = ordersNode.get(0);
+					OrderDTO dto = parseOrderDTO(orderData);
+					allocateLastPrice(dto); // Phân bổ lastPrice sau khi tách SKU và so sánh
+					return dto;
+
+				} catch (IOException ex) {
+					lastException = ex;
+					LOGGER.warning("Attempt " + retry + " failed: " + ex.getMessage());
+					if (retry < maxRetries) {
+						Thread.sleep(delayMillis);
+					}
+				} finally {
+					if (response != null) {
+						response.close();
+					}
+				}
+			}
+		}
+
+		throw new IOException("Failed to fetch order details after maximum retries and token refresh attempts.");
+	}
+
+	private OrderDTO parseOrderDTO(JsonNode data) {
+		OrderDTO dto = new OrderDTO();
+		dto.setOrderId(data.path("id").asText());
+		dto.setOrder_status(data.path("status").asText(""));
+		dto.setPrice(data.path("payment").path("sub_total").asDouble(0.0)); // Sử dụng sub_total làm giá ban đầu
+		dto.setShippingFee(data.path("payment").path("shipping_fee").asDouble(0.0)); // Lấy shipping_fee từ response
+		JsonNode recipient = data.path("recipient_address");
+		dto.setCustomerFirstName(recipient.path("first_name").asText(""));
+		dto.setCustomerLastName(recipient.path("last_name").asText(""));
+		dto.seteCommerceType("TikTok");
+
+		dto.setCreatedAt(fromUnixTime(data.path("create_time").asLong(0)));
+		dto.setUpdatedAt(fromUnixTime(data.path("update_time").asLong(0)));
+
+		List<OrderDetailDTO> details = new ArrayList<>();
+		JsonNode items = data.path("line_items");
+		if (items.isArray()) {
+			for (JsonNode item : items) {
+				OrderDetailDTO detail = new OrderDetailDTO();
+				detail.setOrderItemId(item.path("id").asText());
+				detail.setName(item.path("product_name").asText(""));
+				detail.setSku(item.path("seller_sku").asText(""));
+				detail.setItemPrice(item.path("sale_price").asDouble(0.0));
+				detail.setOrderId(dto.getOrderId());
+				detail.setLoaitmdt("TikTok");
+				detail.setVariant(item.has("combined_listing_skus") && item.path("combined_listing_skus").size() > 0);
+				detail.setQuantity(1); // Mặc định quantity = 1
+				details.add(detail);
+			}
+		}
+		dto.setOrderDetails(details);
+		return dto;
+	}
+
+	private List<OrderDetailDTO> splitSku(OrderDetailDTO detail) {
+		Customer customer = customerService.selectByCode("CO648");
+		if (customer == null) {
+			LOGGER.warning("Không thấy mã KH CO648");
+			List<OrderDetailDTO> result = new ArrayList<>();
+			result.add(detail);
+			return result;
+		}
+
+		PricingProgram pricingProgram = priceProgramService.findByCode("DG027968");
+		if (pricingProgram == null) {
+			LOGGER.warning("Pricing program DG027968 not found");
+			List<OrderDetailDTO> result = new ArrayList<>();
+			result.add(detail);
+			return result;
+		}
+
+		List<PricingProgramDetail> pricingProgramDetails = pricingProgramDetailService
+				.findAllByPricingProgram(pricingProgram.getId());
+
+		List<OrderDetailDTO> result = new ArrayList<>();
+		String skuString = detail.getSku();
+
+		if (skuString == null || skuString.trim().isEmpty()) {
+			result.add(detail);
+			return result;
+		}
+
+		skuString = skuString.trim();
+		int originalQuantity = detail.getQuantity();
+
+		// Kiểm tra pattern 2C, 3C
+		Pattern pattern = Pattern.compile("^(\\d+)C\\s*-\\s*(.+)$");
+		Matcher matcher = pattern.matcher(skuString);
+
+		if (matcher.matches()) {
+			int prefixNumber = Integer.parseInt(matcher.group(1));
+			String remainingSku = matcher.group(2).trim();
+			String[] skuParts = remainingSku.split("\\s*\\+\\s*");
+
+			if (skuParts.length == 1) {
+				// Trường hợp 2C-A hoặc 3C-A
+				OrderDetailDTO newDetail = createDetailWithPricing(detail, skuParts[0].trim(), detail.getName(),
+						prefixNumber, pricingProgramDetails);
+				result.add(newDetail);
+			} else if (skuParts.length == 2) {
+				// Trường hợp 2C-A+B hoặc 3C-A+B
+				String originalName = detail.getName();
+				int tặngIndex = originalName.toLowerCase().indexOf("tặng");
+				String nameA = tặngIndex != -1 ? originalName.substring(0, tặngIndex).trim() : originalName;
+				String nameB = tặngIndex != -1 ? originalName.substring(tặngIndex + "tặng".length()).trim()
+						: originalName;
+
+				OrderDetailDTO detailA = createDetailWithPricing(detail, skuParts[0].trim(), nameA,
+						prefixNumber == 3 ? 3 : 2, pricingProgramDetails);
+				OrderDetailDTO detailB = createDetailWithPricing(detail, skuParts[1].trim(), nameB, 1,
+						pricingProgramDetails);
+
+				result.add(detailA);
+				result.add(detailB);
+			}
+		} else {
+			// Xử lý SKU dạng A+B+C
+			String[] skuParts = skuString.split("\\s*\\+\\s*");
+			if (skuParts.length > 1) {
+				for (String part : skuParts) {
+					if (!part.trim().isEmpty()) {
+						OrderDetailDTO newDetail = createDetailWithPricing(detail, part.trim(), detail.getName(), 1,
+								pricingProgramDetails);
+						result.add(newDetail);
+					}
+				}
+			} else {
+				// Trường hợp SKU đơn
+				OrderDetailDTO newDetail = createDetailWithPricing(detail, skuString, detail.getName(),
+						originalQuantity, pricingProgramDetails);
+				result.add(newDetail);
+			}
+		}
+
+		return result;
+	}
+
+	private OrderDetailDTO createDetailWithPricing(OrderDetailDTO original, String sku, String name, int quantity,
+			List<PricingProgramDetail> pricingProgramDetails) {
+		OrderDetailDTO newDetail = new OrderDetailDTO();
+		newDetail.setOrderItemId(original.getOrderItemId());
+		newDetail.setName(name);
+		newDetail.setSku(sku);
+		newDetail.setOrderId(original.getOrderId());
+		newDetail.setLoaitmdt(original.getLoaitmdt());
+		newDetail.setVariant(original.isVariant());
+		newDetail.setQuantity(quantity);
+
+		Product product = productService.selectByCode(sku);
+		double itemPrice = 0.0;
+		for (PricingProgramDetail item : pricingProgramDetails) {
+			if (item.getProduct() != null && product != null && product.getId() != 0
+					&& item.getProduct().getProduct_code().equals(product.getProduct_code())) {
+				itemPrice = item.getUnit_price() != 0 ? item.getUnit_price() : original.getItemPrice();
+				break;
+			}
+		}
+		if (itemPrice == 0.0) {
+			itemPrice = original.getItemPrice(); // Fallback nếu không tìm thấy trong PricingProgram
+		}
+		newDetail.setItemPrice(itemPrice);
+
+		return newDetail;
+	}
+
+	private void allocateLastPrice(OrderDTO dto) {
+		if (dto == null || dto.getOrderDetails() == null || dto.getOrderDetails().isEmpty()) {
+			LOGGER.warning("Cannot allocate lastPrice: OrderDTO or order details is null/empty");
+			return;
+		}
+
+		// Tính LastPrice trước
+		double totalLastPrice = dto.getPrice() + dto.getShippingFee();
+		dto.setLastPrice(totalLastPrice);
+		LOGGER.info("Calculated totalLastPrice: " + totalLastPrice);
+
+		// Tách SKU trước khi phân bổ
+		List<OrderDetailDTO> splitDetails = new ArrayList<>();
+		for (OrderDetailDTO detail : dto.getOrderDetails()) {
+			splitDetails.addAll(splitSku(detail));
+		}
+		dto.setOrderDetails(splitDetails);
+
+		List<OrderDetailDTO> items = dto.getOrderDetails();
+		List<OrderDetailDTO> validItems = items.stream()
+				.filter(item -> item != null && item.getItemPrice() != null && item.getItemPrice() > 0)
+				.collect(Collectors.toList());
+
+		if (!validItems.isEmpty()) {
+			double totalItemPrice = validItems.stream().mapToDouble(item -> item.getItemPrice() * item.getQuantity())
+					.sum();
+			double remainingLastPrice = totalLastPrice;
+
+			for (OrderDetailDTO item : validItems) {
+				if (item != null && item.getItemPrice() != null) {
+					double allocatedPrice = (item.getItemPrice() * item.getQuantity() / totalItemPrice)
+							* totalLastPrice;
+					item.setLastItemPrice(Math.max(0, Math.min(allocatedPrice, remainingLastPrice)));
+					remainingLastPrice -= item.getLastItemPrice();
+					LOGGER.info("Allocated lastItemPrice for item " + item.getOrderItemId() + ": "
+							+ item.getLastItemPrice());
+				}
+			}
+
+			if (!validItems.isEmpty()) {
+				OrderDetailDTO lastItem = validItems.get(validItems.size() - 1);
+				if (lastItem != null) {
+					lastItem.setLastItemPrice(lastItem.getLastItemPrice() + remainingLastPrice);
+					LOGGER.info("Adjusted lastItemPrice for last item " + lastItem.getOrderItemId() + ": "
+							+ lastItem.getLastItemPrice());
+				}
+			}
+
+			for (OrderDetailDTO item : items) {
+				if (item != null) {
+					if (item.getItemPrice() != null && item.getItemPrice() <= 0) {
+						item.setLastItemPrice(0.0);
+					}
+					if (item.getQuantity() > 0) {
+						item.setUnitPrice(item.getLastItemPrice() / item.getQuantity());
+					} else {
+						item.setUnitPrice(0.0);
+					}
+					LOGGER.info("Set unitPrice for item " + item.getOrderItemId() + ": " + item.getUnitPrice());
+				}
+			}
+		} else {
+			LOGGER.warning("No valid items to allocate lastPrice for order " + dto.getOrderId());
+		}
+	}
+
+	private Date fromUnixTime(long timestamp) {
+		return timestamp <= 0 ? new Date() : new Date(timestamp * 1000);
+	}
+
+	public synchronized void saveOrUpdateOrder(OrderDTO dto) {
+		String orderNumber = dto.getOrderId().trim();
+		String platform = dto.geteCommerceType().trim();
+//        LOGGER.info("Saving/Updating TikTok order: orderNumber=" + orderNumber + ", platform=" + platform);
+
+		EcomOrder existing = ecomOrderService.findByCodeAndPlatform(orderNumber, platform);
+		EcomOrder order;
+
+		if (existing == null) {
+			order = new EcomOrder();
+			order.setOrderNumber(orderNumber);
+			order.setLoaitmdt(platform);
+			order.setCreatedAt(dto.getCreatedAt());
+			LOGGER.info("Creating new TikTok order: " + orderNumber);
+		} else {
+			order = ecomOrderService.findById(existing.getId());
+			if (order == null) {
+				order = new EcomOrder();
+				order.setOrderNumber(orderNumber);
+				order.setLoaitmdt(platform);
+				order.setCreatedAt(dto.getCreatedAt());
+				LOGGER.info("Order reloaded but not found, creating new TikTok order: " + orderNumber);
+			} else {
+				LOGGER.info("Updating existing TikTok order (reloaded): " + orderNumber);
+			}
+		}
+
+		order.setStatus(dto.getOrder_status());
+		order.setPrice(dto.getPrice());
+		order.setCustomerFirstName(dto.getCustomerFirstName());
+		order.setCustomerLastName(dto.getCustomerLastName());
+		order.setUpdatedAt(dto.getUpdatedAt());
+		order.setThoigiancapnhat(new Date());
+		order.setShippingFee(dto.getShippingFee());
+		order.setLastPrice(dto.getLastPrice()); // Lưu lastPrice đã tính
+
+		try {
+			if (existing == null) {
+				ecomOrderService.create(order);
+				LOGGER.info("Saved new TikTok order: " + orderNumber);
+			} else {
+				ecomOrderService.update(order);
+				LOGGER.info("Updated TikTok order: " + orderNumber);
+			}
+		} catch (StaleStateException e) {
+			LOGGER.warning("StaleStateException occurred for order: " + orderNumber + ", reloading and retrying...");
+			order = ecomOrderService.findById(order.getId());
+			if (order != null) {
+				order.setStatus(dto.getOrder_status());
+				order.setPrice(dto.getPrice());
+				order.setCustomerFirstName(dto.getCustomerFirstName());
+				order.setCustomerLastName(dto.getCustomerLastName());
+				order.setUpdatedAt(dto.getUpdatedAt());
+				order.setThoigiancapnhat(new Date());
+				order.setShippingFee(dto.getShippingFee());
+				order.setLastPrice(dto.getLastPrice());
+				ecomOrderService.update(order);
+				LOGGER.info("Retried and updated TikTok order: " + orderNumber);
+			} else {
+				LOGGER.info("Order not found after reload, creating new: " + orderNumber);
+				order = new EcomOrder();
+				order.setOrderNumber(orderNumber);
+				order.setLoaitmdt(platform);
+				order.setCreatedAt(dto.getCreatedAt());
+				order.setStatus(dto.getOrder_status());
+				order.setPrice(dto.getPrice());
+				order.setCustomerFirstName(dto.getCustomerFirstName());
+				order.setCustomerLastName(dto.getCustomerLastName());
+				order.setUpdatedAt(dto.getUpdatedAt());
+				order.setThoigiancapnhat(new Date());
+				order.setShippingFee(dto.getShippingFee());
+				order.setLastPrice(dto.getLastPrice());
+				ecomOrderService.create(order);
+				LOGGER.info("Saved new TikTok order after reload: " + orderNumber);
+			}
+		}
+
+		// Lấy danh sách chi tiết hiện có
+		List<EcomOrderDetail> existingDetails = ecomOrderDetailService.findByCodeAndPlatform(orderNumber, platform);
+		LOGGER.info("Found " + existingDetails.size() + " existing details for order: " + orderNumber);
+
+		// Cập nhật hoặc thêm chi tiết dựa trên orderItemId
+		for (OrderDetailDTO newDetail : dto.getOrderDetails()) {
+			boolean found = false;
+			for (EcomOrderDetail existingDetail : existingDetails) {
+				if (existingDetail.getOrderItemNumber() != null
+						&& existingDetail.getOrderItemNumber().equals(newDetail.getOrderItemId())) {
+					// Cập nhật chi tiết hiện có
+					existingDetail.setName(newDetail.getName());
+					existingDetail.setSku(newDetail.getSku());
+					existingDetail.setItemPrice(newDetail.getItemPrice());
+					existingDetail.setLoaitmdt(platform);
+					existingDetail.setVariant(newDetail.isVariant());
+					existingDetail.setSplitPrice(newDetail.getLastItemPrice()); // Cập nhật lastItemPrice
+					existingDetail.setUnitPrice(newDetail.getUnitPrice());
+					existingDetail.setQuantity(newDetail.getQuantity() != 0 ? newDetail.getQuantity() : 1);
+					ecomOrderDetailService.update(existingDetail);
+					LOGGER.info("Updated existing order detail: orderItemNumber=" + newDetail.getOrderItemId());
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				// Thêm chi tiết mới nếu không tìm thấy
+				EcomOrderDetail detail = new EcomOrderDetail();
+				detail.setOrder(order);
+				detail.setOrderId(orderNumber);
+				detail.setOrderItemNumber(newDetail.getOrderItemId());
+				detail.setName(newDetail.getName());
+				detail.setSku(newDetail.getSku());
+				detail.setItemPrice(newDetail.getItemPrice());
+				detail.setLoaitmdt(platform);
+				detail.setVariant(newDetail.isVariant());
+				detail.setSplitPrice(newDetail.getLastItemPrice()); // Cập nhật lastItemPrice
+				detail.setUnitPrice(newDetail.getUnitPrice());
+				detail.setQuantity(newDetail.getQuantity() != 0 ? newDetail.getQuantity() : 1);
+				ecomOrderDetailService.create(detail);
+				LOGGER.info("Saved new order detail: orderItemNumber=" + newDetail.getOrderItemId());
+			}
+		}
+	}
+
+	private String generateSignature(Request request, String secret) {
+		HttpUrl httpUrl = request.url();
+		List<String> params = new ArrayList<>(httpUrl.queryParameterNames());
+		params.removeIf(p -> p.equals("sign") || p.equals("access_token"));
+		Collections.sort(params);
+
+		StringBuilder paramStr = new StringBuilder(httpUrl.encodedPath());
+		for (String param : params) {
+			paramStr.append(param).append(httpUrl.queryParameter(param));
+		}
+
+		try {
+			okhttp3.RequestBody body = request.body();
+			if (body != null && !"multipart/form-data".equalsIgnoreCase(request.header("Content-Type"))) {
+				Buffer buffer = new Buffer();
+				body.writeTo(buffer);
+				paramStr.append(buffer.readString(StandardCharsets.UTF_8));
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("Error reading request body", e);
+		}
+
+		return hmacSHA256(secret + paramStr.toString() + secret, secret);
+	}
+
+	private String generateWebhookSignature(String rawBody, String secret, String appKey) {
+		return hmacSHA256(appKey + rawBody, secret);
+	}
+
+	private String hmacSHA256(String data, String key) {
+		try {
+			Mac mac = Mac.getInstance("HmacSHA256");
+			mac.init(new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+			byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+			StringBuilder hex = new StringBuilder();
+			for (byte b : hash) {
+				hex.append(String.format("%02x", b));
+			}
+			return hex.toString();
+		} catch (Exception e) {
+			throw new RuntimeException("Error generating signature", e);
+		}
+	}
+
+	private static TikTokAPIServlet instance = new TikTokAPIServlet();
+
+	public static TikTokAPIServlet getInstance() {
+		return instance;
+	}
+
+	public void setTikTokTokenManager(TikTokTokenManager manager) {
+		this.tokenManager = manager;
+	}
+}

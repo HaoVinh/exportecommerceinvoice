@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Jaspersoft Studio version 6.8.0.final using JasperReports Library version 6.8.0-2ed8dfabb690ff337a5797129f2cd92902b0c87b  -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="co_form_aj_2" pageWidth="595" pageHeight="842" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="e63a9a07-0358-4625-a9aa-aa7001028b5c">
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="One Empty Record"/>
+	<import value="lixco.com.common.FormatHandler"/>
+	<parameter name="reference_no" class="java.lang.String"/>
+	<parameter name="customer_name" class="java.lang.String"/>
+	<parameter name="address" class="java.lang.String"/>
+	<parameter name="harbor_name" class="java.lang.String"/>
+	<parameter name="country_en_name" class="java.lang.String"/>
+	<parameter name="etd_date_str" class="java.lang.String"/>
+	<parameter name="shipped_per" class="java.lang.String"/>
+	<parameter name="bill_no" class="java.lang.String"/>
+	<parameter name="product_list" class="java.lang.String"/>
+	<parameter name="netweight" class="Double"/>
+	<parameter name="grossweight" class="java.lang.Double"/>
+	<parameter name="foreign_total_amount" class="java.lang.Double"/>
+	<parameter name="list_voucher_code" class="java.lang.String"/>
+	<parameter name="invoice_date" class="java.lang.String"/>
+	<parameter name="list_left" class="java.lang.String"/>
+	<queryString>
+		<![CDATA[]]>
+	</queryString>
+	<group name="Group1">
+		<groupFooter>
+			<band height="183">
+				<property name="com.jaspersoft.studio.unit.height" value="px"/>
+				<staticText>
+					<reportElement positionType="Float" x="119" y="0" width="212" height="10" uuid="99ef3588-94fa-427e-9305-92ddd98d01a6"/>
+					<textElement verticalAlignment="Middle">
+						<font fontName="FontReport" size="8"/>
+					</textElement>
+					<text><![CDATA[VIET NAM]]></text>
+				</staticText>
+				<textField>
+					<reportElement positionType="Float" x="124" y="57" width="62" height="10" uuid="10912615-0212-499b-81cd-b6834bb30790"/>
+					<textElement verticalAlignment="Middle">
+						<font fontName="FontReport" size="8"/>
+					</textElement>
+					<textFieldExpression><![CDATA[$P{harbor_name}]]></textFieldExpression>
+				</textField>
+				<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+					<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="85" y="125" width="120" height="10" uuid="f496e51a-9943-4088-8ce7-2b1deb24ad4d"/>
+					<textElement verticalAlignment="Middle">
+						<font fontName="FontReport" size="8"/>
+					</textElement>
+					<textFieldExpression><![CDATA["HOCHIMINH CITY,"+$P{etd_date_str}]]></textFieldExpression>
+				</textField>
+				<staticText>
+					<reportElement x="0" y="180" width="554" height="2" uuid="ab2da96c-121c-4b03-addc-56f1af08b27d">
+						<property name="com.jaspersoft.studio.unit.height" value="px"/>
+					</reportElement>
+					<text><![CDATA[]]></text>
+				</staticText>
+			</band>
+		</groupFooter>
+	</group>
+	<background>
+		<band splitType="Stretch"/>
+	</background>
+	<detail>
+		<band height="608" splitType="Stretch">
+			<property name="com.jaspersoft.studio.unit.height" value="px"/>
+			<staticText>
+				<reportElement x="25" y="26" width="226" height="10" uuid="5538d13c-3a73-4157-baa2-d55748b4a366"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[LIX DETERGENT JOIN STOCK COMPANY]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="25" y="36" width="226" height="10" uuid="6741e7f3-38c1-49b6-ae01-6124ee1d923d"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[NO.3, STREET NO.2, LINH TRUNG, THỦ ĐỨC CITY,]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="25" y="47" width="226" height="10" uuid="22946e34-146f-4412-8fd8-c784bb87a611"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[HOCHIMINH  CITY VIETNAM]]></text>
+			</staticText>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="25" y="108" width="226" height="10" uuid="642b6c8c-ea3b-422a-8572-d491bf86d36f"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{customer_name}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="25" y="121" width="226" height="22" uuid="ebeeba36-8936-42ad-97ec-8d0354028b78"/>
+				<textElement verticalAlignment="Top">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{address}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="25" y="166" width="67" height="10" uuid="efe2cff7-43cf-4598-8c37-5448aee2b410"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[BY SEA,      FROM]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="92" y="166" width="5" height="10" uuid="f13b738c-a1b4-4b2b-b6f2-a7fcba0acf9b"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[:]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="97" y="166" width="154" height="10" uuid="0e85e89d-8cc0-4b6f-bd2d-b794f45cb71a"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[HOCHIMINH PORT]]></text>
+			</staticText>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement stretchType="RelativeToTallestObject" x="97" y="177" width="154" height="10" uuid="b0339481-9471-4a08-bd5e-78348b61f21c"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[($P{harbor_name}=="") ? "" :($P{harbor_name}+$P{country_en_name})]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="25" y="177" width="67" height="10" uuid="908b0700-8e4a-4275-99db-2475dbae759e"/>
+				<box rightPadding="6"/>
+				<textElement textAlignment="Right" verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[TO]]></text>
+			</staticText>
+			<staticText>
+				<reportElement x="92" y="177" width="5" height="10" uuid="3de752ba-d72d-413e-8d34-246243015fb1"/>
+				<textElement textAlignment="Center" verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[:]]></text>
+			</staticText>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement stretchType="RelativeToTallestObject" x="25" y="202" width="154" height="10" uuid="0e2f365e-09dd-4ce8-8c31-c6b2dbca8fa6"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{etd_date_str}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement stretchType="RelativeToTallestObject" x="25" y="235" width="154" height="10" uuid="322d1c2f-5726-40ab-80ff-f65e5ab5b2ac"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{shipped_per}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="25" y="246" width="30" height="10" uuid="53b2a679-f86b-4349-ab0a-70e2d45d4744">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[B/L No.]]></text>
+			</staticText>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement stretchType="RelativeToTallestObject" x="25" y="268" width="154" height="10" uuid="3caaa35a-47b4-450b-bd5f-a25ef72c47fa"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[($P{harbor_name}=="") ? "" :($P{harbor_name}+$P{country_en_name})]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement stretchType="RelativeToTallestObject" x="350" y="9" width="205" height="10" uuid="7ffc549a-fdb2-4911-9561-fab6d5f032ea"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{reference_no}]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="383" y="115" width="172" height="10" uuid="56cc9d0c-b4f3-48db-8df0-5690fb223c94"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[VIET NAM]]></text>
+			</staticText>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" isPrintRepeatedValues="false" x="24" y="356" width="87" height="21" uuid="659abf38-aa8f-4737-ab16-8fbd9f84be05"/>
+				<textElement verticalAlignment="Middle" markup="styled">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{list_left}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" isPrintRepeatedValues="false" x="125" y="356" width="212" height="21" isPrintWhenDetailOverflows="true" uuid="2768a7ff-d6da-4d88-ad7a-926b3ff2215f">
+					<property name="net.sf.jasperreports.text.truncate.at.char" value="true"/>
+					<property name="net.sf.jasperreports.print.keep.full.text" value="true"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle" markup="styled">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{product_list}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" isPrintRepeatedValues="false" x="465" y="356" width="67" height="10" uuid="9484ed4b-0e96-4226-9f71-8d86d855f3c8">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<textElement textAlignment="Right" verticalAlignment="Middle" markup="styled">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA["No."+$P{list_voucher_code}]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="465" y="367" width="67" height="10" uuid="062a91d6-6ed3-4212-9c6a-1eeb4dedd50c">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<textElement textAlignment="Left" verticalAlignment="Middle">
+					<font fontName="FontReport" size="7"/>
+				</textElement>
+				<textFieldExpression><![CDATA[("DATE: "+$P{invoice_date})]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement positionType="Float" x="125" y="398" width="212" height="10" uuid="f6ca8fa1-e3f6-454f-a961-fb8f11a434d6"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[CUSTOMS DECLARATION FOR EXPORTED]]></text>
+			</staticText>
+			<staticText>
+				<reportElement positionType="Float" x="125" y="408" width="212" height="10" uuid="c9db62ff-c827-42e8-bde1-0aa9c69bfb70"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<text><![CDATA[COMMODITIES]]></text>
+			</staticText>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="398" y="392" width="70" height="10" uuid="fdba1aa3-f010-41c6-915c-b442010c8d73"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[FormatHandler.getInstance().getNumberFormatEn($P{netweight},100)+" CTNS"]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="398" y="402" width="70" height="10" uuid="e6110f02-adbd-42cc-bec2-5412f532e1ee">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA["N.W:"+FormatHandler.getInstance().getNumberFormatEn($P{netweight},100)+" MTS"]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="398" y="412" width="70" height="10" uuid="589a9b3d-767a-4b30-9a9c-72910f7343ff"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA["G.W:"+FormatHandler.getInstance().getNumberFormatEn($P{grossweight},100)+" KGS"]]></textFieldExpression>
+			</textField>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement positionType="Float" stretchType="RelativeToTallestObject" x="398" y="422" width="70" height="10" uuid="f6eac5c4-c1ff-41c3-aa8e-8ace37129433"/>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA["FOB:"+FormatHandler.getInstance().getNumberFormatEn($P{foreign_total_amount},100)+" USD"]]></textFieldExpression>
+			</textField>
+			<staticText>
+				<reportElement x="0" y="606" width="555" height="2" uuid="1aaa4916-c1f3-4d80-982e-28b511ad9a05"/>
+				<text><![CDATA[]]></text>
+			</staticText>
+			<textField isStretchWithOverflow="true" isBlankWhenNull="true">
+				<reportElement stretchType="RelativeToTallestObject" x="55" y="246" width="124" height="10" uuid="b60fca72-0955-4254-9531-b209307f9577">
+					<property name="com.jaspersoft.studio.unit.width" value="px"/>
+				</reportElement>
+				<textElement verticalAlignment="Middle">
+					<font fontName="FontReport" size="8"/>
+				</textElement>
+				<textFieldExpression><![CDATA[$P{bill_no}]]></textFieldExpression>
+			</textField>
+		</band>
+	</detail>
+</jasperReport>
